@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    console.warn("[formalization/informal] No OPENROUTER_API_KEY — returning mock response.\n\n To generate real responses, add your OpenRouter API key to .env.local");
+    console.warn("[formalization/semiformal] No OPENROUTER_API_KEY — returning mock response.\n\n To generate real responses, add your OpenRouter API key to .env.local");
     return NextResponse.json({ proof: mockResponse(text) });
   }
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error("[formalization/informal] OpenRouter error:", response.status, errorBody);
+    console.error("[formalization/semiformal] OpenRouter error:", response.status, errorBody);
     return NextResponse.json(
       { error: `OpenRouter API error: ${response.status}`, details: errorBody },
       { status: 502 }
