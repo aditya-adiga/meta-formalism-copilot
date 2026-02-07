@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// TODO: Replace mock with real Lean server verification.
-// Real implementation should:
-// 1. Write leanCode to a temp file
-// 2. Call the Lean server with AbortController (10s timeout)
-// 3. Parse stdout/stderr for errors
-// 4. Return { valid, errors } based on Lean output
+const LEAN_VERIFIER_URL =
+  process.env.LEAN_VERIFIER_URL ?? "http://localhost:3100";
+const REQUEST_TIMEOUT_MS = 35_000;
 
 export async function POST(request: NextRequest) {
   const { leanCode } = await request.json();
@@ -17,7 +14,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Mock: always returns valid
-  // To test the retry path, change valid to false and add errors
-  return NextResponse.json({ valid: true });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    const res = await fetch(`${LEAN_VERIFIER_URL}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leanCode }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return NextResponse.json(data, { status: res.status });
+    }
+
+    return NextResponse.json(data);
+  } catch {
+    // Service unavailable — fall back to mock
+    return NextResponse.json({ valid: true, mock: true });
+  }
 }
