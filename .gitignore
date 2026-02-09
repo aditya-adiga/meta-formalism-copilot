@@ -39,8 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# verifier
-verifier/lean-project/.lake/
-verifier/node_modules/
-verifier/dist/
