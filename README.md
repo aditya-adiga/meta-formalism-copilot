@@ -31,12 +31,7 @@ Built with Next.js, TypeScript, and Tailwind CSS.
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 20+
-- Docker (for Lean 4 verification)
-
-### Install and run
+Install dependencies and run the development server:
 
 ```bash
 npm install
@@ -44,42 +39,6 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to use the application.
-
-### Lean Verification Service
-
-The app includes a Dockerized Lean 4 verification service. When running, submitted Lean code is type-checked by a real Lean 4 installation. When the service is not running, the app falls back to a mock response.
-
-**Start the verifier:**
-
-```bash
-docker compose up --build
-```
-
-The first build downloads the Lean 4 toolchain and caches it in the image, so it will take several minutes. Subsequent builds use the Docker cache and are fast.
-
-The verifier runs on port 3100. You can test it directly:
-
-```bash
-# Should return { "valid": true }
-curl -X POST http://localhost:3100/verify \
-  -H 'Content-Type: application/json' \
-  -d '{"leanCode":"theorem t : True := trivial"}'
-
-# Should return { "valid": false, "errors": "..." }
-curl -X POST http://localhost:3100/verify \
-  -H 'Content-Type: application/json' \
-  -d '{"leanCode":"theorem t : False := trivial"}'
-```
-
-**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment (defaults to `http://localhost:3100`).
-
-**Stop the verifier:**
-
-```bash
-docker compose down
-```
-
-The app continues to work without the verifier — the API route falls back to a mock `{ valid: true, mock: true }` response.
 
 ## Available Scripts
 

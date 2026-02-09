@@ -189,53 +189,6 @@ Output + AI Instruction → API (Edit) → Updated Output
 Context + Refinement Action → API (Refine) → Refined Context
 ```
 
-## Lean Verification Service
-
-The app includes a Dockerized Lean 4 verification service (`verifier/`) that type-checks Lean code.
-
-### Request Flow
-
-```
-Next.js route (POST /api/verification/lean)
-  → POST http://localhost:3100/verify { leanCode }
-  ← { valid: true/false, errors?: string }
-
-If verifier is unavailable:
-  ← fallback mock { valid: true, mock: true }
-```
-
-### Verifier Structure
-
-```
-verifier/
-├── Dockerfile           # Ubuntu 22.04 + Node.js 20 + elan/Lean 4
-├── server.ts            # Express server (/health, /verify)
-├── package.json
-├── tsconfig.json
-└── lean-project/
-    ├── lean-toolchain   # leanprover/lean4:v4.14.0
-    ├── lakefile.lean    # Minimal Lake project (Verify lib target)
-    └── Verify.lean      # Overwritten per verification request
-```
-
-### How It Works
-
-1. `POST /verify` receives `{ leanCode }`.
-2. Server writes `leanCode` to `lean-project/Verify.lean`.
-3. Runs `lake build` with a 30-second timeout.
-4. Exit code 0 → `{ valid: true }`. Non-zero → `{ valid: false, errors }`.
-
-A mutex serializes `lake build` calls (shared filesystem). Queue capped at 3; excess requests get 503.
-
-### Running
-
-```bash
-docker compose up --build   # First build is slow (downloads Lean toolchain)
-docker compose down         # Stop; app falls back to mock
-```
-
-Plain Lean 4 only (no Mathlib). Mathlib support is planned for a future iteration.
-
 ## Key Technical Decisions
 
 **Why feature-based structure?**
