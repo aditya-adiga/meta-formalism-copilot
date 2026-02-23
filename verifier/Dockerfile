@@ -19,19 +19,15 @@ RUN useradd -m -s /bin/bash lean
 USER lean
 WORKDIR /home/lean
 
-# Install elan (Lean version manager)
-RUN curl https://elan.lean-lang.org/install.sh -sSf | bash -s -- --default-toolchain none -y
-ENV PATH="/home/lean/.elan/bin:${PATH}"
-
-# Copy Lake project and install toolchain
+# Install elan (Lean version manager), toolchain, and warm up Lake in one layer
+# so the PATH update from elan's installer is visible to subsequent commands
 COPY --chown=lean:lean lean-project/ /home/lean/lean-project/
-WORKDIR /home/lean/lean-project
+RUN curl https://elan.lean-lang.org/install.sh -sSf | bash -s -- --default-toolchain none -y \
+    && export PATH="/home/lean/.elan/bin:${PATH}" \
+    && elan toolchain install $(cat /home/lean/lean-project/lean-toolchain) \
+    && cd /home/lean/lean-project && lake build
 
-# Install the toolchain specified in lean-toolchain
-RUN elan toolchain install $(cat lean-toolchain)
-
-# Warmup: run lake build to cache Lake infrastructure
-RUN lake build
+ENV PATH="/home/lean/.elan/bin:${PATH}"
 
 # Copy server code
 WORKDIR /home/lean/verifier
