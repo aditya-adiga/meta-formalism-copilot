@@ -11,9 +11,12 @@ type OutputPanelProps = {
   semiformalText: string;
   onSemiformalTextChange: (value: string) => void;
   leanCode: string;
-  loadingPhase: "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying";
+  onLeanCodeChange: (code: string) => void;
+  loadingPhase: "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
   verificationStatus: VerificationStatus;
   verificationErrors: string;
+  onReVerify: () => void;
+  onLeanIterate: (instruction: string) => void;
 };
 
 function VerificationBadge({ status }: { status: VerificationStatus }) {
@@ -27,7 +30,7 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
   return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
 }
 
-export default function OutputPanel({ semiformalText, onSemiformalTextChange, leanCode, loadingPhase, verificationStatus, verificationErrors }: OutputPanelProps) {
+export default function OutputPanel({ semiformalText, onSemiformalTextChange, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -108,8 +111,8 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
         />
       </div>
 
-      {/* Lean4 code section — read-only */}
-      {(leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying") && (
+      {/* Lean4 code section */}
+      {(leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying" || loadingPhase === "iterating") && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t-2 border-[var(--ink-black)]">
           <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
@@ -122,7 +125,15 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
               Generating Lean4 code...
             </div>
           ) : (
-            <LeanCodeDisplay code={leanCode} verificationStatus={verificationStatus} verificationErrors={verificationErrors} />
+            <LeanCodeDisplay
+              code={leanCode}
+              verificationStatus={verificationStatus}
+              verificationErrors={verificationErrors}
+              onCodeChange={onLeanCodeChange}
+              onReVerify={onReVerify}
+              onIterate={onLeanIterate}
+              iterating={loadingPhase === "iterating" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+            />
           )}
         </div>
       )}
