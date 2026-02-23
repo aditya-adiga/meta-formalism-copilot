@@ -96,7 +96,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       )}
 
       {/* Semiformal proof section — editable */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Semiformal Proof
@@ -109,6 +109,8 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
           renderMode={renderMode}
           onToggleEdit={handleToggleEdit}
         />
+        {/* Floating bar anchored to the bottom of this section */}
+        {semiformalText && !editing && <WholeTextEditBar onApply={handleWholeTextEdit} />}
       </div>
 
       {/* Lean4 code section */}
@@ -138,8 +140,6 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
         </div>
       )}
 
-      {/* Floating bottom bar for editing whole semiformal text */}
-      {semiformalText && !editing && <WholeTextEditBar onApply={handleWholeTextEdit} />}
     </div>
   );
 }
