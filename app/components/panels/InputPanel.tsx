@@ -2,7 +2,23 @@ import ContextInput from "@/app/components/features/context-input/ContextInput";
 import FileUpload from "@/app/components/features/source-input/FileUpload";
 import TextInput from "@/app/components/features/source-input/TextInput";
 
-export default function InputPanel() {
+type InputPanelProps = {
+  sourceText: string;
+  onSourceTextChange: (value: string) => void;
+  contextText: string;
+  onContextTextChange: (value: string) => void;
+  onFormalise: () => void;
+  loading: boolean;
+};
+
+export default function InputPanel({
+  sourceText,
+  onSourceTextChange,
+  contextText,
+  onContextTextChange,
+  onFormalise,
+  loading,
+}: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Top Section: Source Inputs */}
@@ -13,7 +29,7 @@ export default function InputPanel() {
           </h2>
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-6">
-          <TextInput />
+          <TextInput value={sourceText} onChange={onSourceTextChange} />
           <FileUpload />
         </div>
       </div>
@@ -25,7 +41,12 @@ export default function InputPanel() {
             Formalism Context
           </h2>
         </div>
-        <ContextInput />
+        <ContextInput
+          value={contextText}
+          onChange={onContextTextChange}
+          onFormalise={onFormalise}
+          loading={loading}
+        />
       </div>
     </div>
   );
