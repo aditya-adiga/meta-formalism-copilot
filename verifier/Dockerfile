@@ -22,7 +22,7 @@ WORKDIR /home/lean
 # Install elan (Lean version manager), toolchain, and warm up Lake in one layer
 # so the PATH update from elan's installer is visible to subsequent commands
 COPY --chown=lean:lean lean-project/ /home/lean/lean-project/
-RUN curl https://elan.lean-lang.org/install.sh -sSf | bash -s -- --default-toolchain none -y \
+RUN curl https://elan.lean-lang.org/elan-init.sh -sSf | bash -s -- --default-toolchain none -y \
     && export PATH="/home/lean/.elan/bin:${PATH}" \
     && elan toolchain install $(cat /home/lean/lean-project/lean-toolchain) \
     && cd /home/lean/lean-project && lake build
