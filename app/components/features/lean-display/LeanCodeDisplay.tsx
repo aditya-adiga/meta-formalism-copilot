@@ -79,9 +79,16 @@ export default function LeanCodeDisplay({
         )}
 
         {editMode === "rendered" ? (
-          <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--ink-black)]">
-            {code}
-          </pre>
+          <>
+            {verificationStatus === "invalid" && (
+              <p className="mb-2 font-mono text-xs text-[#6B6560]">
+                {code.length} chars · {code.split("\n").length} lines submitted to verifier
+              </p>
+            )}
+            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--ink-black)]">
+              {code}
+            </pre>
+          </>
         ) : (
           <textarea
             ref={textareaRef}
@@ -99,7 +106,7 @@ export default function LeanCodeDisplay({
           <div className="mt-4 rounded border border-red-300 bg-red-50 px-4 py-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
-                Verification Errors
+                lake build output
               </h3>
               <button
                 onClick={onReVerify}
@@ -109,7 +116,7 @@ export default function LeanCodeDisplay({
                 Re-verify
               </button>
             </div>
-            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
               {verificationErrors}
             </pre>
           </div>

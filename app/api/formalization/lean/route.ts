@@ -22,6 +22,14 @@ Guidelines:
 - Address all verification errors
 - Return only the corrected Lean4 code with no additional commentary`;
 
+/** Strip markdown code fences that LLMs sometimes wrap around Lean output.
+ *  Handles ```lean ... ```, ```lean4 ... ```, and plain ``` ... ```. */
+function extractLeanCode(raw: string): string {
+  const fenced = raw.match(/```(?:lean4?|)[\r\n]([\s\S]*?)```/i);
+  if (fenced) return fenced[1].trim();
+  return raw.trim();
+}
+
 function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
@@ -56,8 +64,8 @@ export async function POST(request: NextRequest) {
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
     });
-    const leanCode = message.content[0].type === "text" ? message.content[0].text : "";
-    return NextResponse.json({ leanCode });
+    const raw = message.content[0].type === "text" ? message.content[0].text : "";
+    return NextResponse.json({ leanCode: extractLeanCode(raw) });
   }
 
   const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 
   const data = await response.json();
-  const leanCode = data.choices?.[0]?.message?.content ?? "";
+  const raw = data.choices?.[0]?.message?.content ?? "";
 
-  return NextResponse.json({ leanCode });
+  return NextResponse.json({ leanCode: extractLeanCode(raw) });
 }
