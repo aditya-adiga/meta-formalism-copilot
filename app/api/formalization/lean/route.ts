@@ -36,13 +36,16 @@ theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
 }
 
 export async function POST(request: NextRequest) {
-  const { informalProof, previousAttempt, errors } = await request.json();
+  const { informalProof, previousAttempt, errors, instruction } = await request.json();
 
   const isRetry = Boolean(previousAttempt && errors);
   const systemPrompt = isRetry ? RETRY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
-  const userContent = isRetry
+  let userContent = isRetry
     ? `Original proof:\n${informalProof}\n\nPrevious Lean4 attempt:\n${previousAttempt}\n\nVerification errors:\n${errors}`
     : informalProof;
+  if (instruction) {
+    userContent += `\n\nAdditional instruction: ${instruction}`;
+  }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
