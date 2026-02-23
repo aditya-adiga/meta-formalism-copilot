@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
@@ -29,6 +29,16 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
 
 export default function OutputPanel({ semiformalText, onSemiformalTextChange, leanCode, loadingPhase, verificationStatus, verificationErrors }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
+  const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
+
+  // Switch back to rendered view whenever new semiformal content arrives
+  useEffect(() => {
+    if (semiformalText) setRenderMode("rendered");
+  }, [semiformalText]);
+
+  const handleToggleEdit = useCallback(() => {
+    setRenderMode((m) => (m === "rendered" ? "raw" : "rendered"));
+  }, []);
 
   const handleInlineEdit = useCallback(async (instruction: string, selection: { start: number; end: number; text: string }) => {
     setEditing(true);
@@ -41,6 +51,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       const data = await response.json();
       if (response.ok) {
         onSemiformalTextChange(data.text);
+        setRenderMode("rendered");
       } else {
         console.error("[inline edit]", data.error);
       }
@@ -62,6 +73,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       const data = await response.json();
       if (response.ok) {
         onSemiformalTextChange(data.text);
+        setRenderMode("rendered");
       } else {
         console.error("[whole edit]", data.error);
       }
@@ -91,6 +103,8 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
           value={semiformalText}
           onChange={onSemiformalTextChange}
           onInlineEdit={handleInlineEdit}
+          renderMode={renderMode}
+          onToggleEdit={handleToggleEdit}
         />
       </div>
 
