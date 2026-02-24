@@ -53,7 +53,8 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       });
       const data = await response.json();
       if (response.ok) {
-        onSemiformalTextChange(data.text);
+        const newText = semiformalText.slice(0, selection.start) + data.text + semiformalText.slice(selection.end);
+        onSemiformalTextChange(newText);
         setRenderMode("rendered");
       } else {
         console.error("[inline edit]", data.error);
