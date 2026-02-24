@@ -10,6 +10,8 @@ type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 type OutputPanelProps = {
   semiformalText: string;
   onSemiformalTextChange: (value: string) => void;
+  semiformalDirty: boolean;
+  onRegenerateLean: () => void;
   leanCode: string;
   onLeanCodeChange: (code: string) => void;
   loadingPhase: "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
@@ -30,7 +32,7 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
   return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
 }
 
-export default function OutputPanel({ semiformalText, onSemiformalTextChange, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
+export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -117,11 +119,19 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       {/* Lean4 code section */}
       {(leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying" || loadingPhase === "iterating") && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t-2 border-[var(--ink-black)]">
-          <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
+          <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
               Lean4 Code
               <VerificationBadge status={verificationStatus} />
             </h2>
+            {semiformalDirty && loadingPhase === "idle" && (
+              <button
+                onClick={onRegenerateLean}
+                className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
+              >
+                Semiformal changed — Regenerate ↺
+              </button>
+            )}
           </div>
           {loadingPhase === "lean" && !leanCode ? (
             <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">

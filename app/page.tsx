@@ -36,14 +36,21 @@ export default function Home() {
   const [contextText, setContextText] = useState("");
   const [semiformalText, setSemiformalText] = useState("");
   const [leanCode, setLeanCode] = useState("");
+  const [semiformalDirty, setSemiformalDirty] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("none");
   const [verificationErrors, setVerificationErrors] = useState("");
+
+  const handleSemiformalTextChange = useCallback((text: string) => {
+    setSemiformalText(text);
+    setSemiformalDirty((prev) => prev || leanCode !== "");
+  }, [leanCode]);
 
   const handleFormalise = useCallback(async () => {
     setLoadingPhase("semiformal");
     setSemiformalText("");
     setLeanCode("");
+    setSemiformalDirty(false);
     setVerificationStatus("none");
     setVerificationErrors("");
 
@@ -129,6 +136,7 @@ export default function Home() {
   /** LLM-guided iteration: regenerate Lean code with an optional instruction, then re-verify. */
   const handleLeanIterate = useCallback(async (instruction: string) => {
     if (!semiformalText) return;
+    setSemiformalDirty(false);
     setLoadingPhase("iterating");
     setVerificationStatus("verifying");
     setVerificationErrors("");
@@ -146,6 +154,10 @@ export default function Home() {
     }
   }, [semiformalText, leanCode, verificationErrors]);
 
+  const handleRegenerateLean = useCallback(() => {
+    handleLeanIterate("");
+  }, [handleLeanIterate]);
+
   return (
     <main className="relative grid h-screen grid-cols-2 gap-px overflow-hidden bg-[var(--ivory-cream)]">
       <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Input panel">
@@ -161,7 +173,9 @@ export default function Home() {
       <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">
         <OutputPanel
           semiformalText={semiformalText}
-          onSemiformalTextChange={setSemiformalText}
+          onSemiformalTextChange={handleSemiformalTextChange}
+          semiformalDirty={semiformalDirty}
+          onRegenerateLean={handleRegenerateLean}
           leanCode={leanCode}
           onLeanCodeChange={setLeanCode}
           loadingPhase={loadingPhase}
