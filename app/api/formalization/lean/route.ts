@@ -2,8 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = "ai-mo/kimina-prover-72b";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+// const OPENROUTER_MODEL = "ai-mo/kimina-prover-72b";
+const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6"; // is there a reason for using sonnet instead of opus here?
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
