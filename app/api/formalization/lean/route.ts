@@ -27,27 +27,8 @@ Guidelines:
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
-const LEAN_SCHEMA = {
-  type: "object",
-  properties: {
-    lean_code: {
-      type: "string",
-      description: "Valid Lean4 code. Must begin with 'import Mathlib'.",
-      pattern: "^import Mathlib",
-    },
-  },
-  required: ["lean_code"],
-  additionalProperties: false,
-};
-
-/** Guarantee the code starts with 'import Mathlib' even if the model ignores the pattern. */
-function ensureImportMathlib(code: string): string {
-  const trimmed = code.trim();
-  return trimmed.startsWith("import Mathlib") ? trimmed : `import Mathlib\n\n${trimmed}`;
-}
-
-/** Fallback for when the provider ignores response_format and returns a plain string.
- *  Strips markdown code fences that models sometimes wrap around Lean output. */
+/** Strip markdown code fences that LLMs sometimes wrap around Lean output.
+ *  Handles ```lean ... ```, ```lean4 ... ```, and plain ``` ... ```. */
 function extractLeanCode(raw: string): string {
   const fenced = raw.match(/```(?:lean4?|)[\r\n]([\s\S]*?)```/i);
   if (fenced) return fenced[1].trim();
@@ -85,17 +66,9 @@ export async function POST(request: NextRequest) {
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...({ output_config: { format: { type: "json_schema", schema: LEAN_SCHEMA } } } as any),
     });
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    let leanCode: string;
-    try {
-      leanCode = (JSON.parse(raw) as { lean_code?: string }).lean_code ?? raw;
-    } catch {
-      leanCode = extractLeanCode(raw);
-    }
-    return NextResponse.json({ leanCode: ensureImportMathlib(leanCode) });
+    return NextResponse.json({ leanCode: extractLeanCode(raw) });
   }
 
   const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -116,10 +89,6 @@ export async function POST(request: NextRequest) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: "lean_output", strict: true, schema: LEAN_SCHEMA },
-      },
     }),
   });
 
@@ -134,12 +103,6 @@ export async function POST(request: NextRequest) {
 
   const data = await response.json();
   const raw = data.choices?.[0]?.message?.content ?? "";
-  let leanCode: string;
-  try {
-    leanCode = (JSON.parse(raw) as { lean_code?: string }).lean_code ?? raw;
-  } catch {
-    leanCode = extractLeanCode(raw);
-  }
 
-  return NextResponse.json({ leanCode: ensureImportMathlib(leanCode) });
+  return NextResponse.json({ leanCode: extractLeanCode(raw) });
 }
