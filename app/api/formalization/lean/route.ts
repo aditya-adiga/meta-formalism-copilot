@@ -7,19 +7,23 @@ const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
+The verifier uses plain Lean4 (no Mathlib). Do not use \`import Mathlib\` or any external library imports.
+
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Include necessary imports (e.g. import Mathlib)
-- Use tactic-style proofs where appropriate
+- Do not import Mathlib or any external packages; use only built-in Lean4 constructs
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by decide\`, \`by exact\`, \`by intro\`)
 - Return only the Lean4 code with no additional commentary`;
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
+The verifier uses plain Lean4 (no Mathlib). Do not use \`import Mathlib\` or any external library imports.
+
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Include necessary imports (e.g. import Mathlib)
-- Use tactic-style proofs where appropriate
-- Address all verification errors
+- Do not import Mathlib or any external packages; use only built-in Lean4 constructs
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by decide\`, \`by exact\`, \`by intro\`)
+- Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
 /** Strip markdown code fences that LLMs sometimes wrap around Lean output.
@@ -35,12 +39,8 @@ function mockResponse(informalProof: string, isRetry: boolean): string {
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
 -- From: "${snippet}${informalProof.length > 60 ? "..." : ""}"
 
-import Mathlib
-
-theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
-  exact ⟨hp, hq⟩
-
-#check example_formalization`;
+theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q :=
+  ⟨hp, hq⟩`;
 }
 
 export async function POST(request: NextRequest) {
