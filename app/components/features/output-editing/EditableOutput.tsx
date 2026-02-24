@@ -117,11 +117,8 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
   }, [activeSelection, activeShowPopup]);
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="relative flex-1 overflow-auto px-8 py-10"
-    >
-      {/* Toggle button — top right of the pane */}
+    <div className="relative flex-1 min-h-0 overflow-hidden">
+      {/* Toggle button — floats at top-right, outside the scroll container */}
       {(value || renderMode === "raw") && (
         <button
           onClick={onToggleEdit}
@@ -131,6 +128,11 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
           {renderMode === "rendered" ? "Edit" : "Done editing"}
         </button>
       )}
+
+      <div
+        ref={scrollContainerRef}
+        className="h-full overflow-auto px-8 py-10"
+      >
 
       {renderMode === "rendered" ? (
         /* ── Rendered LaTeX view ── */
@@ -176,6 +178,7 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

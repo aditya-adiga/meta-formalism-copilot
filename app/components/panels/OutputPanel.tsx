@@ -122,16 +122,26 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
           <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
               Lean4 Code
-              <VerificationBadge status={verificationStatus} />
             </h2>
-            {semiformalDirty && loadingPhase === "idle" && (
-              <button
-                onClick={onRegenerateLean}
-                className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
-              >
-                Semiformal changed — Regenerate ↺
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <VerificationBadge status={verificationStatus} />
+              {verificationStatus === "invalid" && loadingPhase === "idle" && (
+                <button
+                  onClick={() => onLeanIterate("")}
+                  className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
+                >
+                  Verification failed — Fix with AI ↺
+                </button>
+              )}
+              {semiformalDirty && loadingPhase === "idle" && (
+                <button
+                  onClick={onRegenerateLean}
+                  className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
+                >
+                  Semiformal changed — Regenerate ↺
+                </button>
+              )}
+            </div>
           </div>
           {loadingPhase === "lean" && !leanCode ? (
             <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
