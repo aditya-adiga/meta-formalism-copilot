@@ -7,22 +7,22 @@ const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
-The verifier uses plain Lean4 (no Mathlib). Do not use \`import Mathlib\` or any external library imports.
+The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
 
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Do not import Mathlib or any external packages; use only built-in Lean4 constructs
-- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by decide\`, \`by exact\`, \`by intro\`)
+- Start with \`import Mathlib\`
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
 - Return only the Lean4 code with no additional commentary`;
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
-The verifier uses plain Lean4 (no Mathlib). Do not use \`import Mathlib\` or any external library imports.
+The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
 
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Do not import Mathlib or any external packages; use only built-in Lean4 constructs
-- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by decide\`, \`by exact\`, \`by intro\`)
+- Start with \`import Mathlib\`
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
@@ -38,6 +38,8 @@ function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
 -- From: "${snippet}${informalProof.length > 60 ? "..." : ""}"
+
+import Mathlib
 
 theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q :=
   ⟨hp, hq⟩`;
