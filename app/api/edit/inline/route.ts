@@ -1,17 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
+
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324";
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
-
-const SYSTEM_PROMPT = "You are an editing assistant. The user will give you a full text document and a selected portion. Apply the user's instruction ONLY to the selected portion, keeping the rest unchanged. Return the complete edited document with no additional commentary.";
+const SYSTEM_PROMPT = "You are an editing assistant. The user will give you a full text document and a selected portion. Apply the user's instruction ONLY to the selected portion and return only the edited version of the selected text, with no additional commentary.";
 
 function mockResponse(fullText: string, selection: { start: number; end: number; text: string }, instruction: string): string {
-  const before = fullText.slice(0, selection.start);
-  const after = fullText.slice(selection.end);
   const mockEdit = `[mock edit: "${instruction}" applied to "${selection.text.slice(0, 40)}${selection.text.length > 40 ? "..." : ""}"]`;
-  return before + mockEdit + after;
+  return mockEdit;
 }
 
 export async function POST(request: NextRequest) {
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
     const client = new Anthropic({ apiKey: anthropicKey });
     const message = await client.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 4096,
+      max_tokens: 4096, // might be a good idea to think about how to set this based on the context of the document and the instruction
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
     });
