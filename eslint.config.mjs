@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Lean verifier is a separate Node.js project compiled by its own tsconfig.
+    // Its compiled dist/ output uses CommonJS require() which would fail this lint.
+    "verifier/**",
   ]),
 ]);
 
