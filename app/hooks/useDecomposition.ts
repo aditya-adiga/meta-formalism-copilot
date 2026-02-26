@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { DecompositionState, PropositionNode } from "@/app/lib/types/decomposition";
+import type { LlmUsage } from "@/app/lib/types/analytics";
 
 const INITIAL_STATE: DecompositionState = {
   nodes: [],
@@ -16,7 +17,7 @@ export function useDecomposition() {
   const selectedNode: PropositionNode | null =
     state.nodes.find((n) => n.id === state.selectedNodeId) ?? null;
 
-  const extractPropositions = useCallback(async (text: string) => {
+  const extractPropositions = useCallback(async (text: string, onUsage?: (usage: LlmUsage) => void) => {
     setState((prev) => ({ ...prev, paperText: text, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
     try {
       const res = await fetch("/api/decomposition/extract", {
@@ -26,6 +27,7 @@ export function useDecomposition() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Extraction failed");
+      if (data._usage && onUsage) onUsage(data._usage);
 
       // API returns partial nodes without client-side fields; fill defaults
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

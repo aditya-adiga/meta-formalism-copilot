@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
+import type { LlmUsage } from "@/app/lib/types/analytics";
 import PanelShell from "@/app/components/layout/PanelShell";
 import SourcePanel from "@/app/components/panels/SourcePanel";
 import ContextPanel from "@/app/components/panels/ContextPanel";
@@ -9,7 +10,9 @@ import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
+import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
+import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import {
   SourceIcon,
@@ -18,23 +21,13 @@ import {
   LeanIcon,
   GraphIcon,
   NodeDetailIcon,
+  AnalyticsIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
 type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 const MAX_LEAN_ATTEMPTS = 3;
-
-async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
-  const res = await fetch("/api/formalization/lean", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ informalProof, previousAttempt, errors, instruction, contextLeanCode }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Lean generation failed");
-  return data.leanCode as string;
-}
 
 async function verifyLean(leanCode: string) {
   const res = await fetch("/api/verification/lean", {
@@ -44,6 +37,23 @@ async function verifyLean(leanCode: string) {
   });
   const data = await res.json();
   return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
+}
+
+/** Fetch a JSON API route and extract _usage if present. */
+async function fetchWithUsage<T>(
+  url: string,
+  body: Record<string, unknown>,
+  onUsage?: (usage: LlmUsage) => void,
+): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Request failed");
+  if (data._usage && onUsage) onUsage(data._usage);
+  return data as T;
 }
 
 export default function Home() {
@@ -60,6 +70,9 @@ export default function Home() {
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("none");
   const [verificationErrors, setVerificationErrors] = useState("");
+
+  // --- Analytics ---
+  const { entries: analyticsEntries, summary: analyticsSummary, recordUsage, clearAnalytics } = useAnalytics();
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode } = useDecomposition();
@@ -80,6 +93,17 @@ export default function Home() {
   const combinedPaperText = useMemo(() => {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
+
+  // --- LLM call helpers that record usage ---
+
+  async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
+    const data = await fetchWithUsage<{ leanCode: string }>(
+      "/api/formalization/lean",
+      { informalProof, previousAttempt, errors, instruction, contextLeanCode },
+      recordUsage,
+    );
+    return data.leanCode;
+  }
 
   // --- Handlers ---
 
@@ -111,17 +135,12 @@ export default function Home() {
     setActivePanelId("semiformal");
 
     try {
-      const semiformalRes = await fetch("/api/formalization/semiformal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: combinedPaperText }),
-      });
-      const semiformalData = await semiformalRes.json();
-      if (!semiformalRes.ok) {
-        setSemiformalText(`Error: ${semiformalData.error ?? "Unknown error"}`);
-        return;
-      }
-      const proof = semiformalData.proof as string;
+      const semiformalData = await fetchWithUsage<{ proof: string }>(
+        "/api/formalization/semiformal",
+        { text: combinedPaperText },
+        recordUsage,
+      );
+      const proof = semiformalData.proof;
       setSemiformalText(proof);
 
       setLoadingPhase("lean");
@@ -160,7 +179,8 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [combinedPaperText, semiformalText, leanCode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combinedPaperText, semiformalText, leanCode, recordUsage]);
 
   /** Per-node formalization (decomposition mode) */
   const handleNodeFormalise = useCallback(async () => {
@@ -174,17 +194,12 @@ export default function Home() {
       const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
 
       // Step 1: semiformal proof
-      const semiformalRes = await fetch("/api/formalization/semiformal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: nodeText }),
-      });
-      const semiformalData = await semiformalRes.json();
-      if (!semiformalRes.ok) {
-        updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: semiformalData.error ?? "Unknown error" });
-        return;
-      }
-      const proof = semiformalData.proof as string;
+      const semiformalData = await fetchWithUsage<{ proof: string }>(
+        "/api/formalization/semiformal",
+        { text: nodeText },
+        recordUsage,
+      );
+      const proof = semiformalData.proof;
       updateNode(selectedNode.id, { semiformalProof: proof });
 
       // Step 2: Lean generation with dependency context
@@ -229,7 +244,8 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [selectedNode, decomp.nodes, updateNode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNode, decomp.nodes, updateNode, recordUsage]);
 
   const handleReVerify = useCallback(async () => {
     const code = isDecompMode && selectedNode ? selectedNode.leanCode : leanCode;
@@ -332,7 +348,8 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode, recordUsage]);
 
   const handleRegenerateLean = useCallback(() => {
     handleLeanIterate("");
@@ -341,9 +358,9 @@ export default function Home() {
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
     if (combinedPaperText.trim()) {
-      extractPropositions(combinedPaperText);
+      extractPropositions(combinedPaperText, recordUsage);
     }
-  }, [combinedPaperText, extractPropositions]);
+  }, [combinedPaperText, extractPropositions, recordUsage]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
@@ -412,7 +429,15 @@ export default function Home() {
             ? "Code ready"
             : "No code yet",
     },
-  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
+    {
+      id: "analytics" as PanelId,
+      label: "LLM Usage",
+      icon: <AnalyticsIcon />,
+      statusSummary: analyticsSummary.totalCalls > 0
+        ? `${analyticsSummary.totalCalls} calls`
+        : "No calls yet",
+    },
+  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode, analyticsSummary.totalCalls]);
 
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
@@ -469,6 +494,13 @@ export default function Home() {
         loading={loadingPhase !== "idle"}
       />
     ) : undefined,
+    analytics: (
+      <AnalyticsPanel
+        entries={analyticsEntries}
+        summary={analyticsSummary}
+        onClear={clearAnalytics}
+      />
+    ),
   }), [
     sourceText, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
@@ -477,6 +509,7 @@ export default function Home() {
     handleFormalise, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
     handleSelectNode, handleDecompose, handleNodeFormalise,
+    analyticsEntries, analyticsSummary, clearAnalytics,
   ]);
 
   return (
