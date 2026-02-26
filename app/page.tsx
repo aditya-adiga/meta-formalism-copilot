@@ -33,6 +33,7 @@ async function verifyLean(leanCode: string) {
 
 export default function Home() {
   const [sourceText, setSourceText] = useState("");
+  const [extractedFiles, setExtractedFiles] = useState<{ name: string; text: string }[]>([]);
   const [contextText, setContextText] = useState("");
   const [semiformalText, setSemiformalText] = useState("");
   const [leanCode, setLeanCode] = useState("");
@@ -55,11 +56,19 @@ export default function Home() {
     setVerificationErrors("");
 
     try {
+      // Combine user text with extracted file contents for the API
+      const combinedText = [
+        sourceText,
+        ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       // Step 1: Generate semiformal proof
       const semiformalRes = await fetch("/api/formalization/semiformal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: sourceText }),
+        body: JSON.stringify({ text: combinedText }),
       });
       const semiformalData = await semiformalRes.json();
       if (!semiformalRes.ok) {
@@ -113,7 +122,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [sourceText, semiformalText, leanCode]);
+  }, [sourceText, extractedFiles, semiformalText, leanCode]);
 
   /** Re-run verification on whatever Lean code is currently in the box. */
   const handleReVerify = useCallback(async () => {
@@ -168,6 +177,7 @@ export default function Home() {
           onContextTextChange={setContextText}
           onFormalise={handleFormalise}
           loading={loadingPhase !== "idle"}
+          onFilesChanged={setExtractedFiles}
         />
       </section>
       <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">

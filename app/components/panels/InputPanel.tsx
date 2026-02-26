@@ -9,6 +9,7 @@ type InputPanelProps = {
   onContextTextChange: (value: string) => void;
   onFormalise: () => void;
   loading: boolean;
+  onFilesChanged: (files: { name: string; text: string }[]) => void;
 };
 
 export default function InputPanel({
@@ -18,6 +19,7 @@ export default function InputPanel({
   onContextTextChange,
   onFormalise,
   loading,
+  onFilesChanged,
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -30,7 +32,7 @@ export default function InputPanel({
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-6">
           <TextInput value={sourceText} onChange={onSourceTextChange} />
-          <FileUpload />
+          <FileUpload onFilesChanged={onFilesChanged} />
         </div>
       </div>
 
