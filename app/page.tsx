@@ -376,6 +376,21 @@ export default function Home() {
       statusSummary: contextText ? "Context defined" : "No context",
     },
     {
+      id: "graph" as PanelId,
+      label: "Proof Graph",
+      icon: <GraphIcon />,
+      statusSummary: hasDecomp
+        ? `${decomp.nodes.filter((n) => n.verificationStatus === "verified").length}/${decomp.nodes.length} verified`
+        : "No graph",
+    },
+    {
+      id: "node-detail" as PanelId,
+      label: "Node Detail",
+      icon: <NodeDetailIcon />,
+      statusSummary: selectedNode ? selectedNode.label : "",
+      hidden: !selectedNode,
+    },
+    {
       id: "semiformal" as PanelId,
       label: "Semiformal Proof",
       icon: <SemiformalIcon />,
@@ -396,21 +411,6 @@ export default function Home() {
           : activeLeanCode
             ? "Code ready"
             : "No code yet",
-    },
-    {
-      id: "graph" as PanelId,
-      label: "Proof Graph",
-      icon: <GraphIcon />,
-      statusSummary: hasDecomp
-        ? `${decomp.nodes.filter((n) => n.verificationStatus === "verified").length}/${decomp.nodes.length} verified`
-        : "No graph",
-    },
-    {
-      id: "node-detail" as PanelId,
-      label: "Node Detail",
-      icon: <NodeDetailIcon />,
-      statusSummary: selectedNode ? selectedNode.label : "",
-      hidden: !selectedNode,
     },
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
 
