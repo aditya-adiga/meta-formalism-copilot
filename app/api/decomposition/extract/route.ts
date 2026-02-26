@@ -72,14 +72,12 @@ export async function POST(request: NextRequest) {
       openRouterModel: OPENROUTER_MODEL,
     });
 
-    const usageMeta = { ...usage, endpoint: "decomposition/extract", timestamp: new Date().toISOString() };
-
     if (usage.provider === "mock") {
-      return NextResponse.json({ propositions: mockResponse(text), _usage: usageMeta });
+      return NextResponse.json({ propositions: mockResponse(text) });
     }
 
     const propositions = JSON.parse(extractJson(responseText));
-    return NextResponse.json({ propositions, _usage: usageMeta });
+    return NextResponse.json({ propositions });
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(

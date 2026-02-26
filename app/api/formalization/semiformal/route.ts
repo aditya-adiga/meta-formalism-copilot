@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     const proof = usage.provider === "mock" ? mockResponse(text) : responseText;
-    return NextResponse.json({ proof, _usage: { ...usage, endpoint: "formalization/semiformal", timestamp: new Date().toISOString() } });
+    return NextResponse.json({ proof });
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(

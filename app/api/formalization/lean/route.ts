@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const leanCode = usage.provider === "mock"
       ? mockResponse(informalProof, isRetry)
       : extractLeanCode(responseText);
-    return NextResponse.json({ leanCode, _usage: { ...usage, endpoint: "formalization/lean", timestamp: new Date().toISOString() } });
+    return NextResponse.json({ leanCode });
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     });
 
     const text = usage.provider === "mock" ? mockResponse(fullText, instruction) : responseText;
-    return NextResponse.json({ text, _usage: { ...usage, endpoint: "edit/whole", timestamp: new Date().toISOString() } });
+    return NextResponse.json({ text });
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(

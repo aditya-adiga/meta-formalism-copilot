@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
-import type { LlmUsage } from "@/app/lib/types/analytics";
 import PanelShell from "@/app/components/layout/PanelShell";
 import SourcePanel from "@/app/components/panels/SourcePanel";
 import ContextPanel from "@/app/components/panels/ContextPanel";
@@ -12,7 +11,7 @@ import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
-import { useAnalytics } from "@/app/hooks/useAnalytics";
+import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import {
   SourceIcon,
@@ -39,11 +38,10 @@ async function verifyLean(leanCode: string) {
   return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
 }
 
-/** Fetch a JSON API route and extract _usage if present. */
-async function fetchWithUsage<T>(
+/** Fetch a JSON API route. */
+async function fetchApi<T>(
   url: string,
   body: Record<string, unknown>,
-  onUsage?: (usage: LlmUsage) => void,
 ): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
@@ -52,7 +50,6 @@ async function fetchWithUsage<T>(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Request failed");
-  if (data._usage && onUsage) onUsage(data._usage);
   return data as T;
 }
 
@@ -70,9 +67,6 @@ export default function Home() {
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("none");
   const [verificationErrors, setVerificationErrors] = useState("");
-
-  // --- Analytics ---
-  const { entries: analyticsEntries, summary: analyticsSummary, recordUsage, clearAnalytics } = useAnalytics();
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode } = useDecomposition();
@@ -97,10 +91,9 @@ export default function Home() {
   // --- LLM call helpers that record usage ---
 
   async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
-    const data = await fetchWithUsage<{ leanCode: string }>(
+    const data = await fetchApi<{ leanCode: string }>(
       "/api/formalization/lean",
       { informalProof, previousAttempt, errors, instruction, contextLeanCode },
-      recordUsage,
     );
     return data.leanCode;
   }
@@ -135,10 +128,9 @@ export default function Home() {
     setActivePanelId("semiformal");
 
     try {
-      const semiformalData = await fetchWithUsage<{ proof: string }>(
+      const semiformalData = await fetchApi<{ proof: string }>(
         "/api/formalization/semiformal",
         { text: combinedPaperText },
-        recordUsage,
       );
       const proof = semiformalData.proof;
       setSemiformalText(proof);
@@ -179,8 +171,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [combinedPaperText, semiformalText, leanCode, recordUsage]);
+  }, [combinedPaperText, semiformalText, leanCode]);
 
   /** Per-node formalization (decomposition mode) */
   const handleNodeFormalise = useCallback(async () => {
@@ -194,10 +185,9 @@ export default function Home() {
       const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
 
       // Step 1: semiformal proof
-      const semiformalData = await fetchWithUsage<{ proof: string }>(
+      const semiformalData = await fetchApi<{ proof: string }>(
         "/api/formalization/semiformal",
         { text: nodeText },
-        recordUsage,
       );
       const proof = semiformalData.proof;
       updateNode(selectedNode.id, { semiformalProof: proof });
@@ -244,8 +234,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNode, decomp.nodes, updateNode, recordUsage]);
+  }, [selectedNode, decomp.nodes, updateNode]);
 
   const handleReVerify = useCallback(async () => {
     const code = isDecompMode && selectedNode ? selectedNode.leanCode : leanCode;
@@ -348,8 +337,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode, recordUsage]);
+  }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode]);
 
   const handleRegenerateLean = useCallback(() => {
     handleLeanIterate("");
@@ -358,9 +346,9 @@ export default function Home() {
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
     if (combinedPaperText.trim()) {
-      extractPropositions(combinedPaperText, recordUsage);
+      extractPropositions(combinedPaperText);
     }
-  }, [combinedPaperText, extractPropositions, recordUsage]);
+  }, [combinedPaperText, extractPropositions]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
@@ -433,11 +421,9 @@ export default function Home() {
       id: "analytics" as PanelId,
       label: "LLM Usage",
       icon: <AnalyticsIcon />,
-      statusSummary: analyticsSummary.totalCalls > 0
-        ? `${analyticsSummary.totalCalls} calls`
-        : "No calls yet",
+      statusSummary: "Cost estimates",
     },
-  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode, analyticsSummary.totalCalls]);
+  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
 
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
@@ -496,9 +482,7 @@ export default function Home() {
     ) : undefined,
     analytics: (
       <AnalyticsPanel
-        entries={analyticsEntries}
-        summary={analyticsSummary}
-        onClear={clearAnalytics}
+        endpointPriors={ENDPOINT_PRIORS}
       />
     ),
   }), [
@@ -509,7 +493,6 @@ export default function Home() {
     handleFormalise, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
     handleSelectNode, handleDecompose, handleNodeFormalise,
-    analyticsEntries, analyticsSummary, clearAnalytics,
   ]);
 
   return (

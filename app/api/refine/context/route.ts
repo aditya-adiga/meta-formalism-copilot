@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     });
 
     const refined = usage.provider === "mock" ? mockResponse(text, action) : responseText;
-    return NextResponse.json({ text: refined, _usage: { ...usage, endpoint: "refine/context", timestamp: new Date().toISOString() } });
+    return NextResponse.json({ text: refined });
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(
