@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const client = new Anthropic({ apiKey: anthropicKey });
     const message = await client.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 2048,
+      max_tokens: 16384,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: text }],
     });

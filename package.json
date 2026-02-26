@@ -13,11 +13,14 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@types/dagre": "^0.7.54",
+    "dagre": "^0.8.5",
     "katex": "^0.16.33",
     "next": "16.1.6",
     "pdfjs-dist": "^5.4.624",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "reactflow": "^11.11.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
