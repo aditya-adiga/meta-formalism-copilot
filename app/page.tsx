@@ -420,6 +420,7 @@ export default function Home() {
       <SourcePanel
         sourceText={sourceText}
         onSourceTextChange={setSourceText}
+        extractedFiles={extractedFiles}
         onFilesChanged={setExtractedFiles}
       />
     ),
