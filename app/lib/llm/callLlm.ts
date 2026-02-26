@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { computeCost } from "./costs";
+import { getCachedResult, setCachedResult } from "./cache";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
@@ -16,7 +17,7 @@ export class OpenRouterError extends Error {
 }
 
 export type LlmCallUsage = {
-  provider: "anthropic" | "openrouter" | "mock";
+  provider: "anthropic" | "openrouter" | "mock" | "cache";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -49,7 +50,22 @@ export async function callLlm({
   anthropicModel,
   openRouterModel,
 }: CallLlmOptions): Promise<CallLlmResult> {
+  // Resolve effective model for cache key
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const effectiveModel = anthropicKey
+    ? (anthropicModel ?? DEFAULT_ANTHROPIC_MODEL)
+    : (openRouterKey && openRouterModel)
+      ? openRouterModel
+      : "mock";
+
+  // Check cache before making any LLM call
+  const cached = getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
+  if (cached) {
+    console.log(`[${endpoint}] cache hit (model: ${effectiveModel})`);
+    return cached;
+  }
+
   if (anthropicKey) {
     const model = anthropicModel ?? DEFAULT_ANTHROPIC_MODEL;
     const start = Date.now();
@@ -64,7 +80,7 @@ export async function callLlm({
     const text = message.content[0].type === "text" ? message.content[0].text : "";
     const inputTokens = message.usage.input_tokens;
     const outputTokens = message.usage.output_tokens;
-    return {
+    const result: CallLlmResult = {
       text,
       usage: {
         provider: "anthropic",
@@ -75,9 +91,10 @@ export async function callLlm({
         latencyMs,
       },
     };
+    try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    return result;
   }
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (openRouterKey && openRouterModel) {
     const start = Date.now();
     const response = await fetch(OPENROUTER_API_URL, {
@@ -106,7 +123,7 @@ export async function callLlm({
     const text = data.choices?.[0]?.message?.content ?? "";
     const inputTokens = data.usage?.prompt_tokens ?? 0;
     const outputTokens = data.usage?.completion_tokens ?? 0;
-    return {
+    const result: CallLlmResult = {
       text,
       usage: {
         provider: "openrouter",
@@ -117,6 +134,8 @@ export async function callLlm({
         latencyMs,
       },
     };
+    try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    return result;
   }
 
   // Mock fallback — caller provides its own mock text

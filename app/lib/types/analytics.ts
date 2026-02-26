@@ -1,7 +1,7 @@
 export type LlmUsage = {
   endpoint: string;
   model: string;
-  provider: "anthropic" | "openrouter" | "mock";
+  provider: "anthropic" | "openrouter" | "mock" | "cache";
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
