@@ -13,6 +13,17 @@ Guidelines:
 - Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
 - Return only the Lean4 code with no additional commentary`;
 
+const BASE_SYSTEM_PROMPT_WITH_CONTEXT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof along with verified Lean4 code from dependency nodes. Convert the proof into valid Lean4 code that builds on the provided context.
+
+The verifier uses Lean4 with Mathlib. The dependency context already includes \`import Mathlib\`, so do NOT include any import statements in your output.
+
+Guidelines:
+- Use Lean4 syntax (not Lean3)
+- Do NOT include \`import Mathlib\` or any other import — imports are handled by the dependency context
+- Reference theorems and definitions from the provided context rather than redefining them
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
+- Return only the Lean4 code with no additional commentary`;
+
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
 The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
@@ -20,6 +31,18 @@ The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
 Guidelines:
 - Use Lean4 syntax (not Lean3)
 - Start with \`import Mathlib\`
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
+- Address all verification errors shown in the error output
+- Return only the corrected Lean4 code with no additional commentary`;
+
+const RETRY_SYSTEM_PROMPT_WITH_CONTEXT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, the verification errors, and verified Lean4 code from dependency nodes. Fix the Lean4 code so it passes verification.
+
+The verifier uses Lean4 with Mathlib. The dependency context already includes \`import Mathlib\`, so do NOT include any import statements in your output.
+
+Guidelines:
+- Use Lean4 syntax (not Lean3)
+- Do NOT include \`import Mathlib\` or any other import — imports are handled by the dependency context
+- Reference theorems and definitions from the provided context rather than redefining them
 - Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
@@ -46,7 +69,10 @@ export async function POST(request: NextRequest) {
   const { informalProof, previousAttempt, errors, instruction, contextLeanCode } = await request.json();
 
   const isRetry = Boolean(previousAttempt && errors);
-  const systemPrompt = isRetry ? RETRY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
+  const hasContext = Boolean(contextLeanCode);
+  const systemPrompt = isRetry
+    ? (hasContext ? RETRY_SYSTEM_PROMPT_WITH_CONTEXT : RETRY_SYSTEM_PROMPT)
+    : (hasContext ? BASE_SYSTEM_PROMPT_WITH_CONTEXT : BASE_SYSTEM_PROMPT);
   let userContent = "";
 
   if (contextLeanCode) {
@@ -69,9 +95,20 @@ export async function POST(request: NextRequest) {
       openRouterModel: OPENROUTER_MODEL,
     });
 
-    const leanCode = usage.provider === "mock"
+    let leanCode = usage.provider === "mock"
       ? mockResponse(informalProof, isRetry)
       : extractLeanCode(responseText);
+
+    // Safety net: strip import lines when context already provides them.
+    // LLMs sometimes include `import Mathlib` despite being told not to.
+    if (hasContext) {
+      leanCode = leanCode
+        .split("\n")
+        .filter((line) => !/^import\s+/.test(line.trim()))
+        .join("\n")
+        .replace(/^\n+/, "");
+    }
+
     return NextResponse.json({ leanCode });
   } catch (err) {
     if (err instanceof OpenRouterError) {
