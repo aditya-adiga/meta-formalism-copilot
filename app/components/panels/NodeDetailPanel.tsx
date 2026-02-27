@@ -7,6 +7,7 @@ type NodeDetailPanelProps = {
   /** Dependency nodes (resolved from dependsOn IDs) */
   dependencies: PropositionNode[];
   onFormalise: () => void;
+  onGenerateLean: () => void;
   loading: boolean;
 };
 
@@ -17,7 +18,7 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
   failed: { text: "Failed", color: "var(--status-failed)" },
 };
 
-export default function NodeDetailPanel({ node, dependencies, onFormalise, loading }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ node, dependencies, onFormalise, onGenerateLean, loading }: NodeDetailPanelProps) {
   const status = STATUS_LABELS[node.verificationStatus];
 
   return (
@@ -135,16 +136,27 @@ export default function NodeDetailPanel({ node, dependencies, onFormalise, loadi
         )}
       </div>
 
-      {/* Formalise button */}
+      {/* Action button — Generate Lean when semiformal exists but lean doesn't, otherwise Formalise */}
       <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
-        <button
-          type="button"
-          onClick={onFormalise}
-          disabled={loading}
-          className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
-        >
-          {loading ? "Formalising..." : "Formalise This Proposition"}
-        </button>
+        {node.semiformalProof && !node.leanCode && node.verificationStatus === "unverified" ? (
+          <button
+            type="button"
+            onClick={onGenerateLean}
+            disabled={loading}
+            className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          >
+            {loading ? "Generating..." : "Generate Lean4 Code"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onFormalise}
+            disabled={loading}
+            className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          >
+            {loading ? "Formalising..." : node.semiformalProof ? "Re-formalise" : "Formalise This Proposition"}
+          </button>
+        )}
       </div>
     </div>
   );
