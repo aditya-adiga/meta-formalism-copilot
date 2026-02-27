@@ -470,7 +470,7 @@ export default function Home() {
       />
     ) : undefined,
   }), [
-    sourceText, contextText, activeSemiformal, activeLeanCode,
+    sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, isDecompMode, decomp,
     selectedNode, selectedNodeDeps, combinedPaperText,
