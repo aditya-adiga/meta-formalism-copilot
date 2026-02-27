@@ -4,8 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
 import type { SessionScope } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
-import SourcePanel from "@/app/components/panels/SourcePanel";
-import ContextPanel from "@/app/components/panels/ContextPanel";
+import InputPanel from "@/app/components/panels/InputPanel";
 import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
@@ -18,7 +17,6 @@ import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import {
   SourceIcon,
-  ContextIcon,
   SemiformalIcon,
   LeanIcon,
   GraphIcon,
@@ -456,15 +454,12 @@ export default function Home() {
       id: "source" as PanelId,
       label: "Source Input",
       icon: <SourceIcon />,
-      statusSummary: sourceText || extractedFiles.length > 0
-        ? `${extractedFiles.length} file${extractedFiles.length !== 1 ? "s" : ""} uploaded`
-        : "No input yet",
-    },
-    {
-      id: "context" as PanelId,
-      label: "Context",
-      icon: <ContextIcon />,
-      statusSummary: contextText ? "Context defined" : "No context",
+      statusSummary: [
+        sourceText || extractedFiles.length > 0
+          ? `${extractedFiles.length} file${extractedFiles.length !== 1 ? "s" : ""} uploaded`
+          : "No input yet",
+        contextText ? "Context defined" : null,
+      ].filter(Boolean).join(" · "),
     },
     {
       id: "graph" as PanelId,
@@ -523,15 +518,11 @@ export default function Home() {
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
     source: (
-      <SourcePanel
+      <InputPanel
         sourceText={sourceText}
         onSourceTextChange={setSourceText}
         extractedFiles={extractedFiles}
         onFilesChanged={setExtractedFiles}
-      />
-    ),
-    context: (
-      <ContextPanel
         contextText={contextText}
         onContextTextChange={setContextText}
         onFormalise={handleFormalise}
@@ -583,7 +574,7 @@ export default function Home() {
       />
     ),
   }), [
-    sourceText, contextText, activeSemiformal, activeLeanCode,
+    sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, isDecompMode, decomp,
     selectedNode, selectedNodeDeps, combinedPaperText,
