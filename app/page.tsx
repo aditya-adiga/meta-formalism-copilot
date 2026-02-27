@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
+import type { SourceDocument } from "@/app/lib/types/decomposition";
 import PanelShell from "@/app/components/layout/PanelShell";
 import SourcePanel from "@/app/components/panels/SourcePanel";
 import ContextPanel from "@/app/components/panels/ContextPanel";
@@ -76,9 +77,24 @@ export default function Home() {
     : verificationStatus;
   const activeVerificationErrors = isDecompMode ? selectedNode!.verificationErrors : verificationErrors;
 
-  // --- Combined paper text for decomposition ---
+  // --- Combined paper text for single-proof formalization ---
   const combinedPaperText = useMemo(() => {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
+  }, [sourceText, extractedFiles]);
+
+  // --- Source documents for decomposition (each input as a separate document) ---
+  const sourceDocuments: SourceDocument[] = useMemo(() => {
+    const docs: SourceDocument[] = [];
+    let idx = 0;
+    if (sourceText.trim()) {
+      docs.push({ sourceId: `doc-${idx}`, sourceLabel: "Text Input", text: sourceText });
+      idx++;
+    }
+    for (const f of extractedFiles) {
+      docs.push({ sourceId: `doc-${idx}`, sourceLabel: f.name, text: f.text });
+      idx++;
+    }
+    return docs;
   }, [sourceText, extractedFiles]);
 
   // --- Handlers ---
@@ -340,10 +356,10 @@ export default function Home() {
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
-    if (combinedPaperText.trim()) {
-      extractPropositions(combinedPaperText);
+    if (sourceDocuments.length > 0) {
+      extractPropositions(sourceDocuments);
     }
-  }, [combinedPaperText, extractPropositions]);
+  }, [sourceDocuments, extractPropositions]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
@@ -456,7 +472,8 @@ export default function Home() {
         propositions={decomp.nodes}
         selectedNodeId={decomp.selectedNodeId}
         onSelectNode={handleSelectNode}
-        paperText={combinedPaperText}
+        hasContent={sourceDocuments.length > 0}
+        sourceDocuments={sourceDocuments}
         extractionStatus={decomp.extractionStatus}
         onDecompose={handleDecompose}
       />
@@ -470,10 +487,10 @@ export default function Home() {
       />
     ) : undefined,
   }), [
-    sourceText, contextText, activeSemiformal, activeLeanCode,
+    sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, isDecompMode, decomp,
-    selectedNode, selectedNodeDeps, combinedPaperText,
+    selectedNode, selectedNodeDeps, sourceDocuments,
     handleFormalise, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
     handleSelectNode, handleDecompose, handleNodeFormalise,

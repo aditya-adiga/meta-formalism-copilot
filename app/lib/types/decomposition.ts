@@ -12,6 +12,12 @@ export type NodeVerificationStatus =
   | "verified"
   | "failed";
 
+export type SourceDocument = {
+  sourceId: string;
+  sourceLabel: string;
+  text: string;
+};
+
 export type PropositionNode = {
   id: string;
   label: string;
@@ -19,6 +25,8 @@ export type PropositionNode = {
   statement: string;
   proofText: string;
   dependsOn: string[];
+  sourceId: string;
+  sourceLabel: string;
   semiformalProof: string;
   leanCode: string;
   verificationStatus: NodeVerificationStatus;
@@ -29,5 +37,6 @@ export type DecompositionState = {
   nodes: PropositionNode[];
   selectedNodeId: string | null;
   paperText: string;
+  sources: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";
 };
