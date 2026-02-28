@@ -7,9 +7,11 @@ type IconRailProps = {
   panels: PanelDef[];
   activePanelId: PanelId;
   onSelectPanel: (id: PanelId) => void;
+  onExportAll?: () => void;
+  exportAllDisabled?: boolean;
 };
 
-export default function IconRail({ panels, activePanelId, onSelectPanel }: IconRailProps) {
+export default function IconRail({ panels, activePanelId, onSelectPanel, onExportAll, exportAllDisabled }: IconRailProps) {
   const [expanded, setExpanded] = useState(false);
 
   const visiblePanels = panels.filter((p) => !p.hidden);
@@ -75,6 +77,33 @@ export default function IconRail({ panels, activePanelId, onSelectPanel }: IconR
           </button>
         );
       })}
+
+      {/* Spacer pushes export button to bottom */}
+      <div className="flex-1" />
+
+      {/* Export All button */}
+      {onExportAll && (
+        <button
+          onClick={onExportAll}
+          disabled={exportAllDisabled}
+          title={expanded ? undefined : "Export All"}
+          className={`
+            group flex items-center gap-3 px-3 py-3 text-left transition-colors border-t border-[#DDD9D5]
+            text-[#6B6560] hover:bg-[var(--rail-hover)] hover:text-[var(--ink-black)]
+            disabled:opacity-40 disabled:pointer-events-none
+          `}
+        >
+          <span className="flex shrink-0 items-center justify-center w-6 h-6">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 3v10M6 9l4 4 4-4" />
+              <path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" />
+            </svg>
+          </span>
+          {expanded && (
+            <span className="truncate text-xs font-semibold">Export All</span>
+          )}
+        </button>
+      )}
     </nav>
   );
 }

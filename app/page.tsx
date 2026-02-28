@@ -438,6 +438,19 @@ export default function Home() {
     },
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
 
+  // --- Export All handler ---
+  const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
+
+  const handleExportAll = useCallback(async () => {
+    // Dynamic import so jszip is only loaded when user clicks Export All
+    const { exportAllAsZip } = await import("@/app/lib/utils/exportAll");
+    await exportAllAsZip({
+      semiformalText,
+      leanCode,
+      nodes: decomp.nodes,
+    });
+  }, [semiformalText, leanCode, decomp.nodes]);
+
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
     source: (
@@ -511,6 +524,8 @@ export default function Home() {
         activePanelId={activePanelId}
         onSelectPanel={setActivePanelId}
         panelContent={panelContent}
+        onExportAll={handleExportAll}
+        exportAllDisabled={!hasExportableContent}
       />
     </main>
   );
