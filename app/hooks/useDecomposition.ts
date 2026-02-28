@@ -18,6 +18,23 @@ export function useDecomposition() {
 
   const extractPropositions = useCallback(async (text: string) => {
     setState((prev) => ({ ...prev, paperText: text, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
+
+    // Fast path: deterministic LaTeX parsing (no LLM call)
+    try {
+      const { isLatexStructured, parseLatexPropositions } = await import("@/app/lib/utils/latexParser");
+      if (isLatexStructured(text)) {
+        const nodes = parseLatexPropositions(text);
+        if (nodes.length > 0) {
+          setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
+          return;
+        }
+        // Zero nodes → fall through to LLM
+      }
+    } catch (err) {
+      console.error("[decomposition/latex-parse]", err);
+      // Parse error → fall through to LLM
+    }
+
     try {
       const res = await fetch("/api/decomposition/extract", {
         method: "POST",
