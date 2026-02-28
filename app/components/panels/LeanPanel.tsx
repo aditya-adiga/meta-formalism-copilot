@@ -1,6 +1,8 @@
 "use client";
 
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
+import DownloadButton from "@/app/components/ui/DownloadButton";
+import { downloadLeanCode } from "@/app/lib/utils/export";
 
 type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
@@ -64,6 +66,12 @@ export default function LeanPanel({
         </h2>
         <div className="flex items-center gap-2">
           <VerificationBadge status={verificationStatus} />
+          {leanCode && loadingPhase === "idle" && (
+            <DownloadButton
+              label="Export .lean"
+              onClick={() => downloadLeanCode(leanCode)}
+            />
+          )}
           {verificationStatus === "invalid" && loadingPhase === "idle" && (
             <button
               onClick={() => onLeanIterate("")}

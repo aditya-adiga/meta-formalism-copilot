@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
+import DownloadButton from "@/app/components/ui/DownloadButton";
 
 // Dynamic import to avoid SSR issues with ReactFlow
 const ProofGraph = dynamic(
@@ -28,6 +30,21 @@ export default function GraphPanel({
 }: GraphPanelProps) {
   const hasText = paperText.trim().length > 0;
   const hasNodes = propositions.length > 0;
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportGraph = useCallback(async () => {
+    setExporting(true);
+    try {
+      // Dynamic import to avoid loading html-to-image until needed
+      const { getGraphViewportElement, downloadGraphAsPng } = await import("@/app/lib/utils/exportGraph");
+      const viewport = getGraphViewportElement();
+      if (viewport) await downloadGraphAsPng(viewport);
+    } catch (err) {
+      console.error("[graph export]", err);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -35,15 +52,24 @@ export default function GraphPanel({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
           Proof Graph
         </h2>
-        {hasText && (
-          <button
-            onClick={onDecompose}
-            disabled={extractionStatus === "extracting"}
-            className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
-          >
-            {extractionStatus === "extracting" ? "Decomposing..." : "Decompose Paper"}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasNodes && (
+            <DownloadButton
+              label={exporting ? "Exporting..." : "Export .png"}
+              onClick={handleExportGraph}
+              disabled={exporting}
+            />
+          )}
+          {hasText && (
+            <button
+              onClick={onDecompose}
+              disabled={extractionStatus === "extracting"}
+              className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+            >
+              {extractionStatus === "extracting" ? "Decomposing..." : "Decompose Paper"}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
