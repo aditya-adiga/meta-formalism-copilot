@@ -25,7 +25,7 @@ export function useDecomposition() {
     try {
       const { isLatexStructured, parseLatexPropositions } = await import("@/app/lib/utils/latexParser");
       if (isLatexStructured(combinedText)) {
-        const nodes = parseLatexPropositions(combinedText);
+        const nodes = parseLatexPropositions(combinedText, documents);
         if (nodes.length > 0) {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
@@ -39,7 +39,12 @@ export function useDecomposition() {
     if (pdfFile) {
       try {
         const { parsePdfPropositions } = await import("@/app/lib/utils/pdfPropositionParser");
-        const nodes = await parsePdfPropositions(pdfFile);
+        // Find the source document that corresponds to this PDF file
+        const pdfSource = documents.find((d) => d.sourceLabel === pdfFile.name);
+        const nodes = await parsePdfPropositions(
+          pdfFile,
+          pdfSource ? { sourceId: pdfSource.sourceId, sourceLabel: pdfSource.sourceLabel } : undefined,
+        );
         if (nodes && nodes.length > 0) {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;

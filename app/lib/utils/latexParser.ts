@@ -1,4 +1,4 @@
-import type { PropositionKind, PropositionNode } from "@/app/lib/types/decomposition";
+import type { PropositionKind, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 
 /**
  * Map of LaTeX environment names to PropositionKind.
@@ -145,8 +145,20 @@ function extractRefs(text: string): string[] {
  * Extracts theorem-like environments, associates proofs with preceding nodes,
  * resolves \ref/\eqref cross-references into dependsOn edges.
  */
-export function parseLatexPropositions(text: string): PropositionNode[] {
+export function parseLatexPropositions(text: string, documents?: SourceDocument[]): PropositionNode[] {
   const blocks = extractBlocks(text);
+
+  // Build offset ranges for each source document so we can attribute blocks.
+  // The combined text is documents joined by "\n\n", so boundaries are cumulative.
+  const sourceRanges: { sourceId: string; sourceLabel: string; start: number; end: number }[] = [];
+  if (documents && documents.length > 0) {
+    let offset = 0;
+    for (const doc of documents) {
+      const end = offset + doc.text.length;
+      sourceRanges.push({ sourceId: doc.sourceId, sourceLabel: doc.sourceLabel, start: offset, end });
+      offset = end + 2; // account for "\n\n" separator
+    }
+  }
 
   // Per-kind counters for numbering
   const counters: Record<PropositionKind, number> = {
@@ -191,6 +203,9 @@ export function parseLatexPropositions(text: string): PropositionNode[] {
       labelToId[labelKey] = id;
     }
 
+    // Attribute this block to the source document that contains its start offset
+    const source = sourceRanges.find((r) => block.startOffset >= r.start && block.startOffset < r.end);
+
     nodes.push({
       id,
       label,
@@ -198,6 +213,8 @@ export function parseLatexPropositions(text: string): PropositionNode[] {
       statement,
       proofText: "",
       dependsOn: [],
+      sourceId: source?.sourceId ?? "",
+      sourceLabel: source?.sourceLabel ?? "",
       semiformalProof: "",
       leanCode: "",
       verificationStatus: "unverified",
