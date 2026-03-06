@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import type { PanelDef, PanelId } from "@/app/lib/types/panels";
+import type { PanelId } from "@/app/lib/types/panels";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
@@ -16,17 +16,10 @@ import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
-import type { VerificationStatus } from "@/app/hooks/useFormalizationPipeline";
+import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
+import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
-import {
-  SourceIcon,
-  SemiformalIcon,
-  LeanIcon,
-  GraphIcon,
-  NodeDetailIcon,
-  AnalyticsIcon,
-} from "@/app/components/ui/icons/PanelIcons";
 
 export default function Home() {
   // --- Panel navigation ---
@@ -154,21 +147,19 @@ export default function Home() {
 
   // Active pipeline resolves based on decomposition mode
   const activePipeline = isDecompMode ? nodePipeline : globalPipeline;
-  const loadingPhase = isDecompMode ? nodePipeline.loadingPhase : globalPipeline.loadingPhase;
 
-  // When in decomposition mode, the semiformal/lean panels show selected node's data
-  const activeSemiformal = isDecompMode ? selectedNode!.semiformalProof : semiformalText;
-  const activeLeanCode = isDecompMode ? selectedNode!.leanCode : leanCode;
-  const activeVerificationStatus: VerificationStatus = isDecompMode
-    ? (selectedNode!.verificationStatus === "verified" ? "valid"
-      : selectedNode!.verificationStatus === "failed" ? "invalid"
-      : selectedNode!.verificationStatus === "in-progress" ? "verifying"
-      : "none")
-    : verificationStatus;
-  const activeVerificationErrors = isDecompMode ? selectedNode!.verificationErrors : verificationErrors;
-
-  // Semiformal exists but Lean hasn't been generated yet — ready for user review
-  const semiformalReadyForLean = activeSemiformal !== "" && activeLeanCode === "" && loadingPhase === "idle";
+  // Resolve which artifact state to display
+  const {
+    activeSemiformal, activeLeanCode,
+    activeVerificationStatus, activeVerificationErrors,
+    loadingPhase, semiformalReadyForLean,
+  } = useActiveArtifactState(
+    { semiformalText, leanCode, verificationStatus, verificationErrors },
+    selectedNode,
+    isDecompMode,
+    globalPipeline.loadingPhase,
+    nodePipeline.loadingPhase,
+  );
 
   // --- Handlers ---
 
@@ -282,65 +273,12 @@ export default function Home() {
   }, [selectedNode, decomp.nodes]);
 
   // --- Panel definitions ---
-  const hasDecomp = decomp.nodes.length > 0;
-  const panels: PanelDef[] = useMemo(() => [
-    {
-      id: "source" as PanelId,
-      label: "Source Input",
-      icon: <SourceIcon />,
-      statusSummary: [
-        sourceText || extractedFiles.length > 0
-          ? `${extractedFiles.length} file${extractedFiles.length !== 1 ? "s" : ""} uploaded`
-          : "No input yet",
-        contextText ? "Context defined" : null,
-      ].filter(Boolean).join(" · "),
-    },
-    {
-      id: "graph" as PanelId,
-      label: "Proof Graph",
-      icon: <GraphIcon />,
-      statusSummary: hasDecomp
-        ? `${decomp.nodes.filter((n) => n.verificationStatus === "verified").length}/${decomp.nodes.length} verified`
-        : "No graph",
-    },
-    {
-      id: "node-detail" as PanelId,
-      label: "Node Detail",
-      icon: <NodeDetailIcon />,
-      statusSummary: selectedNode ? selectedNode.label : "",
-      hidden: !selectedNode,
-    },
-    {
-      id: "semiformal" as PanelId,
-      label: "Semiformal Proof",
-      icon: <SemiformalIcon />,
-      statusSummary: loadingPhase === "semiformal"
-        ? "Generating..."
-        : semiformalReadyForLean
-          ? "Ready for review"
-          : activeSemiformal
-            ? "Proof ready"
-            : "No proof yet",
-    },
-    {
-      id: "lean" as PanelId,
-      label: "Lean4 Code",
-      icon: <LeanIcon />,
-      statusSummary: activeVerificationStatus === "valid"
-        ? "Verified"
-        : activeVerificationStatus === "invalid"
-          ? "Failed"
-          : activeLeanCode
-            ? "Code ready"
-            : "No code yet",
-    },
-    {
-      id: "analytics" as PanelId,
-      label: "LLM Usage",
-      icon: <AnalyticsIcon />,
-      statusSummary: "Cost estimates",
-    },
-  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, decomp.nodes, selectedNode]);
+  const panels = usePanelDefinitions({
+    sourceText, extractedFiles, contextText,
+    activeSemiformal, activeLeanCode, loadingPhase,
+    activeVerificationStatus, semiformalReadyForLean,
+    nodes: decomp.nodes, selectedNode,
+  });
 
   // --- Export All handler ---
   const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
