@@ -196,6 +196,8 @@ export default function Home() {
 
   /** Global single-proof: generate semiformal only, then stop for review */
   const handleGenerateSemiformal = useCallback(async () => {
+    // Deselect any decomposition node so the global semiformalText drives the panel
+    selectNode(null);
     createSession({ type: "global" });
     setLoadingPhase("semiformal");
     setSemiformalText("");
@@ -217,7 +219,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [combinedPaperText, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+  }, [combinedPaperText, selectNode, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
 
   /** Global single-proof: Lean generation + verification retry loop */
   const handleGenerateLean = useCallback(async () => {
