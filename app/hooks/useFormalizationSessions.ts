@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { FormalizationSession, SessionScope, SessionsState } from "@/app/lib/types/session";
+
+export type SessionRestoreHandler = (session: FormalizationSession) => void;
+
+type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>;
 
 const STORAGE_KEY = "metaformalism-sessions";
 
@@ -22,9 +26,13 @@ function scopeMatches(a: SessionScope, b: SessionScope): boolean {
   return a.type === "node" && b.type === "node" && a.nodeId === b.nodeId;
 }
 
-export function useFormalizationSessions() {
+export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
   const [state, setState] = useState<SessionsState>(loadFromStorage);
   const mounted = useRef(false);
+
+  // Ref so selectAndRestore always sees the latest callback without recreating
+  const onRestoreRef = useRef(onRestore);
+  useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
 
   // Persist to localStorage on every change after initial mount
   useEffect(() => {
@@ -65,7 +73,7 @@ export function useFormalizationSessions() {
     return newSession;
   }, []);
 
-  const updateSession = useCallback((id: string, updates: Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>) => {
+  const updateSession = useCallback((id: string, updates: SessionUpdatableFields) => {
     setState((prev) => ({
       ...prev,
       sessions: prev.sessions.map((s) =>
@@ -78,6 +86,36 @@ export function useFormalizationSessions() {
 
   const selectSession = useCallback((id: string) => {
     setState((prev) => ({ ...prev, activeSessionId: id }));
+  }, []);
+
+  /**
+   * Select a session and restore its state into the workspace.
+   * Calls the onRestore callback (provided at hook init) with the session data
+   * so the caller can apply it to global or per-node state.
+   */
+  const selectAndRestore = useCallback((sessionId: string) => {
+    const session = state.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    setState((prev) => ({ ...prev, activeSessionId: sessionId }));
+    onRestoreRef.current?.(session);
+  }, [state.sessions]);
+
+  /**
+   * Mirror an update to the active session (if one exists).
+   * Consolidates the scattered `if (activeSession) updateSession(...)` pattern.
+   */
+  const syncToActiveSession = useCallback((updates: SessionUpdatableFields) => {
+    setState((prev) => {
+      if (!prev.activeSessionId) return prev;
+      return {
+        ...prev,
+        sessions: prev.sessions.map((s) =>
+          s.id === prev.activeSessionId
+            ? { ...s, ...updates, updatedAt: new Date().toISOString() }
+            : s
+        ),
+      };
+    });
   }, []);
 
   const clearActiveSession = useCallback(() => {
@@ -98,12 +136,21 @@ export function useFormalizationSessions() {
     return scopeMatches(activeSession.scope, scope) ? activeSession : null;
   }, [activeSession]);
 
+  // All sessions sorted by run number (descending), for use in session banners
+  const allSessionsSorted = useMemo(() =>
+    [...state.sessions].sort((a, b) => b.runNumber - a.runNumber || b.updatedAt.localeCompare(a.updatedAt)),
+    [state.sessions],
+  );
+
   return {
     sessions: state.sessions,
+    allSessionsSorted,
     activeSession,
     createSession,
     updateSession,
     selectSession,
+    selectAndRestore,
+    syncToActiveSession,
     clearActiveSession,
     sessionsForScope,
     activeSessionForScope,

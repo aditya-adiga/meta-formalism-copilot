@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
+import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
 import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
@@ -65,13 +66,39 @@ export default function Home() {
   }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
 
   // --- Session state ---
+  // Restore callback: applies a session's data to global or per-node state
+  const handleRestoreSession = useCallback((session: FormalizationSession) => {
+    if (session.scope.type === "node") {
+      selectNode(session.scope.nodeId);
+      const nodeStatus = session.verificationStatus === "valid" ? "verified" as const
+        : session.verificationStatus === "invalid" ? "failed" as const
+        : session.verificationStatus === "verifying" ? "in-progress" as const
+        : "unverified" as const;
+      updateNode(session.scope.nodeId, {
+        semiformalProof: session.semiformalText,
+        leanCode: session.leanCode,
+        verificationStatus: nodeStatus,
+        verificationErrors: session.verificationErrors,
+      });
+    } else {
+      selectNode(null);
+      setSemiformalText(session.semiformalText);
+      setLeanCode(session.leanCode);
+      setVerificationStatus(session.verificationStatus);
+      setVerificationErrors(session.verificationErrors);
+      setSemiformalDirty(false);
+    }
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+
   const {
     activeSession,
+    allSessionsSorted,
     createSession,
-    updateSession,
+    syncToActiveSession,
     selectSession,
+    selectAndRestore,
     sessionsForScope,
-  } = useFormalizationSessions();
+  } = useFormalizationSessions(handleRestoreSession);
 
 
   // --- Combined paper text for single-proof formalization ---
@@ -105,11 +132,6 @@ export default function Home() {
   }, [sourceText, extractedFiles]);
 
   // --- Formalization pipelines ---
-  // Helper: mirror updates to the active session
-  const sessionUpdate = useCallback((updates: Record<string, unknown>) => {
-    if (activeSession) updateSession(activeSession.id, updates as Partial<Pick<import("@/app/lib/types/session").FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>);
-  }, [activeSession, updateSession]);
-
   // Global pipeline: reads/writes global persisted state
   const globalPipeline = useFormalizationPipeline({
     getSemiformal: () => semiformalText,
@@ -121,7 +143,7 @@ export default function Home() {
     setVerificationErrors,
     onResetForSemiformal: () => { setSemiformalDirty(false); },
     onResetForLean: () => { setSemiformalDirty(false); },
-    onSessionUpdate: sessionUpdate,
+    onSessionUpdate: syncToActiveSession,
   });
 
   // Node pipeline: reads/writes selected node state
@@ -142,7 +164,7 @@ export default function Home() {
     setVerificationErrors: (errors) => { if (selectedNode) updateNode(selectedNode.id, { verificationErrors: errors }); },
     onResetForLean: () => { if (selectedNode) updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" }); },
     getDependencyContext: () => selectedNode ? gatherDependencyContext(decomp.nodes, selectedNode.id) || undefined : undefined,
-    onSessionUpdate: sessionUpdate,
+    onSessionUpdate: syncToActiveSession,
   });
 
   // Active pipeline resolves based on decomposition mode
@@ -170,8 +192,8 @@ export default function Home() {
       setSemiformalText(text);
       setSemiformalDirty((prev) => prev || leanCode !== "");
     }
-    if (activeSession) updateSession(activeSession.id, { semiformalText: text });
-  }, [isDecompMode, selectedNode, updateNode, leanCode, setSemiformalText, setSemiformalDirty, activeSession, updateSession]);
+    syncToActiveSession({ semiformalText: text });
+  }, [isDecompMode, selectedNode, updateNode, leanCode, setSemiformalText, setSemiformalDirty, syncToActiveSession]);
 
   const handleLeanCodeChange = useCallback((code: string) => {
     if (isDecompMode && selectedNode) {
@@ -179,8 +201,8 @@ export default function Home() {
     } else {
       setLeanCode(code);
     }
-    if (activeSession) updateSession(activeSession.id, { leanCode: code });
-  }, [isDecompMode, selectedNode, updateNode, setLeanCode, activeSession, updateSession]);
+    syncToActiveSession({ leanCode: code });
+  }, [isDecompMode, selectedNode, updateNode, setLeanCode, syncToActiveSession]);
 
   /** Global: generate semiformal, create session, navigate to panel */
   const handleGenerateSemiformal = useCallback(async () => {
@@ -210,39 +232,6 @@ export default function Home() {
     setActivePanelId("lean");
     await nodePipeline.handleGenerateLean();
   }, [nodePipeline]);
-
-  /** Load a previous session's data into the current view (supports cross-scope navigation) */
-  const handleSelectSession = useCallback((sessionId: string) => {
-    selectSession(sessionId);
-    const allSessions = sessionsForScope({ type: "global" }).concat(
-      decomp.nodes.flatMap((n) => sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label }))
-    );
-    const target = allSessions.find((s) => s.id === sessionId);
-    if (!target) return;
-
-    if (target.scope.type === "node") {
-      // Navigate into the target node
-      selectNode(target.scope.nodeId);
-      const nodeStatus = target.verificationStatus === "valid" ? "verified"
-        : target.verificationStatus === "invalid" ? "failed"
-        : target.verificationStatus === "verifying" ? "in-progress"
-        : "unverified";
-      updateNode(target.scope.nodeId, {
-        semiformalProof: target.semiformalText,
-        leanCode: target.leanCode,
-        verificationStatus: nodeStatus,
-        verificationErrors: target.verificationErrors,
-      });
-    } else {
-      // Global session — exit decomposition mode
-      selectNode(null);
-      setSemiformalText(target.semiformalText);
-      setLeanCode(target.leanCode);
-      setVerificationStatus(target.verificationStatus);
-      setVerificationErrors(target.verificationErrors);
-      setSemiformalDirty(false);
-    }
-  }, [selectSession, sessionsForScope, decomp.nodes, selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
@@ -294,21 +283,12 @@ export default function Home() {
   }, [semiformalText, leanCode, decomp.nodes]);
 
   // --- Panel content map ---
-  // Collect all sessions for the banner dropdown (global + all node scopes)
-  const allSessions = useMemo(() => {
-    const global = sessionsForScope({ type: "global" });
-    const nodeSessions = decomp.nodes.flatMap((n) =>
-      sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label })
-    );
-    return [...global, ...nodeSessions].sort((a, b) => b.runNumber - a.runNumber || b.updatedAt.localeCompare(a.updatedAt));
-  }, [sessionsForScope, decomp.nodes]);
-
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
   const sessionBannerElement = activeSession ? (
     <SessionBanner
       currentSession={activeSession}
-      sessions={allSessions}
-      onSelectSession={handleSelectSession}
+      sessions={allSessionsSorted}
+      onSelectSession={selectAndRestore}
     />
   ) : null;
 
@@ -390,7 +370,7 @@ export default function Home() {
     handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     activePipeline,
     handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
-    activeSession, allSessions, handleSelectSession,
+    activeSession, allSessionsSorted, selectAndRestore,
   ]);
 
   return (
