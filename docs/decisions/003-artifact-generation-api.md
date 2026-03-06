@@ -322,6 +322,7 @@ Include verification prompts in the generation system prompt so the LLM self-che
 
 **Resolves these open questions from 002:**
 - Parallel vs. sequential generation: **parallel**, no dependencies between artifact types
+  - Though the LiteLLM caller interface should avoid hitting rate limits on LLM backends
 - Partial failure handling: **per-artifact error state**, independent success/failure
 - Session model extension: **`artifacts` array** replaces top-level deductive fields
 - Per-node context storage: **`context` field on `PropositionNode`**
