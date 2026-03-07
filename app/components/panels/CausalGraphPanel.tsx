@@ -1,6 +1,7 @@
 "use client";
 
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
@@ -19,35 +20,16 @@ function WeightBadge({ weight }: { weight: number }) {
 }
 
 export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPanelProps) {
-  if (!causalGraph && !loading) {
-    return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-        <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Causal Graph
-          </h2>
-        </div>
-        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
-          No causal graph yet. Generate one from the source panel or node detail.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-      <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Causal Graph
-        </h2>
-      </div>
-
-      {loading && !causalGraph ? (
-        <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating causal graph...
-        </div>
-      ) : causalGraph ? (
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+    <ArtifactPanelShell
+      title="Causal Graph"
+      loading={loading}
+      hasData={causalGraph !== null}
+      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
+      loadingMessage="Generating causal graph..."
+    >
+      {causalGraph && (
+        <>
           {/* Summary */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
@@ -110,8 +92,8 @@ export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPa
               </div>
             </section>
           )}
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </ArtifactPanelShell>
   );
 }

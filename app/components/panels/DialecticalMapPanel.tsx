@@ -1,6 +1,7 @@
 "use client";
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type DialecticalMapPanelProps = {
   dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
@@ -8,35 +9,16 @@ type DialecticalMapPanelProps = {
 };
 
 export default function DialecticalMapPanel({ dialecticalMap, loading }: DialecticalMapPanelProps) {
-  if (!dialecticalMap && !loading) {
-    return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-        <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Dialectical Map
-          </h2>
-        </div>
-        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
-          No dialectical map yet. Generate one from the source panel or node detail.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-      <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Dialectical Map
-        </h2>
-      </div>
-
-      {loading && !dialecticalMap ? (
-        <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating dialectical map...
-        </div>
-      ) : dialecticalMap ? (
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+    <ArtifactPanelShell
+      title="Dialectical Map"
+      loading={loading}
+      hasData={dialecticalMap !== null}
+      emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
+      loadingMessage="Generating dialectical map..."
+    >
+      {dialecticalMap && (
+        <>
           {/* Topic */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Topic</h3>
@@ -127,8 +109,8 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
               )}
             </div>
           </section>
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </ArtifactPanelShell>
   );
 }

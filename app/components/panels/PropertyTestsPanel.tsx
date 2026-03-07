@@ -1,6 +1,7 @@
 "use client";
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
+import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type PropertyTestsPanelProps = {
   propertyTests: PropertyTestsResponse["propertyTests"] | null;
@@ -8,35 +9,16 @@ type PropertyTestsPanelProps = {
 };
 
 export default function PropertyTestsPanel({ propertyTests, loading }: PropertyTestsPanelProps) {
-  if (!propertyTests && !loading) {
-    return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-        <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Property Tests
-          </h2>
-        </div>
-        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
-          No property tests yet. Generate them from the source panel or node detail.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-      <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Property Tests
-        </h2>
-      </div>
-
-      {loading && !propertyTests ? (
-        <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating property tests...
-        </div>
-      ) : propertyTests ? (
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+    <ArtifactPanelShell
+      title="Property Tests"
+      loading={loading}
+      hasData={propertyTests !== null}
+      emptyMessage="No property tests yet. Generate them from the source panel or node detail."
+      loadingMessage="Generating property tests..."
+    >
+      {propertyTests && (
+        <>
           {/* Summary */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
@@ -89,8 +71,8 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
               </div>
             </section>
           )}
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </ArtifactPanelShell>
   );
 }

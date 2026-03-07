@@ -1,6 +1,7 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
+import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -24,35 +25,16 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function StatisticalModelPanel({ statisticalModel, loading }: StatisticalModelPanelProps) {
-  if (!statisticalModel && !loading) {
-    return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-        <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Statistical Model
-          </h2>
-        </div>
-        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
-          No statistical model yet. Generate one from the source panel or node detail.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-      <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Statistical Model
-        </h2>
-      </div>
-
-      {loading && !statisticalModel ? (
-        <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating statistical model...
-        </div>
-      ) : statisticalModel ? (
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+    <ArtifactPanelShell
+      title="Statistical Model"
+      loading={loading}
+      hasData={statisticalModel !== null}
+      emptyMessage="No statistical model yet. Generate one from the source panel or node detail."
+      loadingMessage="Generating statistical model..."
+    >
+      {statisticalModel && (
+        <>
           {/* Summary */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
@@ -125,8 +107,8 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               </p>
             </section>
           )}
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </ArtifactPanelShell>
   );
 }
