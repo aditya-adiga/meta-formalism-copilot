@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-import type { LoadingPhase, VerificationStatus } from "@/app/hooks/useFormalizationPipeline";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 import {
   SourceIcon,
   SemiformalIcon,

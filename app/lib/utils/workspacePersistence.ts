@@ -1,8 +1,7 @@
 import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { VerificationStatus } from "@/app/lib/types/session";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import { WORKSPACE_VERSION, WORKSPACE_KEY } from "@/app/lib/types/persistence";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 /** Strip transient "verifying" status back to "none" */
 export function sanitizeVerificationStatus(status: string): "none" | "valid" | "invalid" {

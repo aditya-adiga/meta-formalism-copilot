@@ -3,9 +3,7 @@
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import { downloadLeanCode } from "@/app/lib/utils/export";
-
-type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 
 type LeanPanelProps = {
   leanCode: string;

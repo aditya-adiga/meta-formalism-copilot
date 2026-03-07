@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+import type { VerificationStatus } from "@/app/lib/types/session";
 
 type OutputPanelProps = {
   semiformalText: string;

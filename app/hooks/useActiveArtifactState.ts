@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-import type { LoadingPhase, VerificationStatus } from "@/app/hooks/useFormalizationPipeline";
+import { fromNodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 
 type GlobalState = {
   semiformalText: string;
@@ -38,10 +39,7 @@ export function useActiveArtifactState(
     }
 
     const activeVerificationStatus: VerificationStatus =
-      selectedNode.verificationStatus === "verified" ? "valid"
-        : selectedNode.verificationStatus === "failed" ? "invalid"
-        : selectedNode.verificationStatus === "in-progress" ? "verifying"
-        : "none";
+      fromNodeVerificationStatus(selectedNode.verificationStatus);
 
     const semiformalReadyForLean =
       selectedNode.semiformalProof !== "" && selectedNode.leanCode === "" && loadingPhase === "idle";

@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
+import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
@@ -115,14 +116,10 @@ export default function Home() {
   const handleRestoreSession = useCallback((session: FormalizationSession) => {
     if (session.scope.type === "node") {
       selectNode(session.scope.nodeId);
-      const nodeStatus = session.verificationStatus === "valid" ? "verified" as const
-        : session.verificationStatus === "invalid" ? "failed" as const
-        : session.verificationStatus === "verifying" ? "in-progress" as const
-        : "unverified" as const;
       updateNode(session.scope.nodeId, {
         semiformalProof: session.semiformalText,
         leanCode: session.leanCode,
-        verificationStatus: nodeStatus,
+        verificationStatus: toNodeVerificationStatus(session.verificationStatus),
         verificationErrors: session.verificationErrors,
       });
     } else {
@@ -265,11 +262,7 @@ export default function Home() {
     getVerificationErrors: () => selectedNode?.verificationErrors ?? "",
     setVerificationStatus: (status) => {
       if (!selectedNode) return;
-      const nodeStatus = status === "valid" ? "verified" as const
-        : status === "invalid" ? "failed" as const
-        : status === "verifying" ? "in-progress" as const
-        : "unverified" as const;
-      updateNode(selectedNode.id, { verificationStatus: nodeStatus });
+      updateNode(selectedNode.id, { verificationStatus: toNodeVerificationStatus(status) });
     },
     setVerificationErrors: (errors) => { if (selectedNode) updateNode(selectedNode.id, { verificationErrors: errors }); },
     onResetForLean: () => { if (selectedNode) updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" }); },

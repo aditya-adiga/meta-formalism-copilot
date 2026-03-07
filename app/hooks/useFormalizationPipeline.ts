@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useRef } from "react";
 import { generateSemiformal, generateLean, verifyLean } from "@/app/lib/formalization/api";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 
-export type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-export type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+export type { LoadingPhase, VerificationStatus };
 
 const MAX_LEAN_ATTEMPTS = 3;
 

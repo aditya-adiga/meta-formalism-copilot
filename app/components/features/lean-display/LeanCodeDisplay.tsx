@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import SendIcon from "@/app/components/ui/icons/SendIcon";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+import type { VerificationStatus } from "@/app/lib/types/session";
 
 type LeanCodeDisplayProps = {
   code: string;

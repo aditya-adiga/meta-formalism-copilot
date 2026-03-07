@@ -12,6 +12,30 @@ export type NodeVerificationStatus =
   | "verified"
   | "failed";
 
+/** Map global VerificationStatus to per-node NodeVerificationStatus */
+export function toNodeVerificationStatus(
+  status: import("./session").VerificationStatus,
+): NodeVerificationStatus {
+  switch (status) {
+    case "valid": return "verified";
+    case "invalid": return "failed";
+    case "verifying": return "in-progress";
+    default: return "unverified";
+  }
+}
+
+/** Map per-node NodeVerificationStatus to global VerificationStatus */
+export function fromNodeVerificationStatus(
+  status: NodeVerificationStatus,
+): import("./session").VerificationStatus {
+  switch (status) {
+    case "verified": return "valid";
+    case "failed": return "invalid";
+    case "in-progress": return "verifying";
+    default: return "none";
+  }
+}
+
 export type SourceDocument = {
   sourceId: string;
   sourceLabel: string;

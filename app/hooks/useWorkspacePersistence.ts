@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedDecomposition } from "@/app/lib/types/persistence";
+import type { VerificationStatus } from "@/app/lib/types/session";
 import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData } from "@/app/lib/utils/workspacePersistence";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 type WorkspaceState = {
   sourceText: string;
