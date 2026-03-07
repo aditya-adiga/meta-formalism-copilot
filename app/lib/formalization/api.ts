@@ -39,10 +39,10 @@ export async function generateLean(
   return data.leanCode;
 }
 
-export async function generateSemiformal(text: string) {
+export async function generateSemiformal(sourceText: string, context?: string) {
   const data = await fetchApi<{ proof: string }>(
     "/api/formalization/semiformal",
-    { text },
+    { sourceText, context: context ?? "" },
   );
   return data.proof;
 }
