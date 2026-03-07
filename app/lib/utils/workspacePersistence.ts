@@ -35,31 +35,34 @@ export type ArtifactPersistenceData = {
   dialecticalMap: string | null;
 };
 
-export function saveWorkspace(
-  sourceText: string,
-  extractedFiles: { name: string; text: string }[],
-  contextText: string,
-  semiformalText: string,
-  leanCode: string,
-  semiformalDirty: boolean,
-  verificationStatus: VerificationStatus,
-  verificationErrors: string,
-  decomposition: PersistedDecomposition,
-  artifacts: ArtifactPersistenceData = { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null },
-): boolean {
+export type SaveWorkspaceInput = {
+  sourceText: string;
+  extractedFiles: { name: string; text: string }[];
+  contextText: string;
+  semiformalText: string;
+  leanCode: string;
+  semiformalDirty: boolean;
+  verificationStatus: VerificationStatus;
+  verificationErrors: string;
+  decomposition: PersistedDecomposition;
+  artifacts?: ArtifactPersistenceData;
+};
+
+export function saveWorkspace(input: SaveWorkspaceInput): boolean {
+  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null };
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
-    sourceText,
-    extractedFiles,
-    contextText,
-    semiformalText,
-    leanCode,
-    semiformalDirty,
-    verificationStatus: sanitizeVerificationStatus(verificationStatus),
-    verificationErrors,
+    sourceText: input.sourceText,
+    extractedFiles: input.extractedFiles,
+    contextText: input.contextText,
+    semiformalText: input.semiformalText,
+    leanCode: input.leanCode,
+    semiformalDirty: input.semiformalDirty,
+    verificationStatus: sanitizeVerificationStatus(input.verificationStatus),
+    verificationErrors: input.verificationErrors,
     decomposition: {
-      ...decomposition,
-      nodes: decomposition.nodes.map(sanitizeNode),
+      ...input.decomposition,
+      nodes: input.decomposition.nodes.map(sanitizeNode),
     },
     causalGraph: artifacts.causalGraph,
     statisticalModel: artifacts.statisticalModel,
