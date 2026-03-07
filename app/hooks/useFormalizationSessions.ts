@@ -26,22 +26,45 @@ function scopeMatches(a: SessionScope, b: SessionScope): boolean {
   return a.type === "node" && b.type === "node" && a.nodeId === b.nodeId;
 }
 
+const DEBOUNCE_MS = 500;
+
 export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
   const [state, setState] = useState<SessionsState>(loadFromStorage);
   const mounted = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef(state);
 
   // Ref so selectAndRestore always sees the latest callback without recreating
   const onRestoreRef = useRef(onRestore);
   useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
 
-  // Persist to localStorage on every change after initial mount
+  // Keep stateRef in sync for unmount flush
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Debounced persist to localStorage after initial mount
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, DEBOUNCE_MS);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [state]);
+
+  // Flush on unmount to avoid data loss
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+      }
+    };
+  }, []);
 
   const createSession = useCallback((scope: SessionScope): FormalizationSession => {
     const newSession: FormalizationSession = {
