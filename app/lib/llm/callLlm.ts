@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { computeCost } from "./costs";
-import { getCachedResult, setCachedResult } from "./cache";
+import { computeHash, getCachedResult, setCachedResult } from "./cache";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
@@ -76,10 +76,13 @@ export async function callLlm({
       ? openRouterModel
       : "mock";
 
+  // Compute hash once, reuse for cache get and set
+  const cacheHash = computeHash(effectiveModel, systemPrompt, userContent, maxTokens);
+
   // Check cache before making any LLM call
-  const cached = getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
+  const cached = await getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
   if (cached) {
-    console.log(`[${endpoint}] cache hit (model: ${effectiveModel}, hash: ${cached.cacheHash.slice(0, 8)})`);
+    console.log(`[${endpoint}] cache hit (model: ${effectiveModel}, hash: ${cacheHash.slice(0, 8)})`);
     return { text: cached.text, usage: cached.usage };
   }
 
@@ -108,7 +111,7 @@ export async function callLlm({
     const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
     const result = { text, usage, cacheKey };
     if (text) {
-      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+      try { await setCachedResult(cacheHash, result); } catch { /* cache write failure must not break LLM calls */ }
     }
     return result;
   }
@@ -152,7 +155,7 @@ export async function callLlm({
     const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
     const result = { text, usage, cacheKey };
     if (text) {
-      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+      try { await setCachedResult(cacheHash, result); } catch { /* cache write failure must not break LLM calls */ }
     }
     return result;
   }

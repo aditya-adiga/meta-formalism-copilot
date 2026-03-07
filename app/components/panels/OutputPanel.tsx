@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
+import VerificationBadge from "@/app/components/ui/VerificationBadge";
 import type { VerificationStatus } from "@/app/lib/types/session";
 
 type OutputPanelProps = {
@@ -19,17 +20,6 @@ type OutputPanelProps = {
   onReVerify: () => void;
   onLeanIterate: (instruction: string) => void;
 };
-
-function VerificationBadge({ status }: { status: VerificationStatus }) {
-  if (status === "none") return null;
-  if (status === "verifying") {
-    return <span className="ml-2 text-xs font-normal text-[#6B6560]">Verifying...</span>;
-  }
-  if (status === "valid") {
-    return <span className="ml-2 text-xs font-normal text-green-700">Verified</span>;
-  }
-  return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
-}
 
 export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);

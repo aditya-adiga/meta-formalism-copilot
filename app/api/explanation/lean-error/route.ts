@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-
-const OPENROUTER_MODEL = "anthropic/claude-sonnet-4-6";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const SYSTEM_PROMPT = `You are a Lean 4 error explanation assistant. The user will provide Lean 4 code and the errors produced by \`lake build\`.
 

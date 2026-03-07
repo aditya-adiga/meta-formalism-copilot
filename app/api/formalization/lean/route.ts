@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-
-const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 

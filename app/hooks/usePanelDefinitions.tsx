@@ -49,6 +49,8 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
   } = opts;
 
   const hasDecomp = nodes.length > 0;
+  const nodeCount = nodes.length;
+  const verifiedCount = nodes.filter((n) => n.verificationStatus === "verified").length;
 
   return useMemo(() => [
     // --- Navigation group ---
@@ -70,7 +72,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       icon: <GraphIcon />,
       group: "navigation" as const,
       statusSummary: hasDecomp
-        ? `${nodes.filter((n) => n.verificationStatus === "verified").length}/${nodes.length} verified`
+        ? `${verifiedCount}/${nodeCount} verified`
         : "No graph",
     },
     {
@@ -149,7 +151,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       statusSummary: "Cost estimates",
     },
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
-      loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, nodes, selectedNode,
+      loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, nodeCount, verifiedCount, selectedNode,
       hasCausalGraph, causalGraphLoading,
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,

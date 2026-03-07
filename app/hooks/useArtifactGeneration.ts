@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
@@ -78,7 +78,10 @@ export function useArtifactGeneration() {
     return results;
   }, []);
 
-  const isAnyGenerating = Object.values(loadingState).some((s) => s === "generating");
+  const isAnyGenerating = useMemo(
+    () => Object.values(loadingState).some((s) => s === "generating"),
+    [loadingState],
+  );
 
   return { loadingState, generateArtifacts, isAnyGenerating };
 }

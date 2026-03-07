@@ -3,8 +3,7 @@ import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-
-const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const SYSTEM_PROMPT = `You are a mathematical paper analyzer. Given one or more source documents, extract all formal propositions (definitions, lemmas, theorems, propositions, corollaries, axioms) and their dependency relationships.
 
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ propositions });
     } catch {
       if (cacheKey) {
-        try { removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
+        try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
       }
       const preview = responseText.slice(0, 500);
       console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);

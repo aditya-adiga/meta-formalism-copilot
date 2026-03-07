@@ -3,8 +3,7 @@ import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-
-const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];
@@ -83,7 +82,7 @@ export async function handleArtifactRoute(
       return NextResponse.json({ [config.responseKey]: parsed });
     } catch {
       if (cacheKey) {
-        try { removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
+        try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
       }
       const preview = responseText.slice(0, 500);
       console.error(`[${config.endpoint}] Failed to parse LLM response as JSON:`, preview);
