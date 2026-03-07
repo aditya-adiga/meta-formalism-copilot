@@ -9,8 +9,8 @@ vi.mock('@/app/components/features/source-input/TextInput', () => ({
 vi.mock('@/app/components/features/source-input/FileUpload', () => ({
   default: () => <div data-testid="file-upload" />,
 }))
-vi.mock('@/app/components/features/context-input/ContextInput', () => ({
-  default: ({ value }: { value: string }) => <textarea data-testid="context-input" defaultValue={value} />,
+vi.mock('@/app/components/features/formalization-controls/FormalizationControls', () => ({
+  default: () => <div data-testid="formalization-controls" />,
 }))
 
 describe('InputPanel', () => {
@@ -23,6 +23,8 @@ describe('InputPanel', () => {
     onContextTextChange: vi.fn(),
     onFormalise: vi.fn(),
     loading: false,
+    selectedArtifactTypes: ['semiformal'] as import('@/app/lib/types/session').ArtifactType[],
+    onArtifactTypesChange: vi.fn(),
   }
 
   it('renders the Source Inputs heading', () => {
@@ -30,15 +32,15 @@ describe('InputPanel', () => {
     expect(screen.getByText('Source Inputs')).toBeInTheDocument()
   })
 
-  it('renders the Formalism Context heading', () => {
+  it('renders the Direct Formalization heading', () => {
     render(<InputPanel {...defaultProps} />)
-    expect(screen.getByText('Formalism Context')).toBeInTheDocument()
+    expect(screen.getByText('Direct Formalization')).toBeInTheDocument()
   })
 
-  it('renders TextInput, FileUpload, and ContextInput', () => {
+  it('renders TextInput, FileUpload, and FormalizationControls', () => {
     render(<InputPanel {...defaultProps} />)
     expect(screen.getByTestId('text-input')).toBeInTheDocument()
     expect(screen.getByTestId('file-upload')).toBeInTheDocument()
-    expect(screen.getByTestId('context-input')).toBeInTheDocument()
+    expect(screen.getByTestId('formalization-controls')).toBeInTheDocument()
   })
 })
