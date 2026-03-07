@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedDecomposition } from "@/app/lib/types/persistence";
-import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData } from "@/app/lib/utils/workspacePersistence";
+import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData, type SaveWorkspaceInput } from "@/app/lib/utils/workspacePersistence";
 
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
@@ -79,6 +79,9 @@ export function useWorkspacePersistence() {
 
   // --- Debounced save on change ---
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep a ref to current state so scheduleSave always reads fresh data
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const artifactData: ArtifactPersistenceData = useMemo(() => ({
     causalGraph: state.causalGraph,
@@ -87,48 +90,42 @@ export function useWorkspacePersistence() {
     dialecticalMap: state.dialecticalMap,
   }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap]);
 
-  useEffect(() => {
+  const artifactRef = useRef(artifactData);
+  useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
+
+  // Stable save scheduler — reads from refs, never changes identity
+  const scheduleSave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      saveWorkspace(
-        state.sourceText,
-        state.extractedFiles,
-        state.contextText,
-        state.semiformalText,
-        state.leanCode,
-        state.semiformalDirty,
-        state.verificationStatus,
-        state.verificationErrors,
-        decompRef.current,
-        artifactData,
-      );
+      const s = stateRef.current;
+      const input: SaveWorkspaceInput = {
+        sourceText: s.sourceText,
+        extractedFiles: s.extractedFiles,
+        contextText: s.contextText,
+        semiformalText: s.semiformalText,
+        leanCode: s.leanCode,
+        semiformalDirty: s.semiformalDirty,
+        verificationStatus: s.verificationStatus,
+        verificationErrors: s.verificationErrors,
+        decomposition: decompRef.current,
+        artifacts: artifactRef.current,
+      };
+      saveWorkspace(input);
     }, 500);
+  }, []);
 
+  useEffect(() => {
+    scheduleSave();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [state, artifactData]);
+  }, [state, artifactData, scheduleSave]);
 
   /** Call this whenever decomposition state changes so persistence stays in sync */
   const persistDecompState = useCallback((decompState: PersistedDecomposition) => {
     decompRef.current = decompState;
-    // Trigger a debounced save
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      saveWorkspace(
-        state.sourceText,
-        state.extractedFiles,
-        state.contextText,
-        state.semiformalText,
-        state.leanCode,
-        state.semiformalDirty,
-        state.verificationStatus,
-        state.verificationErrors,
-        decompRef.current,
-        artifactData,
-      );
-    }, 500);
-  }, [state, artifactData]);
+    scheduleSave();
+  }, [scheduleSave]);
 
   // --- Individual setters that match the useState API page.tsx expects ---
   const setSourceText = useCallback((v: string) => setState((s) => ({ ...s, sourceText: v })), []);

@@ -63,22 +63,26 @@ describe("saveWorkspace", () => {
   });
 
   it("writes JSON to localStorage and returns true", () => {
-    const result = saveWorkspace(
-      "source", [], "ctx", "semi", "lean", false, "valid", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
-    );
+    const result = saveWorkspace({
+      sourceText: "source", extractedFiles: [], contextText: "ctx",
+      semiformalText: "semi", leanCode: "lean", semiformalDirty: false,
+      verificationStatus: "valid", verificationErrors: "",
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+    });
     expect(result).toBe(true);
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
-    expect(stored.version).toBe(1);
+    expect(stored.version).toBe(2);
     expect(stored.sourceText).toBe("source");
     expect(stored.verificationStatus).toBe("valid");
   });
 
   it("sanitizes 'verifying' status to 'none'", () => {
-    saveWorkspace(
-      "", [], "", "", "", false, "verifying", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
-    );
+    saveWorkspace({
+      sourceText: "", extractedFiles: [], contextText: "",
+      semiformalText: "", leanCode: "", semiformalDirty: false,
+      verificationStatus: "verifying", verificationErrors: "",
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+    });
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.verificationStatus).toBe("none");
   });
@@ -93,10 +97,12 @@ describe("saveWorkspace", () => {
       verificationErrors: "",
       context: "", selectedArtifactTypes: [], artifacts: [],
     };
-    saveWorkspace(
-      "", [], "", "", "", false, "none", "",
-      { nodes: [node], selectedNodeId: null, paperText: "" },
-    );
+    saveWorkspace({
+      sourceText: "", extractedFiles: [], contextText: "",
+      semiformalText: "", leanCode: "", semiformalDirty: false,
+      verificationStatus: "none", verificationErrors: "",
+      decomposition: { nodes: [node], selectedNodeId: null, paperText: "" },
+    });
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.decomposition.nodes[0].verificationStatus).toBe("unverified");
   });
@@ -106,10 +112,12 @@ describe("saveWorkspace", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("quota exceeded", "QuotaExceededError");
     });
-    const result = saveWorkspace(
-      "", [], "", "", "", false, "none", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
-    );
+    const result = saveWorkspace({
+      sourceText: "", extractedFiles: [], contextText: "",
+      semiformalText: "", leanCode: "", semiformalDirty: false,
+      verificationStatus: "none", verificationErrors: "",
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+    });
     expect(result).toBe(false);
     Storage.prototype.setItem = originalSetItem;
   });
