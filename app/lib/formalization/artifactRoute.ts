@@ -36,6 +36,10 @@ type ArtifactRouteConfig = {
   responseKey: string;
   mockResponse: (sourceText: string) => unknown;
   maxTokens?: number;
+  /** How to parse the LLM response. Default: "json" (parse as JSON). "text" returns raw text. */
+  parseResponse?: "json" | "text";
+  /** Optional: transform the request body before building the user message (e.g. legacy field mapping). */
+  transformBody?: (body: Record<string, unknown>) => ArtifactGenerationRequest;
 };
 
 /**
@@ -46,7 +50,10 @@ export async function handleArtifactRoute(
   request: NextRequest,
   config: ArtifactRouteConfig,
 ): Promise<NextResponse> {
-  const body: ArtifactGenerationRequest = await request.json();
+  const rawBody = await request.json();
+  const body: ArtifactGenerationRequest = config.transformBody
+    ? config.transformBody(rawBody)
+    : rawBody;
 
   if (!body.sourceText) {
     return NextResponse.json({ error: "sourceText is required" }, { status: 400 });
@@ -65,6 +72,10 @@ export async function handleArtifactRoute(
 
     if (usage.provider === "mock") {
       return NextResponse.json({ [config.responseKey]: config.mockResponse(body.sourceText) });
+    }
+
+    if (config.parseResponse === "text") {
+      return NextResponse.json({ [config.responseKey]: responseText });
     }
 
     try {
