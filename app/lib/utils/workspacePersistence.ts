@@ -3,6 +3,33 @@ import type { VerificationStatus } from "@/app/lib/types/session";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import { WORKSPACE_VERSION, WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
+const LEGACY_WORKSPACE_KEY = "workspace-v1";
+
+/** Migrate legacy workspace-v1 data to workspace-v2 key, then remove the old key. */
+export function migrateV1Workspace(): void {
+  try {
+    const raw = localStorage.getItem(LEGACY_WORKSPACE_KEY);
+    if (!raw) return;
+
+    // Only migrate if there's no v2 data yet
+    if (localStorage.getItem(WORKSPACE_KEY)) {
+      localStorage.removeItem(LEGACY_WORKSPACE_KEY);
+      return;
+    }
+
+    const parsed: unknown = JSON.parse(raw);
+    if (isObject(parsed)) {
+      // Stamp with current version so loadWorkspace accepts it
+      (parsed as Record<string, unknown>).version = WORKSPACE_VERSION;
+      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(parsed));
+    }
+    localStorage.removeItem(LEGACY_WORKSPACE_KEY);
+  } catch {
+    // Best-effort; don't block app startup
+    try { localStorage.removeItem(LEGACY_WORKSPACE_KEY); } catch { /* ignore */ }
+  }
+}
+
 /** Strip transient "verifying" status back to "none" */
 export function sanitizeVerificationStatus(status: string): "none" | "valid" | "invalid" {
   if (status === "valid" || status === "invalid") return status;
@@ -118,13 +145,13 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
  */
 export function loadWorkspace(): PersistedWorkspace | null {
   try {
+    migrateV1Workspace();
     const raw = localStorage.getItem(WORKSPACE_KEY);
     if (!raw) return null;
 
     const parsed: unknown = JSON.parse(raw);
     if (!isObject(parsed)) return null;
-    // Accept both v1 and v2 — v1 just won't have artifact data
-    if (parsed.version !== WORKSPACE_VERSION && parsed.version !== 1) return null;
+    if (parsed.version !== WORKSPACE_VERSION) return null;
 
     const decomposition = coerceDecomposition(parsed.decomposition);
 
