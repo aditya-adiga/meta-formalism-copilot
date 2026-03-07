@@ -137,3 +137,13 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "property-tests": "/api/formalization/property-tests",
   "dialectical-map": "/api/formalization/dialectical-map",
 };
+
+/** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
+export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
+  semiformal: "proof",
+  lean: "leanCode",
+  "causal-graph": "causalGraph",
+  "statistical-model": "statisticalModel",
+  "property-tests": "propertyTests",
+  "dialectical-map": "dialecticalMap",
+};

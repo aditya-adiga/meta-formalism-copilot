@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
-import { ARTIFACT_ROUTE } from "@/app/lib/types/artifacts";
+import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
 import { generateSemiformal } from "@/app/lib/formalization/api";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
@@ -53,13 +53,7 @@ export function useArtifactGeneration() {
           return [type, null];
         }
 
-        // Each route returns data keyed by its camelCase name
-        // e.g. { causalGraph: {...} }, { statisticalModel: {...} }
-        const responseKey = type === "causal-graph" ? "causalGraph"
-          : type === "statistical-model" ? "statisticalModel"
-          : type === "property-tests" ? "propertyTests"
-          : type === "dialectical-map" ? "dialecticalMap"
-          : type;
+        const responseKey = ARTIFACT_RESPONSE_KEY[type];
         return [type, data[responseKey] ?? null];
       } catch (err) {
         console.error(`[${type}]`, err);
