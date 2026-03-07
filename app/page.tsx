@@ -461,118 +461,127 @@ export default function Home() {
     });
   }, [semiformalText, leanCode, decomp.nodes]);
 
-  // --- Panel content map ---
-  const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
-  const sessionBannerElement = activeSession ? (
-    <SessionBanner
-      currentSession={activeSession}
-      sessions={allSessionsSorted}
-      onSelectSession={selectAndRestore}
-    />
-  ) : null;
+  // --- Panel render function (only creates JSX for the active panel) ---
+  const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
+    const sessionBannerElement = activeSession ? (
+      <SessionBanner
+        currentSession={activeSession}
+        sessions={allSessionsSorted}
+        onSelectSession={selectAndRestore}
+      />
+    ) : null;
 
-  return ({
-    source: (
-      <InputPanel
-        sourceText={sourceText}
-        onSourceTextChange={setSourceText}
-        extractedFiles={extractedFiles}
-        onFilesChanged={setExtractedFiles}
-        contextText={contextText}
-        onContextTextChange={setContextText}
-        onFormalise={handleGenerate}
-        loading={loadingPhase !== "idle" || isAnyGenerating}
-        onDecompose={handleDecompose}
-        decomposing={decomp.extractionStatus === "extracting"}
-        selectedArtifactTypes={selectedArtifactTypes}
-        onArtifactTypesChange={setSelectedArtifactTypes}
-        loadingState={artifactLoadingState}
-      />
-    ),
-    semiformal: (
-      <SemiformalPanel
-        semiformalText={activeSemiformal}
-        onSemiformalTextChange={handleSemiformalTextChange}
-        sessionBanner={sessionBannerElement}
-        onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
-        showGenerateLean={semiformalReadyForLean}
-        leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
-      />
-    ),
-    lean: (
-      <LeanPanel
-        leanCode={activeLeanCode}
-        onLeanCodeChange={handleLeanCodeChange}
-        loadingPhase={loadingPhase}
-        verificationStatus={activeVerificationStatus}
-        verificationErrors={activeVerificationErrors}
-        semiformalDirty={!isDecompMode && semiformalDirty}
-        semiformalReady={semiformalReadyForLean}
-        onRegenerateLean={activePipeline.handleRegenerateLean}
-        onReVerify={activePipeline.handleReVerify}
-        onLeanIterate={activePipeline.handleLeanIterate}
-        sessionBanner={sessionBannerElement}
-      />
-    ),
-    decomposition: (
-      <GraphPanel
-        propositions={decomp.nodes}
-        selectedNodeId={decomp.selectedNodeId}
-        onSelectNode={handleSelectNode}
-        hasContent={sourceDocuments.length > 0}
-        sourceDocuments={sourceDocuments}
-        extractionStatus={decomp.extractionStatus}
-        onDecompose={handleDecompose}
-        queueProgress={queueProgress}
-        onFormalizeAll={startQueue}
-        onPauseQueue={pauseQueue}
-        onResumeQueue={resumeQueue}
-        onCancelQueue={cancelQueue}
-      />
-    ),
-    "node-detail": selectedNode ? (
-      <NodeDetailPanel
-        node={selectedNode}
-        dependencies={selectedNodeDeps}
-        onFormalise={handleNodeGenerate}
-        onGenerateLean={handleNodeGenerateLean}
-        loading={loadingPhase !== "idle" || queueRunning}
-        globalContextText={contextText}
-        onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
-        onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
-        loadingState={artifactLoadingState}
-      />
-    ) : undefined,
-    "causal-graph": (
-      <CausalGraphPanel
-        causalGraph={causalGraph}
-        loading={causalGraphLoading}
-      />
-    ),
-    "statistical-model": (
-      <StatisticalModelPanel
-        statisticalModel={statisticalModel}
-        loading={statisticalModelLoading}
-      />
-    ),
-    "property-tests": (
-      <PropertyTestsPanel
-        propertyTests={propertyTests}
-        loading={propertyTestsLoading}
-      />
-    ),
-    "dialectical-map": (
-      <DialecticalMapPanel
-        dialecticalMap={dialecticalMap}
-        loading={dialecticalMapLoading}
-      />
-    ),
-    analytics: (
-      <AnalyticsPanel
-        endpointPriors={ENDPOINT_PRIORS}
-      />
-    ),
-  });}, [
+    switch (panelId) {
+      case "source":
+        return (
+          <InputPanel
+            sourceText={sourceText}
+            onSourceTextChange={setSourceText}
+            extractedFiles={extractedFiles}
+            onFilesChanged={setExtractedFiles}
+            contextText={contextText}
+            onContextTextChange={setContextText}
+            onFormalise={handleGenerate}
+            loading={loadingPhase !== "idle" || isAnyGenerating}
+            onDecompose={handleDecompose}
+            decomposing={decomp.extractionStatus === "extracting"}
+            selectedArtifactTypes={selectedArtifactTypes}
+            onArtifactTypesChange={setSelectedArtifactTypes}
+            loadingState={artifactLoadingState}
+          />
+        );
+      case "semiformal":
+        return (
+          <SemiformalPanel
+            semiformalText={activeSemiformal}
+            onSemiformalTextChange={handleSemiformalTextChange}
+            sessionBanner={sessionBannerElement}
+            onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
+            showGenerateLean={semiformalReadyForLean}
+            leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+          />
+        );
+      case "lean":
+        return (
+          <LeanPanel
+            leanCode={activeLeanCode}
+            onLeanCodeChange={handleLeanCodeChange}
+            loadingPhase={loadingPhase}
+            verificationStatus={activeVerificationStatus}
+            verificationErrors={activeVerificationErrors}
+            semiformalDirty={!isDecompMode && semiformalDirty}
+            semiformalReady={semiformalReadyForLean}
+            onRegenerateLean={activePipeline.handleRegenerateLean}
+            onReVerify={activePipeline.handleReVerify}
+            onLeanIterate={activePipeline.handleLeanIterate}
+            sessionBanner={sessionBannerElement}
+          />
+        );
+      case "decomposition":
+        return (
+          <GraphPanel
+            propositions={decomp.nodes}
+            selectedNodeId={decomp.selectedNodeId}
+            onSelectNode={handleSelectNode}
+            hasContent={sourceDocuments.length > 0}
+            sourceDocuments={sourceDocuments}
+            extractionStatus={decomp.extractionStatus}
+            onDecompose={handleDecompose}
+            queueProgress={queueProgress}
+            onFormalizeAll={startQueue}
+            onPauseQueue={pauseQueue}
+            onResumeQueue={resumeQueue}
+            onCancelQueue={cancelQueue}
+          />
+        );
+      case "node-detail":
+        return selectedNode ? (
+          <NodeDetailPanel
+            node={selectedNode}
+            dependencies={selectedNodeDeps}
+            onFormalise={handleNodeGenerate}
+            onGenerateLean={handleNodeGenerateLean}
+            loading={loadingPhase !== "idle" || queueRunning}
+            globalContextText={contextText}
+            onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
+            onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
+            loadingState={artifactLoadingState}
+          />
+        ) : undefined;
+      case "causal-graph":
+        return (
+          <CausalGraphPanel
+            causalGraph={causalGraph}
+            loading={causalGraphLoading}
+          />
+        );
+      case "statistical-model":
+        return (
+          <StatisticalModelPanel
+            statisticalModel={statisticalModel}
+            loading={statisticalModelLoading}
+          />
+        );
+      case "property-tests":
+        return (
+          <PropertyTestsPanel
+            propertyTests={propertyTests}
+            loading={propertyTestsLoading}
+          />
+        );
+      case "dialectical-map":
+        return (
+          <DialecticalMapPanel
+            dialecticalMap={dialecticalMap}
+            loading={dialecticalMapLoading}
+          />
+        );
+      case "analytics":
+        return <AnalyticsPanel endpointPriors={ENDPOINT_PRIORS} />;
+      default:
+        return undefined;
+    }
+  }, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
@@ -596,7 +605,7 @@ export default function Home() {
         panels={panels}
         activePanelId={activePanelId}
         onSelectPanel={setActivePanelId}
-        panelContent={panelContent}
+        renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
       />
