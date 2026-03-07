@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
 
@@ -49,12 +50,6 @@ Guidelines:
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
-/** Strip markdown code fences that LLMs sometimes wrap around Lean output. */
-function extractLeanCode(raw: string): string {
-  const fenced = raw.match(/```(?:lean4?|)[\r\n]([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  return raw.trim();
-}
 
 function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
@@ -99,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     let leanCode = usage.provider === "mock"
       ? mockResponse(informalProof, isRetry)
-      : extractLeanCode(responseText);
+      : stripCodeFences(responseText);
 
     // Safety net: strip import lines when context already provides them.
     // LLMs sometimes include `import Mathlib` despite being told not to.

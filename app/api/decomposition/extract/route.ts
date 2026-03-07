@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
+import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
 
@@ -73,13 +74,6 @@ function mockResponse(documents: SourceDocument[]) {
   return propositions;
 }
 
-/** Strip markdown code fences if present */
-function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?[\r\n]([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  return raw.trim();
-}
-
 /** Parse request body with backward compatibility for { text } format */
 function parseDocuments(body: Record<string, unknown>): SourceDocument[] | null {
   if (Array.isArray(body.documents) && body.documents.length > 0) {
@@ -116,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const propositions = JSON.parse(extractJson(responseText));
+      const propositions = JSON.parse(stripCodeFences(responseText));
       return NextResponse.json({ propositions });
     } catch {
       if (cacheKey) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
+import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
 
@@ -27,13 +28,6 @@ export function buildUserMessage(req: ArtifactGenerationRequest): string {
   }
 
   return parts.join("\n\n");
-}
-
-/** Strip markdown code fences if present */
-export function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?[\r\n]([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  return raw.trim();
 }
 
 type ArtifactRouteConfig = {
@@ -74,7 +68,7 @@ export async function handleArtifactRoute(
     }
 
     try {
-      const parsed = JSON.parse(extractJson(responseText));
+      const parsed = JSON.parse(stripCodeFences(responseText));
       return NextResponse.json({ [config.responseKey]: parsed });
     } catch {
       if (cacheKey) {
