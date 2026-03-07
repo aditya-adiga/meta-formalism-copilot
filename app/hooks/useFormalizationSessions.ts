@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import type { FormalizationSession, SessionScope, SessionsState } from "@/app/lib/types/session";
+import type { FormalizationSession, SessionScope, SessionsState, ArtifactData, ArtifactType } from "@/app/lib/types/session";
 
 export type SessionRestoreHandler = (session: FormalizationSession) => void;
 
-type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>;
+type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors" | "artifacts">>;
 
 const STORAGE_KEY = "metaformalism-sessions";
 
@@ -119,6 +119,38 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     });
   }, []);
 
+  /**
+   * Upsert an artifact entry in the active session's artifacts[].
+   * If an artifact of the same type exists, it's replaced; otherwise appended.
+   */
+  const updateSessionArtifact = useCallback((type: ArtifactType, content: string) => {
+    setState((prev) => {
+      if (!prev.activeSessionId) return prev;
+      const now = new Date().toISOString();
+      const newArtifact: ArtifactData = {
+        type,
+        content,
+        generatedAt: now,
+        verificationStatus: "none",
+        verificationErrors: "",
+      };
+      return {
+        ...prev,
+        sessions: prev.sessions.map((s) => {
+          if (s.id !== prev.activeSessionId) return s;
+          const existing = s.artifacts.findIndex((a) => a.type === type);
+          const artifacts = [...s.artifacts];
+          if (existing >= 0) {
+            artifacts[existing] = newArtifact;
+          } else {
+            artifacts.push(newArtifact);
+          }
+          return { ...s, artifacts, updatedAt: now };
+        }),
+      };
+    });
+  }, []);
+
   const clearActiveSession = useCallback(() => {
     setState((prev) => ({ ...prev, activeSessionId: null }));
   }, []);
@@ -152,6 +184,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     selectSession,
     selectAndRestore,
     syncToActiveSession,
+    updateSessionArtifact,
     clearActiveSession,
     sessionsForScope,
     activeSessionForScope,

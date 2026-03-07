@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
-import type { SourceDocument } from "@/app/lib/types/decomposition";
+import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
@@ -43,13 +43,36 @@ export default function Home() {
     verificationStatus, setVerificationStatus,
     verificationErrors, setVerificationErrors,
     restoredDecompState, persistDecompState,
+    causalGraph: persistedCausalGraph, setCausalGraph: setPersistedCausalGraph,
+    statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
+    propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
+    dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
   } = useWorkspacePersistence();
 
-  // --- Artifact data state ---
-  const [causalGraph, setCausalGraph] = useState<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"] | null>(null);
-  const [statisticalModel, setStatisticalModel] = useState<import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"] | null>(null);
-  const [propertyTests, setPropertyTests] = useState<import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"] | null>(null);
-  const [dialecticalMap, setDialecticalMap] = useState<import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"] | null>(null);
+  // --- Artifact data (persisted as JSON strings, parsed for display) ---
+  const causalGraph = useMemo(() => {
+    if (!persistedCausalGraph) return null;
+    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+    catch { return null; }
+  }, [persistedCausalGraph]);
+
+  const statisticalModel = useMemo(() => {
+    if (!persistedStatisticalModel) return null;
+    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
+    catch { return null; }
+  }, [persistedStatisticalModel]);
+
+  const propertyTests = useMemo(() => {
+    if (!persistedPropertyTests) return null;
+    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
+    catch { return null; }
+  }, [persistedPropertyTests]);
+
+  const dialecticalMap = useMemo(() => {
+    if (!persistedDialecticalMap) return null;
+    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+    catch { return null; }
+  }, [persistedDialecticalMap]);
 
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>(["semiformal"]);
@@ -110,18 +133,75 @@ export default function Home() {
       setVerificationErrors(session.verificationErrors);
       setSemiformalDirty(false);
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+
+    // Restore artifact data from session's artifacts[]
+    for (const artifact of session.artifacts) {
+      switch (artifact.type) {
+        case "causal-graph": setPersistedCausalGraph(artifact.content); break;
+        case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
+        case "property-tests": setPersistedPropertyTests(artifact.content); break;
+        case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+      }
+    }
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   const {
     activeSession,
     allSessionsSorted,
     createSession,
     syncToActiveSession,
+    updateSessionArtifact,
     selectSession,
     selectAndRestore,
     sessionsForScope,
   } = useFormalizationSessions(handleRestoreSession);
 
+
+  /** Store artifact results in session and (optionally) node */
+  const storeArtifactResults = useCallback((
+    results: Partial<Record<ArtifactType, unknown>>,
+    nodeId?: string,
+  ) => {
+    for (const [type, value] of Object.entries(results)) {
+      if (value == null) continue;
+      const artifactType = type as ArtifactType;
+      const content = typeof value === "string" ? value : JSON.stringify(value);
+
+      // Store in active session
+      updateSessionArtifact(artifactType, content);
+
+      // Store in node artifacts if per-node generation
+      if (nodeId) {
+        const nodeArtifact: NodeArtifact = {
+          type: artifactType,
+          content,
+          verificationStatus: "unverified",
+          verificationErrors: "",
+        };
+        // Upsert: replace existing artifact of same type, or append
+        updateNode(nodeId, {
+          artifacts: [
+            ...(decomp.nodes.find((n) => n.id === nodeId)?.artifacts.filter((a) => a.type !== artifactType) ?? []),
+            nodeArtifact,
+          ],
+        });
+      }
+    }
+
+    // Also update persisted display state (JSON strings)
+    if (results["causal-graph"]) {
+      setPersistedCausalGraph(JSON.stringify(results["causal-graph"]));
+    }
+    if (results["statistical-model"]) {
+      setPersistedStatisticalModel(JSON.stringify(results["statistical-model"]));
+    }
+    if (results["property-tests"]) {
+      setPersistedPropertyTests(JSON.stringify(results["property-tests"]));
+    }
+    if (results["dialectical-map"]) {
+      setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   // --- Combined paper text for single-proof formalization ---
   const combinedPaperText = useMemo(() => {
@@ -165,7 +245,15 @@ export default function Home() {
     setVerificationErrors,
     onResetForSemiformal: () => { setSemiformalDirty(false); },
     onResetForLean: () => { setSemiformalDirty(false); },
-    onSessionUpdate: syncToActiveSession,
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
   });
 
   // Node pipeline: reads/writes selected node state
@@ -186,7 +274,15 @@ export default function Home() {
     setVerificationErrors: (errors) => { if (selectedNode) updateNode(selectedNode.id, { verificationErrors: errors }); },
     onResetForLean: () => { if (selectedNode) updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" }); },
     getDependencyContext: () => selectedNode ? gatherDependencyContext(decomp.nodes, selectedNode.id) || undefined : undefined,
-    onSessionUpdate: syncToActiveSession,
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
   });
 
   // Active pipeline resolves based on decomposition mode
@@ -267,23 +363,15 @@ export default function Home() {
         : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
     ]);
 
-    // Store results in appropriate state
-    if (artifactResults?.["causal-graph"]) {
-      setCausalGraph(artifactResults["causal-graph"] as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]);
-    }
-    if (artifactResults?.["statistical-model"]) {
-      setStatisticalModel(artifactResults["statistical-model"] as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]);
-    }
-    if (artifactResults?.["property-tests"]) {
-      setPropertyTests(artifactResults["property-tests"] as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]);
-    }
-    if (artifactResults?.["dialectical-map"]) {
-      setDialecticalMap(artifactResults["dialectical-map"] as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]);
+    // Store results in session, node, and display state
+    // (Semiformal is stored via the pipeline's onSessionUpdate callback)
+    if (artifactResults) {
+      storeArtifactResults(artifactResults, selectedNode?.id);
     }
   }, [
     isDecompMode, selectedNode, combinedPaperText, contextText,
     selectedArtifactTypes, selectNode, createSession,
-    globalPipeline, nodePipeline, generateArtifacts,
+    globalPipeline, nodePipeline, generateArtifacts, storeArtifactResults,
   ]);
 
   /** Global: generate Lean from semiformal, navigate to panel */
@@ -329,19 +417,10 @@ export default function Home() {
         : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
     ]);
 
-    if (artifactResults?.["causal-graph"]) {
-      setCausalGraph(artifactResults["causal-graph"] as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]);
+    if (artifactResults) {
+      storeArtifactResults(artifactResults, selectedNode.id);
     }
-    if (artifactResults?.["statistical-model"]) {
-      setStatisticalModel(artifactResults["statistical-model"] as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]);
-    }
-    if (artifactResults?.["property-tests"]) {
-      setPropertyTests(artifactResults["property-tests"] as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]);
-    }
-    if (artifactResults?.["dialectical-map"]) {
-      setDialecticalMap(artifactResults["dialectical-map"] as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]);
-    }
-  }, [selectedNode, contextText, selectedArtifactTypes, createSession, nodePipeline, generateArtifacts]);
+  }, [selectedNode, contextText, selectedArtifactTypes, createSession, nodePipeline, generateArtifacts, storeArtifactResults]);
 
   /** Per-node: generate Lean + verify, navigate to panel */
   const handleNodeGenerateLean = useCallback(async () => {

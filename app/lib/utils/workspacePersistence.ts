@@ -29,6 +29,13 @@ function sanitizeNode(node: PropositionNode): PropositionNode {
  * Save workspace state to localStorage.
  * Returns true on success, false on failure (e.g. QuotaExceededError).
  */
+export type ArtifactPersistenceData = {
+  causalGraph: string | null;
+  statisticalModel: string | null;
+  propertyTests: string | null;
+  dialecticalMap: string | null;
+};
+
 export function saveWorkspace(
   sourceText: string,
   extractedFiles: { name: string; text: string }[],
@@ -39,6 +46,7 @@ export function saveWorkspace(
   verificationStatus: VerificationStatus,
   verificationErrors: string,
   decomposition: PersistedDecomposition,
+  artifacts: ArtifactPersistenceData = { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null },
 ): boolean {
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
@@ -54,6 +62,10 @@ export function saveWorkspace(
       ...decomposition,
       nodes: decomposition.nodes.map(sanitizeNode),
     },
+    causalGraph: artifacts.causalGraph,
+    statisticalModel: artifacts.statisticalModel,
+    propertyTests: artifacts.propertyTests,
+    dialecticalMap: artifacts.dialecticalMap,
   };
 
   try {
@@ -109,7 +121,8 @@ export function loadWorkspace(): PersistedWorkspace | null {
 
     const parsed: unknown = JSON.parse(raw);
     if (!isObject(parsed)) return null;
-    if (parsed.version !== WORKSPACE_VERSION) return null;
+    // Accept both v1 and v2 — v1 just won't have artifact data
+    if (parsed.version !== WORKSPACE_VERSION && parsed.version !== 1) return null;
 
     const decomposition = coerceDecomposition(parsed.decomposition);
 
@@ -133,6 +146,10 @@ export function loadWorkspace(): PersistedWorkspace | null {
       ),
       verificationErrors: typeof parsed.verificationErrors === "string" ? parsed.verificationErrors : "",
       decomposition,
+      causalGraph: typeof parsed.causalGraph === "string" ? parsed.causalGraph : null,
+      statisticalModel: typeof parsed.statisticalModel === "string" ? parsed.statisticalModel : null,
+      propertyTests: typeof parsed.propertyTests === "string" ? parsed.propertyTests : null,
+      dialecticalMap: typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null,
     };
   } catch {
     return null;

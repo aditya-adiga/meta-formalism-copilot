@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedDecomposition } from "@/app/lib/types/persistence";
-import { loadWorkspace, saveWorkspace } from "@/app/lib/utils/workspacePersistence";
+import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData } from "@/app/lib/utils/workspacePersistence";
 
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
@@ -15,6 +15,11 @@ type WorkspaceState = {
   semiformalDirty: boolean;
   verificationStatus: VerificationStatus;
   verificationErrors: string;
+  // Artifact data (JSON-stringified)
+  causalGraph: string | null;
+  statisticalModel: string | null;
+  propertyTests: string | null;
+  dialecticalMap: string | null;
 };
 
 const DEFAULT_STATE: WorkspaceState = {
@@ -26,6 +31,10 @@ const DEFAULT_STATE: WorkspaceState = {
   semiformalDirty: false,
   verificationStatus: "none",
   verificationErrors: "",
+  causalGraph: null,
+  statisticalModel: null,
+  propertyTests: null,
+  dialecticalMap: null,
 };
 
 export function useWorkspacePersistence() {
@@ -58,6 +67,10 @@ export function useWorkspacePersistence() {
       semiformalDirty: data.semiformalDirty,
       verificationStatus: data.verificationStatus,
       verificationErrors: data.verificationErrors,
+      causalGraph: data.causalGraph,
+      statisticalModel: data.statisticalModel,
+      propertyTests: data.propertyTests,
+      dialecticalMap: data.dialecticalMap,
     });
 
     decompRef.current = data.decomposition;
@@ -66,6 +79,13 @@ export function useWorkspacePersistence() {
 
   // --- Debounced save on change ---
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const artifactData: ArtifactPersistenceData = useMemo(() => ({
+    causalGraph: state.causalGraph,
+    statisticalModel: state.statisticalModel,
+    propertyTests: state.propertyTests,
+    dialecticalMap: state.dialecticalMap,
+  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap]);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -80,13 +100,14 @@ export function useWorkspacePersistence() {
         state.verificationStatus,
         state.verificationErrors,
         decompRef.current,
+        artifactData,
       );
     }, 500);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [state]);
+  }, [state, artifactData]);
 
   /** Call this whenever decomposition state changes so persistence stays in sync */
   const persistDecompState = useCallback((decompState: PersistedDecomposition) => {
@@ -104,9 +125,10 @@ export function useWorkspacePersistence() {
         state.verificationStatus,
         state.verificationErrors,
         decompRef.current,
+        artifactData,
       );
     }, 500);
-  }, [state]);
+  }, [state, artifactData]);
 
   // --- Individual setters that match the useState API page.tsx expects ---
   const setSourceText = useCallback((v: string) => setState((s) => ({ ...s, sourceText: v })), []);
@@ -120,6 +142,10 @@ export function useWorkspacePersistence() {
     setState((s) => ({ ...s, semiformalDirty: typeof v === "function" ? v(s.semiformalDirty) : v })), []);
   const setVerificationStatus = useCallback((v: VerificationStatus) => setState((s) => ({ ...s, verificationStatus: v })), []);
   const setVerificationErrors = useCallback((v: string) => setState((s) => ({ ...s, verificationErrors: v })), []);
+  const setCausalGraph = useCallback((v: string | null) => setState((s) => ({ ...s, causalGraph: v })), []);
+  const setStatisticalModel = useCallback((v: string | null) => setState((s) => ({ ...s, statisticalModel: v })), []);
+  const setPropertyTests = useCallback((v: string | null) => setState((s) => ({ ...s, propertyTests: v })), []);
+  const setDialecticalMap = useCallback((v: string | null) => setState((s) => ({ ...s, dialecticalMap: v })), []);
 
   // Stable return object that destructures the same as before
   return useMemo(() => ({
@@ -139,7 +165,15 @@ export function useWorkspacePersistence() {
     setVerificationStatus,
     verificationErrors: state.verificationErrors,
     setVerificationErrors,
+    causalGraph: state.causalGraph,
+    setCausalGraph,
+    statisticalModel: state.statisticalModel,
+    setStatisticalModel,
+    propertyTests: state.propertyTests,
+    setPropertyTests,
+    dialecticalMap: state.dialecticalMap,
+    setDialecticalMap,
     restoredDecompState,
     persistDecompState,
-  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap]);
 }
