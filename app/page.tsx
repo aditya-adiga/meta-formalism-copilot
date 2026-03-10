@@ -477,7 +477,6 @@ export default function Home() {
           <InputPanel
             sourceText={sourceText}
             onSourceTextChange={setSourceText}
-            extractedFiles={extractedFiles}
             onFilesChanged={setExtractedFiles}
             contextText={contextText}
             onContextTextChange={setContextText}

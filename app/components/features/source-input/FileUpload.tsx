@@ -103,6 +103,11 @@ export default function FileUpload({ onFilesChanged }: FileUploadProps) {
               <span className="flex items-center gap-2 truncate">
                 <StatusIndicator status={tf.status} />
                 <span className="truncate">{tf.file.name}</span>
+                {tf.status === "ready" && (
+                  <span className="ml-auto shrink-0 text-[10px] text-[#9A9590]">
+                    {tf.text.length.toLocaleString()} chars
+                  </span>
+                )}
                 {tf.status === "error" && tf.error && (
                   <span className="text-xs text-red-600" title={tf.error}>
                     — {tf.error}

@@ -7,7 +7,6 @@ import FormalizationControls from "@/app/components/features/formalization-contr
 type InputPanelProps = {
   sourceText: string;
   onSourceTextChange: (value: string) => void;
-  extractedFiles: { name: string; text: string }[];
   onFilesChanged: (files: { name: string; text: string }[]) => void;
   contextText: string;
   onContextTextChange: (value: string) => void;
@@ -25,7 +24,6 @@ type InputPanelProps = {
 export default function InputPanel({
   sourceText,
   onSourceTextChange,
-  extractedFiles,
   onFilesChanged,
   contextText,
   onContextTextChange,
@@ -40,7 +38,7 @@ export default function InputPanel({
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Top Section: Source Inputs */}
-      <div className="flex min-h-0 flex-col overflow-hidden border-b border-[#DDD9D5]">
+      <div className="flex max-h-[50%] min-h-0 flex-col overflow-hidden border-b border-[#DDD9D5]">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Source Inputs
@@ -49,28 +47,6 @@ export default function InputPanel({
         <div className="flex min-h-0 flex-col gap-3 overflow-auto p-4">
           <TextInput value={sourceText} onChange={onSourceTextChange} />
           <FileUpload onFilesChanged={onFilesChanged} />
-
-          {extractedFiles.length > 0 && (
-            <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                Uploaded Documents
-              </h3>
-              <ul className="space-y-1">
-                {extractedFiles.map((f) => (
-                  <li
-                    key={f.name}
-                    className="flex items-center gap-2 rounded-md border border-[#E8E4E0] bg-white px-3 py-2 text-sm text-[var(--ink-black)] shadow-sm"
-                  >
-                    <span className="text-green-600" aria-hidden>&#10003;</span>
-                    <span className="truncate">{f.name}</span>
-                    <span className="ml-auto shrink-0 text-[10px] text-[#9A9590]">
-                      {f.text.length.toLocaleString()} chars
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
 
           {/* Decompose action */}
           {onDecompose && (
