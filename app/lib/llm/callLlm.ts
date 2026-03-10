@@ -1,5 +1,7 @@
+import { randomUUID } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { computeCost } from "./costs";
+import { appendAnalyticsEntry } from "@/app/lib/analytics/persist";
 import { computeHash, getCachedResult, setCachedResult } from "./cache";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -108,6 +110,14 @@ export async function callLlm({
       costUsd: computeCost(model, inputTokens, outputTokens),
       latencyMs,
     };
+    try {
+      appendAnalyticsEntry({
+        id: randomUUID(),
+        endpoint,
+        ...usage,
+        timestamp: new Date().toISOString(),
+      });
+    } catch { /* persistence failure must not break LLM calls */ }
     const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
     const result = { text, usage, cacheKey };
     if (text) {
@@ -152,6 +162,14 @@ export async function callLlm({
       costUsd: computeCost(openRouterModel, inputTokens, outputTokens),
       latencyMs,
     };
+    try {
+      appendAnalyticsEntry({
+        id: randomUUID(),
+        endpoint,
+        ...usage,
+        timestamp: new Date().toISOString(),
+      });
+    } catch { /* persistence failure must not break LLM calls */ }
     const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
     const result = { text, usage, cacheKey };
     if (text) {
@@ -170,5 +188,13 @@ export async function callLlm({
     costUsd: 0,
     latencyMs: 0,
   };
+  try {
+    appendAnalyticsEntry({
+      id: randomUUID(),
+      endpoint,
+      ...usage,
+      timestamp: new Date().toISOString(),
+    });
+  } catch { /* persistence failure must not break LLM calls */ }
   return { text: "", usage };
 }

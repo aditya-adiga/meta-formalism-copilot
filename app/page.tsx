@@ -26,7 +26,7 @@ import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
-import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
+import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 
 export default function Home() {
@@ -78,6 +78,9 @@ export default function Home() {
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
+
+  // --- Analytics ---
+  const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics } = useAnalytics();
 
   // Derive per-type loading booleans from artifactLoadingState
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
@@ -577,7 +580,7 @@ export default function Home() {
           />
         );
       case "analytics":
-        return <AnalyticsPanel endpointPriors={ENDPOINT_PRIORS} />;
+        return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
       default:
         return undefined;
     }
@@ -597,6 +600,7 @@ export default function Home() {
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
     dialecticalMap, dialecticalMapLoading,
+    analyticsEntries, analyticsSummary, clearAnalytics,
   ]);
 
   return (
