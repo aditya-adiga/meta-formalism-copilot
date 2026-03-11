@@ -5,6 +5,10 @@
 
 import JSZip from "jszip";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
+import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
+import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
+import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { sanitizeFilename, triggerDownload } from "./export";
 import { getGraphViewportElement, graphToPngBlob } from "./exportGraph";
 
@@ -12,12 +16,20 @@ type ExportAllOptions = {
   semiformalText: string;
   leanCode: string;
   nodes: PropositionNode[];
+  causalGraph?: CausalGraphResponse["causalGraph"] | null;
+  statisticalModel?: StatisticalModelResponse["statisticalModel"] | null;
+  propertyTests?: PropertyTestsResponse["propertyTests"] | null;
+  dialecticalMap?: DialecticalMapResponse["dialecticalMap"] | null;
 };
 
 export async function exportAllAsZip({
   semiformalText,
   leanCode,
   nodes,
+  causalGraph,
+  statisticalModel,
+  propertyTests,
+  dialecticalMap,
 }: ExportAllOptions) {
   const zip = new JSZip();
 
@@ -27,6 +39,20 @@ export async function exportAllAsZip({
   }
   if (leanCode.trim()) {
     zip.file("proof.lean", leanCode);
+  }
+
+  // New formalism artifacts
+  if (causalGraph) {
+    zip.file("causal-graph.json", JSON.stringify(causalGraph, null, 2));
+  }
+  if (statisticalModel) {
+    zip.file("statistical-model.json", JSON.stringify(statisticalModel, null, 2));
+  }
+  if (propertyTests) {
+    zip.file("property-tests.json", JSON.stringify(propertyTests, null, 2));
+  }
+  if (dialecticalMap) {
+    zip.file("dialectical-map.json", JSON.stringify(dialecticalMap, null, 2));
   }
 
   // Graph screenshot (best-effort)

@@ -452,7 +452,10 @@ export default function Home() {
   });
 
   // --- Export All handler ---
-  const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
+  const hasExportableContent = Boolean(
+    semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
+    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+  );
 
   const handleExportAll = useCallback(async () => {
     // Dynamic import so jszip is only loaded when user clicks Export All
@@ -461,8 +464,12 @@ export default function Home() {
       semiformalText,
       leanCode,
       nodes: decomp.nodes,
+      causalGraph,
+      statisticalModel,
+      propertyTests,
+      dialecticalMap,
     });
-  }, [semiformalText, leanCode, decomp.nodes]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
