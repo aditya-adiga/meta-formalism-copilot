@@ -1,10 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
-// const OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
@@ -27,8 +24,7 @@ Guidelines:
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
-/** Strip markdown code fences that LLMs sometimes wrap around Lean output.
- *  Handles ```lean ... ```, ```lean4 ... ```, and plain ``` ... ```. */
+/** Strip markdown code fences that LLMs sometimes wrap around Lean output. */
 function extractLeanCode(raw: string): string {
   const fenced = raw.match(/```(?:lean4?|)[\r\n]([\s\S]*?)```/i);
   if (fenced) return fenced[1].trim();
@@ -53,8 +49,6 @@ export async function POST(request: NextRequest) {
   const systemPrompt = isRetry ? RETRY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
   let userContent = "";
 
-  // When dependency context is available, prepend it so the LLM can reference
-  // already-verified definitions and theorems instead of redefining them.
   if (contextLeanCode) {
     userContent += `The following verified Lean4 code defines theorems and definitions you can reference. Build on these rather than redefining them:\n\n${contextLeanCode}\n\n---\n\n`;
   }
@@ -66,51 +60,26 @@ export async function POST(request: NextRequest) {
     userContent += `\n\nAdditional instruction: ${instruction}`;
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const message = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 16384,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userContent }],
+  try {
+    const { text: responseText, usage } = await callLlm({
+      endpoint: "formalization/lean",
+      systemPrompt,
+      userContent,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
     });
-    const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    return NextResponse.json({ leanCode: extractLeanCode(raw) });
+
+    const leanCode = usage.provider === "mock"
+      ? mockResponse(informalProof, isRetry)
+      : extractLeanCode(responseText);
+    return NextResponse.json({ leanCode });
+  } catch (err) {
+    if (err instanceof OpenRouterError) {
+      return NextResponse.json(
+        { error: err.message, details: err.details },
+        { status: 502 },
+      );
+    }
+    throw err;
   }
-
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterKey) {
-    console.warn("[formalization/lean] No API key configured — returning mock response.\n\n To generate real responses, add ANTHROPIC_API_KEY or OPENROUTER_API_KEY to .env.local");
-    return NextResponse.json({ leanCode: mockResponse(informalProof, isRetry) });
-  }
-
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openRouterKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[formalization/lean] OpenRouter error:", response.status, errorBody);
-    return NextResponse.json(
-      { error: `OpenRouter API error: ${response.status}`, details: errorBody },
-      { status: 502 },
-    );
-  }
-
-  const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content ?? "";
-
-  return NextResponse.json({ leanCode: extractLeanCode(raw) });
 }

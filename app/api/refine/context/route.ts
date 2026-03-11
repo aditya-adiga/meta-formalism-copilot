@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const ACTION_PROMPTS: Record<string, string> = {
   elaborate: "Expand this context description with more detail, examples, and specificity. Keep the same intent but make it richer and more thorough.",
@@ -40,51 +38,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const message = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [{ role: "user", content: text }],
+  try {
+    const { text: responseText, usage } = await callLlm({
+      endpoint: "refine/context",
+      systemPrompt,
+      userContent: text,
+      maxTokens: 1024,
+      openRouterModel: OPENROUTER_MODEL,
     });
-    const refined = message.content[0].type === "text" ? message.content[0].text : "";
+
+    const refined = usage.provider === "mock" ? mockResponse(text, action) : responseText;
     return NextResponse.json({ text: refined });
+  } catch (err) {
+    if (err instanceof OpenRouterError) {
+      return NextResponse.json(
+        { error: err.message, details: err.details },
+        { status: 502 },
+      );
+    }
+    throw err;
   }
-
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterKey) {
-    console.warn("[refine/context] No API key configured — returning mock response");
-    return NextResponse.json({ text: mockResponse(text, action) });
-  }
-
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openRouterKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[refine/context] OpenRouter error:", response.status, errorBody);
-    return NextResponse.json(
-      { error: `OpenRouter API error: ${response.status}`, details: errorBody },
-      { status: 502 },
-    );
-  }
-
-  const data = await response.json();
-  const refined = data.choices?.[0]?.message?.content ?? "";
-
-  return NextResponse.json({ text: refined });
 }

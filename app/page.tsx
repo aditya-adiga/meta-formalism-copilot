@@ -9,7 +9,9 @@ import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
+import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
+import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import {
   SourceIcon,
@@ -18,23 +20,13 @@ import {
   LeanIcon,
   GraphIcon,
   NodeDetailIcon,
+  AnalyticsIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
 type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 const MAX_LEAN_ATTEMPTS = 3;
-
-async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
-  const res = await fetch("/api/formalization/lean", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ informalProof, previousAttempt, errors, instruction, contextLeanCode }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Lean generation failed");
-  return data.leanCode as string;
-}
 
 async function verifyLean(leanCode: string) {
   const res = await fetch("/api/verification/lean", {
@@ -44,6 +36,21 @@ async function verifyLean(leanCode: string) {
   });
   const data = await res.json();
   return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
+}
+
+/** Fetch a JSON API route. */
+async function fetchApi<T>(
+  url: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Request failed");
+  return data as T;
 }
 
 export default function Home() {
@@ -81,6 +88,16 @@ export default function Home() {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
 
+  // --- LLM call helpers that record usage ---
+
+  async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
+    const data = await fetchApi<{ leanCode: string }>(
+      "/api/formalization/lean",
+      { informalProof, previousAttempt, errors, instruction, contextLeanCode },
+    );
+    return data.leanCode;
+  }
+
   // --- Handlers ---
 
   const handleSemiformalTextChange = useCallback((text: string) => {
@@ -111,17 +128,11 @@ export default function Home() {
     setActivePanelId("semiformal");
 
     try {
-      const semiformalRes = await fetch("/api/formalization/semiformal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: combinedPaperText }),
-      });
-      const semiformalData = await semiformalRes.json();
-      if (!semiformalRes.ok) {
-        setSemiformalText(`Error: ${semiformalData.error ?? "Unknown error"}`);
-        return;
-      }
-      const proof = semiformalData.proof as string;
+      const semiformalData = await fetchApi<{ proof: string }>(
+        "/api/formalization/semiformal",
+        { text: combinedPaperText },
+      );
+      const proof = semiformalData.proof;
       setSemiformalText(proof);
 
       setLoadingPhase("lean");
@@ -174,17 +185,11 @@ export default function Home() {
       const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
 
       // Step 1: semiformal proof
-      const semiformalRes = await fetch("/api/formalization/semiformal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: nodeText }),
-      });
-      const semiformalData = await semiformalRes.json();
-      if (!semiformalRes.ok) {
-        updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: semiformalData.error ?? "Unknown error" });
-        return;
-      }
-      const proof = semiformalData.proof as string;
+      const semiformalData = await fetchApi<{ proof: string }>(
+        "/api/formalization/semiformal",
+        { text: nodeText },
+      );
+      const proof = semiformalData.proof;
       updateNode(selectedNode.id, { semiformalProof: proof });
 
       // Step 2: Lean generation with dependency context
@@ -412,6 +417,12 @@ export default function Home() {
             ? "Code ready"
             : "No code yet",
     },
+    {
+      id: "analytics" as PanelId,
+      label: "LLM Usage",
+      icon: <AnalyticsIcon />,
+      statusSummary: "Cost estimates",
+    },
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
 
   // --- Panel content map ---
@@ -469,6 +480,11 @@ export default function Home() {
         loading={loadingPhase !== "idle"}
       />
     ) : undefined,
+    analytics: (
+      <AnalyticsPanel
+        endpointPriors={ENDPOINT_PRIORS}
+      />
+    ),
   }), [
     sourceText, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,

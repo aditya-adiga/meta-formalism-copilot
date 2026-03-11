@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `You are a mathematical paper analyzer. Given the text of a mathematical paper or proof document, extract all formal propositions (definitions, lemmas, theorems, propositions, corollaries, axioms) and their dependency relationships.
 
@@ -65,52 +63,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const message = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 16384,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: text }],
+  try {
+    const { text: responseText, usage } = await callLlm({
+      endpoint: "decomposition/extract",
+      systemPrompt: SYSTEM_PROMPT,
+      userContent: text,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
     });
-    const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    const propositions = JSON.parse(extractJson(raw));
+
+    if (usage.provider === "mock") {
+      return NextResponse.json({ propositions: mockResponse(text) });
+    }
+
+    const propositions = JSON.parse(extractJson(responseText));
     return NextResponse.json({ propositions });
+  } catch (err) {
+    if (err instanceof OpenRouterError) {
+      return NextResponse.json(
+        { error: err.message, details: err.details },
+        { status: 502 },
+      );
+    }
+    throw err;
   }
-
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterKey) {
-    console.warn("[decomposition/extract] No API key configured — returning mock response.");
-    return NextResponse.json({ propositions: mockResponse(text) });
-  }
-
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openRouterKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[decomposition/extract] OpenRouter error:", response.status, errorBody);
-    return NextResponse.json(
-      { error: `OpenRouter API error: ${response.status}`, details: errorBody },
-      { status: 502 },
-    );
-  }
-
-  const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content ?? "";
-  const propositions = JSON.parse(extractJson(raw));
-  return NextResponse.json({ propositions });
 }

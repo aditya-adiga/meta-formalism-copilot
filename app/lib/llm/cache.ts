@@ -1,0 +1,70 @@
+import { createHash } from "crypto";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
+import type { LlmCallUsage } from "./callLlm";
+
+const CACHE_DIR = join(process.cwd(), "data", "cache");
+
+type CachedResult = {
+  text: string;
+  usage: LlmCallUsage;
+};
+
+function computeHash(
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens: number
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ model, systemPrompt, userContent, maxTokens }))
+    .digest("hex");
+}
+
+function ensureCacheDir() {
+  if (!existsSync(CACHE_DIR)) {
+    mkdirSync(CACHE_DIR, { recursive: true });
+  }
+}
+
+export function getCachedResult(
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens: number
+): CachedResult | null {
+  const hash = computeHash(model, systemPrompt, userContent, maxTokens);
+  const filePath = join(CACHE_DIR, `${hash}.json`);
+
+  if (!existsSync(filePath)) return null;
+
+  try {
+    const data = JSON.parse(readFileSync(filePath, "utf-8")) as CachedResult;
+    // Override usage to reflect cache hit
+    return {
+      text: data.text,
+      usage: {
+        ...data.usage,
+        provider: "cache",
+        costUsd: 0,
+        latencyMs: 0,
+      },
+    };
+  } catch {
+    // Corrupt cache file — treat as miss
+    return null;
+  }
+}
+
+export function setCachedResult(
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens: number,
+  result: CachedResult
+): void {
+  ensureCacheDir();
+  const hash = computeHash(model, systemPrompt, userContent, maxTokens);
+  const filePath = join(CACHE_DIR, `${hash}.json`);
+  writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8");
+}
