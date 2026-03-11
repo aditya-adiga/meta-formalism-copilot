@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+// const OPENROUTER_MODEL = "deepseek/deepseek-prover-v2";
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+// const OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = "You are a mathematical reasoning assistant. The user will provide text from a conversation or document. Generate semiformal mathematical reasoning that captures the key ideas — using mathematical notation, logical structure, and proof sketches where appropriate. Return structured output with the mathematical reasoning.";
 

@@ -584,14 +584,38 @@ export default function Home() {
     sessionBannerElement,
   ]);
 
+  const handleRegenerateLean = useCallback(() => {
+    handleLeanIterate("");
+  }, [handleLeanIterate]);
+
   return (
-    <main>
-      <PanelShell
-        panels={panels}
-        activePanelId={activePanelId}
-        onSelectPanel={setActivePanelId}
-        panelContent={panelContent}
-      />
+    <main className="relative grid h-screen grid-cols-2 gap-px overflow-hidden bg-[var(--ivory-cream)]">
+      <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Input panel">
+        <InputPanel
+          sourceText={sourceText}
+          onSourceTextChange={setSourceText}
+          contextText={contextText}
+          onContextTextChange={setContextText}
+          onFormalise={handleFormalise}
+          loading={loadingPhase !== "idle"}
+        />
+      </section>
+      <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">
+        <OutputPanel
+          semiformalText={semiformalText}
+          onSemiformalTextChange={handleSemiformalTextChange}
+          semiformalDirty={semiformalDirty}
+          onRegenerateLean={handleRegenerateLean}
+          leanCode={leanCode}
+          onLeanCodeChange={setLeanCode}
+          loadingPhase={loadingPhase}
+          verificationStatus={verificationStatus}
+          verificationErrors={verificationErrors}
+          onReVerify={handleReVerify}
+          onLeanIterate={handleLeanIterate}
+        />
+      </section>
+      <BookSpineDivider />
     </main>
   );
 }
