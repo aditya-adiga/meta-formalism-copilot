@@ -107,26 +107,19 @@ export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPa
         <div className="flex flex-col h-full">
           {/* View toggle */}
           <div className="flex gap-1 mb-3">
-            <button
-              onClick={() => setViewMode("graph")}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                viewMode === "graph"
-                  ? "bg-[var(--ink-black)] text-white"
-                  : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
-              }`}
-            >
-              Graph
-            </button>
-            <button
-              onClick={() => setViewMode("details")}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                viewMode === "details"
-                  ? "bg-[var(--ink-black)] text-white"
-                  : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
-              }`}
-            >
-              Details
-            </button>
+            {(["graph", "details"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  viewMode === mode
+                    ? "bg-[var(--ink-black)] text-white"
+                    : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
+                }`}
+              >
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
           </div>
 
           {viewMode === "graph" ? (
