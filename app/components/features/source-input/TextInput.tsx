@@ -8,7 +8,7 @@ type TextInputProps = {
 export default function TextInput({ value, onChange }: TextInputProps) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs text-[#6B6560]">
+      <p className="text-sm text-[#6B6560]">
         Enter source information containing insight, research notes, or conceptual material
       </p>
       <textarea

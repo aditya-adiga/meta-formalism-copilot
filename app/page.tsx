@@ -5,27 +5,55 @@ import BookSpineDivider from "@/app/components/ui/BookSpineDivider";
 import InputPanel from "@/app/components/panels/InputPanel";
 import OutputPanel from "@/app/components/panels/OutputPanel";
 
-type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying";
+type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+
+const MAX_LEAN_ATTEMPTS = 3;
+
+async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string) {
+  const res = await fetch("/api/formalization/lean", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ informalProof, previousAttempt, errors, instruction }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Lean generation failed");
+  return data.leanCode as string;
+}
+
+async function verifyLean(leanCode: string) {
+  const res = await fetch("/api/verification/lean", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leanCode }),
+  });
+  const data = await res.json();
+  return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
+}
 
 export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [contextText, setContextText] = useState("");
   const [semiformalText, setSemiformalText] = useState("");
   const [leanCode, setLeanCode] = useState("");
+  const [semiformalDirty, setSemiformalDirty] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("none");
   const [verificationErrors, setVerificationErrors] = useState("");
+
+  const handleSemiformalTextChange = useCallback((text: string) => {
+    setSemiformalText(text);
+    setSemiformalDirty((prev) => prev || leanCode !== "");
+  }, [leanCode]);
 
   const handleFormalise = useCallback(async () => {
     setLoadingPhase("semiformal");
     setSemiformalText("");
     setLeanCode("");
+    setSemiformalDirty(false);
     setVerificationStatus("none");
     setVerificationErrors("");
 
-    let gotSemiformal = false;
-    let gotLean = false;
     try {
       // Step 1: Generate semiformal proof
       const semiformalRes = await fetch("/api/formalization/semiformal", {
@@ -34,105 +62,101 @@ export default function Home() {
         body: JSON.stringify({ text: sourceText }),
       });
       const semiformalData = await semiformalRes.json();
-
       if (!semiformalRes.ok) {
         setSemiformalText(`Error: ${semiformalData.error ?? "Unknown error"}`);
         return;
       }
-
-      const proof = semiformalData.proof;
+      const proof = semiformalData.proof as string;
       setSemiformalText(proof);
-      gotSemiformal = true;
 
-      // Step 2: Convert to Lean4 code
+      // Steps 2–4: Generate Lean4 with up to MAX_LEAN_ATTEMPTS retries
       setLoadingPhase("lean");
-      const leanRes = await fetch("/api/formalization/lean", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ informalProof: proof }),
-      });
-      const leanData = await leanRes.json();
+      let currentCode = "";
+      let lastErrors = "";
 
-      if (!leanRes.ok) {
-        setLeanCode(`-- Error: ${leanData.error ?? "Unknown error"}`);
-        return;
-      }
+      for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
+        // Generate (first attempt has no previous context)
+        if (attempt > 1) {
+          setLoadingPhase("retrying");
+        }
+        currentCode = await generateLean(
+          proof,
+          attempt > 1 ? currentCode : undefined,
+          attempt > 1 ? lastErrors : undefined,
+        );
+        setLeanCode(currentCode);
 
-      let currentLeanCode = leanData.leanCode;
-      setLeanCode(currentLeanCode);
-      gotLean = true;
+        // Verify
+        setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
+        setVerificationStatus("verifying");
+        const { valid, errors } = await verifyLean(currentCode);
 
-      // Step 3: Verify the Lean4 code
-      setLoadingPhase("verifying");
-      setVerificationStatus("verifying");
-      const verifyRes = await fetch("/api/verification/lean", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leanCode: currentLeanCode }),
-      });
-      const verifyData = await verifyRes.json();
+        if (valid) {
+          setVerificationStatus("valid");
+          setVerificationErrors("");
+          return;
+        }
 
-      if (verifyRes.ok && verifyData.valid) {
-        setVerificationStatus("valid");
-        return;
-      }
+        lastErrors = errors || "Verification failed";
+        setVerificationErrors(lastErrors);
 
-      // Verification failed — try once more
-      const firstErrors = verifyData.errors ?? "Unknown verification error";
-      setVerificationErrors(firstErrors);
-
-      // Step 4: Retry Lean4 generation with error context
-      setLoadingPhase("retrying");
-      const retryRes = await fetch("/api/formalization/lean", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          informalProof: proof,
-          previousAttempt: currentLeanCode,
-          errors: firstErrors,
-        }),
-      });
-      const retryData = await retryRes.json();
-
-      if (!retryRes.ok) {
-        setVerificationStatus("invalid");
-        return;
-      }
-
-      currentLeanCode = retryData.leanCode;
-      setLeanCode(currentLeanCode);
-
-      // Step 5: Re-verify the retried code
-      setLoadingPhase("reverifying");
-      setVerificationStatus("verifying");
-      const reVerifyRes = await fetch("/api/verification/lean", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leanCode: currentLeanCode }),
-      });
-      const reVerifyData = await reVerifyRes.json();
-
-      if (reVerifyRes.ok && reVerifyData.valid) {
-        setVerificationStatus("valid");
-        setVerificationErrors("");
-      } else {
-        setVerificationStatus("invalid");
-        setVerificationErrors(reVerifyData.errors ?? "Unknown verification error");
+        if (attempt === MAX_LEAN_ATTEMPTS) {
+          setVerificationStatus("invalid");
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
-      if (!gotSemiformal) {
-        setSemiformalText(`Error: ${msg}`);
-      } else if (!gotLean) {
-        setLeanCode(`-- Error: ${msg}`);
-      } else {
-        setVerificationStatus("invalid");
-        setVerificationErrors(msg);
-      }
+      // Show error in whichever pane was being filled
+      if (!semiformalText) setSemiformalText(`Error: ${msg}`);
+      else if (!leanCode) setLeanCode(`-- Error: ${msg}`);
+      else { setVerificationStatus("invalid"); setVerificationErrors(msg); }
     } finally {
       setLoadingPhase("idle");
     }
-  }, [sourceText]);
+  }, [sourceText, semiformalText, leanCode]);
+
+  /** Re-run verification on whatever Lean code is currently in the box. */
+  const handleReVerify = useCallback(async () => {
+    if (!leanCode) return;
+    setLoadingPhase("verifying");
+    setVerificationStatus("verifying");
+    setVerificationErrors("");
+    try {
+      const { valid, errors } = await verifyLean(leanCode);
+      setVerificationStatus(valid ? "valid" : "invalid");
+      setVerificationErrors(valid ? "" : errors || "Verification failed");
+    } catch (err) {
+      setVerificationStatus("invalid");
+      setVerificationErrors(err instanceof Error ? err.message : "Verification request failed");
+    } finally {
+      setLoadingPhase("idle");
+    }
+  }, [leanCode]);
+
+  /** LLM-guided iteration: regenerate Lean code with an optional instruction, then re-verify. */
+  const handleLeanIterate = useCallback(async (instruction: string) => {
+    if (!semiformalText) return;
+    setSemiformalDirty(false);
+    setLoadingPhase("iterating");
+    setVerificationStatus("verifying");
+    setVerificationErrors("");
+    try {
+      const newCode = await generateLean(semiformalText, leanCode || undefined, verificationErrors || undefined, instruction || undefined);
+      setLeanCode(newCode);
+      const { valid, errors } = await verifyLean(newCode);
+      setVerificationStatus(valid ? "valid" : "invalid");
+      setVerificationErrors(valid ? "" : errors || "Verification failed");
+    } catch (err) {
+      setVerificationStatus("invalid");
+      setVerificationErrors(err instanceof Error ? err.message : "Iteration failed");
+    } finally {
+      setLoadingPhase("idle");
+    }
+  }, [semiformalText, leanCode, verificationErrors]);
+
+  const handleRegenerateLean = useCallback(() => {
+    handleLeanIterate("");
+  }, [handleLeanIterate]);
 
   return (
     <main className="relative grid h-screen grid-cols-2 gap-px overflow-hidden bg-[var(--ivory-cream)]">
@@ -149,11 +173,16 @@ export default function Home() {
       <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">
         <OutputPanel
           semiformalText={semiformalText}
-          onSemiformalTextChange={setSemiformalText}
+          onSemiformalTextChange={handleSemiformalTextChange}
+          semiformalDirty={semiformalDirty}
+          onRegenerateLean={handleRegenerateLean}
           leanCode={leanCode}
+          onLeanCodeChange={setLeanCode}
           loadingPhase={loadingPhase}
           verificationStatus={verificationStatus}
           verificationErrors={verificationErrors}
+          onReVerify={handleReVerify}
+          onLeanIterate={handleLeanIterate}
         />
       </section>
       <BookSpineDivider />

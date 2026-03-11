@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
@@ -10,10 +10,15 @@ type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 type OutputPanelProps = {
   semiformalText: string;
   onSemiformalTextChange: (value: string) => void;
+  semiformalDirty: boolean;
+  onRegenerateLean: () => void;
   leanCode: string;
-  loadingPhase: "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying";
+  onLeanCodeChange: (code: string) => void;
+  loadingPhase: "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
   verificationStatus: VerificationStatus;
   verificationErrors: string;
+  onReVerify: () => void;
+  onLeanIterate: (instruction: string) => void;
 };
 
 function VerificationBadge({ status }: { status: VerificationStatus }) {
@@ -27,8 +32,18 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
   return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
 }
 
-export default function OutputPanel({ semiformalText, onSemiformalTextChange, leanCode, loadingPhase, verificationStatus, verificationErrors }: OutputPanelProps) {
+export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
+  const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
+
+  // Switch back to rendered view when new semiformal content arrives, but not while user is editing (raw mode)
+  useEffect(() => {
+    if (semiformalText && renderMode !== "raw") setRenderMode("rendered");
+  }, [semiformalText, renderMode]);
+
+  const handleToggleEdit = useCallback(() => {
+    setRenderMode((m) => (m === "rendered" ? "raw" : "rendered"));
+  }, []);
 
   const handleInlineEdit = useCallback(async (instruction: string, selection: { start: number; end: number; text: string }) => {
     setEditing(true);
@@ -40,7 +55,9 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       });
       const data = await response.json();
       if (response.ok) {
-        onSemiformalTextChange(data.text);
+        const newText = semiformalText.slice(0, selection.start) + data.text + semiformalText.slice(selection.end);
+        onSemiformalTextChange(newText);
+        setRenderMode("rendered");
       } else {
         console.error("[inline edit]", data.error);
       }
@@ -62,6 +79,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       const data = await response.json();
       if (response.ok) {
         onSemiformalTextChange(data.text);
+        setRenderMode("rendered");
       } else {
         console.error("[whole edit]", data.error);
       }
@@ -81,7 +99,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
       )}
 
       {/* Semiformal proof section — editable */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Semiformal Proof
@@ -91,30 +109,58 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, le
           value={semiformalText}
           onChange={onSemiformalTextChange}
           onInlineEdit={handleInlineEdit}
+          renderMode={renderMode}
+          onToggleEdit={handleToggleEdit}
         />
+        {/* Floating bar anchored to the bottom of this section */}
+        {semiformalText && !editing && <WholeTextEditBar onApply={handleWholeTextEdit} />}
       </div>
 
-      {/* Lean4 code section — read-only */}
-      {(leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying") && (
+      {/* Lean4 code section */}
+      {(leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying" || loadingPhase === "iterating") && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t-2 border-[var(--ink-black)]">
-          <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
+          <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
               Lean4 Code
-              <VerificationBadge status={verificationStatus} />
             </h2>
+            <div className="flex items-center gap-2">
+              <VerificationBadge status={verificationStatus} />
+              {verificationStatus === "invalid" && loadingPhase === "idle" && (
+                <button
+                  onClick={() => onLeanIterate("")}
+                  className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
+                >
+                  Verification failed — Fix with AI ↺
+                </button>
+              )}
+              {semiformalDirty && loadingPhase === "idle" && (
+                <button
+                  onClick={onRegenerateLean}
+                  className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
+                >
+                  Semiformal changed — Regenerate ↺
+                </button>
+              )}
+            </div>
           </div>
           {loadingPhase === "lean" && !leanCode ? (
             <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
               Generating Lean4 code...
             </div>
           ) : (
-            <LeanCodeDisplay code={leanCode} verificationStatus={verificationStatus} verificationErrors={verificationErrors} />
+            <LeanCodeDisplay
+              code={leanCode}
+              verificationStatus={verificationStatus}
+              verificationErrors={verificationErrors}
+              onCodeChange={onLeanCodeChange}
+              onReVerify={onReVerify}
+              onIterate={onLeanIterate}
+              iterating={loadingPhase === "iterating" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+            />
           )}
         </div>
       )}
 
-      {/* Floating bottom bar for editing whole semiformal text */}
-      {semiformalText && !editing && <WholeTextEditBar onApply={handleWholeTextEdit} />}
     </div>
   );
 }
