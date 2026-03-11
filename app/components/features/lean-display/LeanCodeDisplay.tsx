@@ -131,7 +131,27 @@ export default function LeanCodeDisplay({
             spellCheck={false}
           />
         )}
-        </div>
+
+        {/* Verification errors */}
+        {verificationStatus === "invalid" && verificationErrors && (
+          <div className="mt-4 rounded border border-red-300 bg-red-50 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
+                lake build output
+              </h3>
+              <button
+                onClick={onReVerify}
+                disabled={!canReVerify}
+                className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                Re-verify
+              </button>
+            </div>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
+              {verificationErrors}
+            </pre>
+          </div>
+        )}
       </div>
 
       {/* Iterate bar — visible whenever there is code */}
