@@ -48,6 +48,18 @@ Guidelines:
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
+const RETRY_SYSTEM_PROMPT_WITH_CONTEXT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, the verification errors, and verified Lean4 code from dependency nodes. Fix the Lean4 code so it passes verification.
+
+The verifier uses Lean4 with Mathlib. The dependency context already includes \`import Mathlib\`, so do NOT include any import statements in your output.
+
+Guidelines:
+- Use Lean4 syntax (not Lean3)
+- Do NOT include \`import Mathlib\` or any other import — imports are handled by the dependency context
+- Reference theorems and definitions from the provided context rather than redefining them
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
+- Address all verification errors shown in the error output
+- Return only the corrected Lean4 code with no additional commentary`;
+
 /** Strip markdown code fences that LLMs sometimes wrap around Lean output. */
 function extractLeanCode(raw: string): string {
   const fenced = raw.match(/```(?:lean4?|)[\r\n]([\s\S]*?)```/i);
