@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
-    throw err;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[edit/whole] Unexpected error:", message);
+    return NextResponse.json(
+      { error: `LLM call failed: ${message}` },
+      { status: 502 },
+    );
   }
 }

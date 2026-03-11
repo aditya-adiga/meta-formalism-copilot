@@ -34,9 +34,17 @@ type CallLlmOptions = {
   openRouterModel?: string;
 };
 
+export type CacheKey = {
+  model: string;
+  systemPrompt: string;
+  userContent: string;
+  maxTokens: number;
+};
+
 type CallLlmResult = {
   text: string;
   usage: LlmCallUsage;
+  cacheKey?: CacheKey;
 };
 
 /** Centralized LLM call with Anthropic -> OpenRouter -> mock fallback.
@@ -88,8 +96,11 @@ export async function callLlm({
       costUsd: computeCost(model, inputTokens, outputTokens),
       latencyMs,
     };
-    const result = { text, usage };
-    try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
+    const result = { text, usage, cacheKey };
+    if (text) {
+      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    }
     return result;
   }
 
@@ -129,8 +140,11 @@ export async function callLlm({
       costUsd: computeCost(openRouterModel, inputTokens, outputTokens),
       latencyMs,
     };
-    const result = { text, usage };
-    try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
+    const result = { text, usage, cacheKey };
+    if (text) {
+      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
+    }
     return result;
   }
 

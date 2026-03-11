@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { removeCachedResult } from "@/app/lib/llm/cache";
 
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
 
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { text: responseText, usage } = await callLlm({
+    const { text: responseText, usage, cacheKey } = await callLlm({
       endpoint: "decomposition/extract",
       systemPrompt: SYSTEM_PROMPT,
       userContent: text,
@@ -76,8 +77,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ propositions: mockResponse(text) });
     }
 
-    const propositions = JSON.parse(extractJson(responseText));
-    return NextResponse.json({ propositions });
+    try {
+      const propositions = JSON.parse(extractJson(responseText));
+      return NextResponse.json({ propositions });
+    } catch {
+      // JSON parse failed — invalidate the cached bad response
+      if (cacheKey) {
+        try { removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
+      }
+      const preview = responseText.slice(0, 500);
+      console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);
+      return NextResponse.json(
+        { error: "LLM response was not valid JSON", details: preview },
+        { status: 502 },
+      );
+    }
   } catch (err) {
     if (err instanceof OpenRouterError) {
       return NextResponse.json(
@@ -85,6 +99,11 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
-    throw err;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[decomposition/extract] Unexpected error:", message);
+    return NextResponse.json(
+      { error: `LLM call failed: ${message}` },
+      { status: 502 },
+    );
   }
 }

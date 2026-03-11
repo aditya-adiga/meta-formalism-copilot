@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { LlmCallUsage } from "./callLlm";
 
@@ -67,4 +67,17 @@ export function setCachedResult(
   const hash = computeHash(model, systemPrompt, userContent, maxTokens);
   const filePath = join(CACHE_DIR, `${hash}.json`);
   writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8");
+}
+
+export function removeCachedResult(
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens: number,
+): void {
+  const hash = computeHash(model, systemPrompt, userContent, maxTokens);
+  const filePath = join(CACHE_DIR, `${hash}.json`);
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
 }
