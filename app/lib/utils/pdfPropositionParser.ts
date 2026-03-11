@@ -81,7 +81,7 @@ const KIND_MAP: Record<string, PropositionKind> = {
   ax: "axiom",
 };
 
-const KIND_PREFIX: Record<PropositionKind, string> = {
+const KIND_PREFIX: Partial<Record<PropositionKind, string>> = {
   definition: "def",
   lemma: "lem",
   theorem: "thm",
@@ -90,7 +90,7 @@ const KIND_PREFIX: Record<PropositionKind, string> = {
   axiom: "ax",
 };
 
-const KIND_LABEL: Record<PropositionKind, string> = {
+const KIND_LABEL: Partial<Record<PropositionKind, string>> = {
   definition: "Definition",
   lemma: "Lemma",
   theorem: "Theorem",
@@ -348,12 +348,12 @@ type PropositionIndex = Map<string, string>; // "theorem-1" → node ID
  */
 function buildPropositionIndex(segments: RawSegment[]): PropositionIndex {
   const index: PropositionIndex = new Map();
-  const counters: Record<PropositionKind, number> = {
+  const counters: Partial<Record<PropositionKind, number>> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
   for (const seg of segments) {
-    counters[seg.kind]++;
+    counters[seg.kind] = (counters[seg.kind] ?? 0) + 1;
     const id = `${KIND_PREFIX[seg.kind]}-${counters[seg.kind]}`;
 
     // Index by kind + number (e.g. "theorem-1", "lemma-2.3")
@@ -381,13 +381,13 @@ export function extractDependencies(
   const index = buildPropositionIndex(segments);
   const deps = new Map<number, string[]>();
 
-  const counters: Record<PropositionKind, number> = {
+  const counters: Partial<Record<PropositionKind, number>> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
-    counters[seg.kind]++;
+    counters[seg.kind] = (counters[seg.kind] ?? 0) + 1;
     const selfId = `${KIND_PREFIX[seg.kind]}-${counters[seg.kind]}`;
 
     const allText = `${seg.body}\n${seg.proofText}`;
@@ -514,12 +514,12 @@ export async function parsePdfPropositions(
   const deps = extractDependencies(segments, allAnnotations);
 
   // Build PropositionNodes
-  const counters: Record<PropositionKind, number> = {
+  const counters: Partial<Record<PropositionKind, number>> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
   const nodes: PropositionNode[] = segments.map((seg, i) => {
-    counters[seg.kind]++;
+    counters[seg.kind] = (counters[seg.kind] ?? 0) + 1;
     const num = counters[seg.kind];
     const id = `${KIND_PREFIX[seg.kind]}-${num}`;
     const titleSuffix = seg.title ? ` (${seg.title})` : "";

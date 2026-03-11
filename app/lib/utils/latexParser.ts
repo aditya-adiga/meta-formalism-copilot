@@ -23,7 +23,7 @@ const ENV_TO_KIND: Record<string, PropositionKind> = {
 const ALL_ENV_NAMES = [...Object.keys(ENV_TO_KIND), "proof"];
 
 /** Short prefix per kind for counter-based IDs (e.g. "thm-1"). */
-const KIND_PREFIX: Record<PropositionKind, string> = {
+const KIND_PREFIX: Partial<Record<PropositionKind, string>> = {
   definition: "def",
   lemma: "lem",
   theorem: "thm",
@@ -33,7 +33,7 @@ const KIND_PREFIX: Record<PropositionKind, string> = {
 };
 
 /** Human-readable label prefix per kind. */
-const KIND_LABEL: Record<PropositionKind, string> = {
+const KIND_LABEL: Partial<Record<PropositionKind, string>> = {
   definition: "Definition",
   lemma: "Lemma",
   theorem: "Theorem",
@@ -161,7 +161,7 @@ export function parseLatexPropositions(text: string, documents?: SourceDocument[
   }
 
   // Per-kind counters for numbering
-  const counters: Record<PropositionKind, number> = {
+  const counters: Partial<Record<PropositionKind, number>> = {
     definition: 0,
     lemma: 0,
     theorem: 0,
@@ -187,7 +187,7 @@ export function parseLatexPropositions(text: string, documents?: SourceDocument[
     const kind = ENV_TO_KIND[block.envName];
     if (!kind) continue; // shouldn't happen given our env list, but be safe
 
-    counters[kind]++;
+    counters[kind] = (counters[kind] ?? 0) + 1;
     const num = counters[kind];
 
     const labelKey = extractLabel(block.body);
