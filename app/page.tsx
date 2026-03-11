@@ -51,29 +51,17 @@ export default function Home() {
   } = useWorkspacePersistence();
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
-  const causalGraph = useMemo(() => {
-    if (!persistedCausalGraph) return null;
-    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+  // Safe JSON parse: returns null for empty/corrupt strings
+  const parseJsonOrNull = useCallback(<T,>(json: string | null): T | null => {
+    if (!json) return null;
+    try { return JSON.parse(json) as T; }
     catch { return null; }
-  }, [persistedCausalGraph]);
+  }, []);
 
-  const statisticalModel = useMemo(() => {
-    if (!persistedStatisticalModel) return null;
-    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
-    catch { return null; }
-  }, [persistedStatisticalModel]);
-
-  const propertyTests = useMemo(() => {
-    if (!persistedPropertyTests) return null;
-    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
-    catch { return null; }
-  }, [persistedPropertyTests]);
-
-  const dialecticalMap = useMemo(() => {
-    if (!persistedDialecticalMap) return null;
-    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
-    catch { return null; }
-  }, [persistedDialecticalMap]);
+  const causalGraph = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]>(persistedCausalGraph), [persistedCausalGraph, parseJsonOrNull]);
+  const statisticalModel = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]>(persistedStatisticalModel), [persistedStatisticalModel, parseJsonOrNull]);
+  const propertyTests = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]>(persistedPropertyTests), [persistedPropertyTests, parseJsonOrNull]);
+  const dialecticalMap = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]>(persistedDialecticalMap), [persistedDialecticalMap, parseJsonOrNull]);
 
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);

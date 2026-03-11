@@ -5,10 +5,7 @@
 
 import JSZip from "jszip";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
-import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
-import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { sanitizeFilename, triggerDownload } from "./export";
 import { getGraphViewportElement, graphToPngBlob } from "./exportGraph";
 

@@ -28,15 +28,9 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-/** Short endpoint label: "formalization/semiformal" -> "semiformal" */
-function shortEndpoint(endpoint: string): string {
-  const parts = endpoint.split("/");
-  return parts[parts.length - 1];
-}
-
-/** Short model label: "anthropic/claude-opus-4.6" -> "claude-opus-4.6" */
-function shortModel(model: string): string {
-  const parts = model.split("/");
+/** Extract last path segment: "formalization/semiformal" -> "semiformal" */
+function lastSegment(path: string): string {
+  const parts = path.split("/");
   return parts[parts.length - 1];
 }
 
@@ -91,8 +85,8 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
                 {[...entries].reverse().map((e) => (
                   <tr key={e.id} className="border-b border-[#F0EBE6] hover:bg-[#F5F1ED]">
                     <td className="whitespace-nowrap px-3 py-1.5 text-[#6B6560]">{formatTime(e.timestamp)}</td>
-                    <td className="px-3 py-1.5">{shortEndpoint(e.endpoint)}</td>
-                    <td className="px-3 py-1.5 text-[#6B6560]">{shortModel(e.model)}</td>
+                    <td className="px-3 py-1.5">{lastSegment(e.endpoint)}</td>
+                    <td className="px-3 py-1.5 text-[#6B6560]">{lastSegment(e.model)}</td>
                     <td className="px-3 py-1.5 text-right">{e.inputTokens.toLocaleString()}</td>
                     <td className="px-3 py-1.5 text-right">{e.outputTokens.toLocaleString()}</td>
                     <td className="px-3 py-1.5 text-right">{formatCost(e.costUsd)}</td>
