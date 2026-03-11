@@ -12,7 +12,20 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Lean verifier is a separate Node.js project compiled by its own tsconfig.
+    // Its compiled dist/ output uses CommonJS require() which would fail this lint.
+    "verifier/**",
   ]),
+  // Provide the React version explicitly so eslint-plugin-react does not try to
+  // auto-detect it via context.getFilename(), which is not available in ESLint v9+
+  // flat config and would otherwise cause a crash.
+  {
+    settings: {
+      react: {
+        version: "19",
+      },
+    },
+  },
 ]);
 
 export default eslintConfig;

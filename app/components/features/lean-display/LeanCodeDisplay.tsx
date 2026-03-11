@@ -28,6 +28,7 @@ export default function LeanCodeDisplay({
   // Track which version of `code` our localCode was initialised from
   const [syncedCode, setSyncedCode] = useState(code);
   const [localCode, setLocalCode] = useState(code);
+  const [leanEdited, setLeanEdited] = useState(false);
   const [instruction, setInstruction] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -37,6 +38,11 @@ export default function LeanCodeDisplay({
     setSyncedCode(code);
     setLocalCode(code);
     setEditMode("rendered");
+    // Only clear leanEdited when the parent pushes genuinely new code (e.g. after
+    // regeneration). If code === localCode, this is just our own edit echoed back.
+    if (code !== localCode) {
+      setLeanEdited(false);
+    }
   }
 
   // Focus textarea on entering edit mode
@@ -47,6 +53,7 @@ export default function LeanCodeDisplay({
   const handleDoneEditing = useCallback(() => {
     onCodeChange(localCode);
     setEditMode("rendered");
+    setLeanEdited(true);
   }, [localCode, onCodeChange]);
 
   const handleIterateSubmit = useCallback(() => {
@@ -67,15 +74,39 @@ export default function LeanCodeDisplay({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Code area */}
-      <div className="relative flex-1 overflow-auto px-8 py-6">
-        {/* Edit / Done toggle */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Edit / Done toggle + Re-verify — outside scroll container so they stay visible */}
         {code && (
-          <button
-            onClick={editMode === "rendered" ? () => setEditMode("raw") : handleDoneEditing}
-            className="absolute right-4 top-4 z-30 rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-1 text-xs text-[#6B6560] shadow-sm transition-shadow hover:shadow-md hover:text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
-          >
-            {editMode === "rendered" ? "Edit" : "Done"}
-          </button>
+          <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+            {(leanEdited || verificationStatus === "invalid") && editMode === "rendered" && (
+              <button
+                onClick={() => { onReVerify(); setLeanEdited(false); }}
+                disabled={!canReVerify}
+                className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                Re-verify ↺
+              </button>
+            )}
+            <button
+              onClick={editMode === "rendered" ? () => setEditMode("raw") : handleDoneEditing}
+              className="rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-1 text-xs text-[#6B6560] shadow-sm transition-shadow hover:shadow-md hover:text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
+            >
+              {editMode === "rendered" ? "Edit" : "Done"}
+            </button>
+          </div>
+        )}
+        <div className="h-full overflow-auto px-8 py-6">
+
+        {/* Verification errors */}
+        {verificationStatus === "invalid" && verificationErrors && (
+          <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
+              lake build output
+            </h3>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
+              {verificationErrors}
+            </pre>
+          </div>
         )}
 
         {editMode === "rendered" ? (

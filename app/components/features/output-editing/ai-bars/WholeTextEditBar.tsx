@@ -26,8 +26,8 @@ export default function WholeTextEditBar({ onApply }: WholeTextEditBarProps) {
   };
 
   return (
-    <div className="absolute bottom-6 left-1/2 z-50 w-[calc(100%-4rem)] max-w-xl -translate-x-1/2">
-      <div className="flex items-center gap-3 rounded-full bg-[var(--ink-black)] px-6 py-3 shadow-lg transition-shadow duration-200 hover:shadow-xl">
+    <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
+      <div className="flex items-center gap-2 rounded-full bg-[var(--ink-black)] px-4 py-2.5 shadow-md">
         <input
           ref={inputRef}
           type="text"
@@ -35,7 +35,7 @@ export default function WholeTextEditBar({ onApply }: WholeTextEditBarProps) {
           onChange={(e) => setInstruction(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Make changes to entire output... e.g., make it more concise"
-          className="min-w-0 flex-1 bg-transparent text-sm font-medium text-white placeholder-white/70 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none"
           aria-label="Edit entire output instruction"
         />
         <button

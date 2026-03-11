@@ -2,15 +2,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = "ai-mo/kimina-prover-72b";
+const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+// const OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6";
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
+The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
+
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Include necessary imports (e.g. import Mathlib)
-- Use tactic-style proofs where appropriate
+- Start with \`import Mathlib\`
+- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
 - Return only the Lean4 code with no additional commentary`;
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.

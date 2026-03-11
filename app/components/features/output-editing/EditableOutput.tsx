@@ -132,6 +132,11 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
         </button>
       )}
 
+      <div
+        ref={scrollContainerRef}
+        className="h-full overflow-auto px-8 py-10"
+      >
+
       {renderMode === "rendered" ? (
         /* ── Rendered LaTeX view ── */
         <LatexRenderer value={value} />
@@ -176,6 +181,7 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
