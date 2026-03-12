@@ -3,15 +3,17 @@
 import { useState } from "react";
 import RefinementButtons from "@/app/components/features/context-input/RefinementButtons";
 import RefinementPreview from "@/app/components/features/context-input/RefinementPreview";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type ContextInputProps = {
   value: string;
   onChange: (value: string) => void;
   onFormalise: () => void;
   loading: boolean;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
-export default function ContextInput({ value, onChange, onFormalise, loading }: ContextInputProps) {
+export default function ContextInput({ value, onChange, onFormalise, loading, waitEstimate }: ContextInputProps) {
   const [refinedValue, setRefinedValue] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
 
@@ -84,9 +86,21 @@ export default function ContextInput({ value, onChange, onFormalise, loading }: 
           type="button"
           onClick={onFormalise}
           disabled={loading || refining}
-          className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          className="relative w-full overflow-hidden rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
         >
-          {loading ? "Formalising..." : "Formalise"}
+          {loading && waitEstimate && (
+            <span
+              className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-1000 ease-linear"
+              style={{ width: `${Math.round(waitEstimate.progress * 100)}%` }}
+            />
+          )}
+          <span className="relative">
+            {loading
+              ? waitEstimate
+                ? `Formalising... ${waitEstimate.remainingLabel}`
+                : "Formalising..."
+              : "Formalise"}
+          </span>
         </button>
       </div>
     </div>

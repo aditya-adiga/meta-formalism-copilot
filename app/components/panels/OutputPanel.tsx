@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
@@ -19,6 +20,7 @@ type OutputPanelProps = {
   verificationErrors: string;
   onReVerify: () => void;
   onLeanIterate: (instruction: string) => void;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 function VerificationBadge({ status }: { status: VerificationStatus }) {
@@ -32,7 +34,7 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
   return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
 }
 
-export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate }: OutputPanelProps) {
+export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate, waitEstimate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -100,10 +102,15 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
 
       {/* Semiformal proof section — editable */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
+        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Semiformal Proof
           </h2>
+          {loadingPhase === "semiformal" && waitEstimate && (
+            <span className="text-xs text-[#6B6560]">
+              Generating... {waitEstimate.remainingLabel}
+            </span>
+          )}
         </div>
         <EditableOutput
           value={semiformalText}
@@ -125,6 +132,9 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
             </h2>
             <div className="flex items-center gap-2">
               <VerificationBadge status={verificationStatus} />
+              {(loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "iterating") && waitEstimate && (
+                <span className="text-xs text-[#6B6560]">{waitEstimate.remainingLabel}</span>
+              )}
               {verificationStatus === "invalid" && loadingPhase === "idle" && (
                 <button
                   onClick={() => onLeanIterate("")}
@@ -145,7 +155,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
           </div>
           {loadingPhase === "lean" && !leanCode ? (
             <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-              Generating Lean4 code...
+              Generating Lean4 code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
             </div>
           ) : (
             <LeanCodeDisplay

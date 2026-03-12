@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import BookSpineDivider from "@/app/components/ui/BookSpineDivider";
 import InputPanel from "@/app/components/panels/InputPanel";
 import OutputPanel from "@/app/components/panels/OutputPanel";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
@@ -41,6 +42,12 @@ export default function Home() {
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("none");
   const [verificationErrors, setVerificationErrors] = useState("");
+
+  // --- Wait time estimate ---
+  const inputCharCount = useMemo(() => {
+    return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
+  }, [sourceText, extractedFiles]);
+  const waitEstimate = useWaitTimeEstimate(loadingPhase, inputCharCount);
 
   const handleSemiformalTextChange = useCallback((text: string) => {
     setSemiformalText(text);
@@ -178,6 +185,7 @@ export default function Home() {
           onFormalise={handleFormalise}
           loading={loadingPhase !== "idle"}
           onFilesChanged={setExtractedFiles}
+          waitEstimate={waitEstimate}
         />
       </section>
       <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">
@@ -193,6 +201,7 @@ export default function Home() {
           verificationErrors={verificationErrors}
           onReVerify={handleReVerify}
           onLeanIterate={handleLeanIterate}
+          waitEstimate={waitEstimate}
         />
       </section>
       <BookSpineDivider />
