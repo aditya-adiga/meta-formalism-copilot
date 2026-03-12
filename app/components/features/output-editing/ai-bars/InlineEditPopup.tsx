@@ -13,6 +13,7 @@ type InlineEditPopupProps = {
 export default function InlineEditPopup({
   onApply,
   onClose,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   selectedText,
   position,
 }: InlineEditPopupProps) {
