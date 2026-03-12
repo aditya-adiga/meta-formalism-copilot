@@ -18,7 +18,7 @@ type WorkspaceState = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  perspectiveBalance: string | null;
 };
 
 const DEFAULT_STATE: WorkspaceState = {
@@ -33,7 +33,7 @@ const DEFAULT_STATE: WorkspaceState = {
   causalGraph: null,
   statisticalModel: null,
   propertyTests: null,
-  dialecticalMap: null,
+  perspectiveBalance: null,
 };
 
 export function useWorkspacePersistence() {
@@ -69,7 +69,7 @@ export function useWorkspacePersistence() {
       causalGraph: data.causalGraph,
       statisticalModel: data.statisticalModel,
       propertyTests: data.propertyTests,
-      dialecticalMap: data.dialecticalMap,
+      perspectiveBalance: data.perspectiveBalance,
     });
 
     decompRef.current = data.decomposition;
@@ -86,8 +86,8 @@ export function useWorkspacePersistence() {
     causalGraph: state.causalGraph,
     statisticalModel: state.statisticalModel,
     propertyTests: state.propertyTests,
-    dialecticalMap: state.dialecticalMap,
-  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap]);
+    perspectiveBalance: state.perspectiveBalance,
+  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.perspectiveBalance]);
 
   const artifactRef = useRef(artifactData);
   useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
@@ -141,7 +141,7 @@ export function useWorkspacePersistence() {
   const setCausalGraph = useCallback((v: string | null) => setState((s) => ({ ...s, causalGraph: v })), []);
   const setStatisticalModel = useCallback((v: string | null) => setState((s) => ({ ...s, statisticalModel: v })), []);
   const setPropertyTests = useCallback((v: string | null) => setState((s) => ({ ...s, propertyTests: v })), []);
-  const setDialecticalMap = useCallback((v: string | null) => setState((s) => ({ ...s, dialecticalMap: v })), []);
+  const setPerspectiveBalance = useCallback((v: string | null) => setState((s) => ({ ...s, perspectiveBalance: v })), []);
 
   // Stable return object that destructures the same as before
   return useMemo(() => ({
@@ -167,9 +167,9 @@ export function useWorkspacePersistence() {
     setStatisticalModel,
     propertyTests: state.propertyTests,
     setPropertyTests,
-    dialecticalMap: state.dialecticalMap,
-    setDialecticalMap,
+    perspectiveBalance: state.perspectiveBalance,
+    setPerspectiveBalance,
     restoredDecompState,
     persistDecompState,
-  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap]);
+  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setPerspectiveBalance]);
 }

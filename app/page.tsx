@@ -13,7 +13,7 @@ import LeanPanel from "@/app/components/panels/LeanPanel";
 import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
 import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
-import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
+import PerspectiveBalancePanel from "@/app/components/panels/PerspectiveBalancePanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -47,7 +47,7 @@ export default function Home() {
     causalGraph: persistedCausalGraph, setCausalGraph: setPersistedCausalGraph,
     statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
     propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
-    dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
+    perspectiveBalance: persistedPerspectiveBalance, setPerspectiveBalance: setPersistedPerspectiveBalance,
   } = useWorkspacePersistence();
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
@@ -61,7 +61,7 @@ export default function Home() {
   const causalGraph = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]>(persistedCausalGraph), [persistedCausalGraph, parseJsonOrNull]);
   const statisticalModel = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]>(persistedStatisticalModel), [persistedStatisticalModel, parseJsonOrNull]);
   const propertyTests = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]>(persistedPropertyTests), [persistedPropertyTests, parseJsonOrNull]);
-  const dialecticalMap = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]>(persistedDialecticalMap), [persistedDialecticalMap, parseJsonOrNull]);
+  const perspectiveBalance = useMemo(() => parseJsonOrNull<import("@/app/lib/types/artifacts").PerspectiveBalanceResponse["perspectiveBalance"]>(persistedPerspectiveBalance), [persistedPerspectiveBalance, parseJsonOrNull]);
 
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
@@ -79,7 +79,7 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const perspectiveBalanceLoading = artifactLoadingState["perspective-balance"] === "generating";
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
@@ -133,10 +133,10 @@ export default function Home() {
         case "causal-graph": setPersistedCausalGraph(artifact.content); break;
         case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
         case "property-tests": setPersistedPropertyTests(artifact.content); break;
-        case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+        case "perspective-balance": setPersistedPerspectiveBalance(artifact.content); break;
       }
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedPerspectiveBalance]);
 
   const {
     activeSession,
@@ -191,10 +191,10 @@ export default function Home() {
     if (results["property-tests"]) {
       setPersistedPropertyTests(JSON.stringify(results["property-tests"]));
     }
-    if (results["dialectical-map"]) {
-      setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
+    if (results["perspective-balance"]) {
+      setPersistedPerspectiveBalance(JSON.stringify(results["perspective-balance"]));
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedPerspectiveBalance]);
 
   // --- Combined paper text for single-proof formalization ---
   const combinedPaperText = useMemo(() => {
@@ -440,14 +440,14 @@ export default function Home() {
     statisticalModelLoading,
     hasPropertyTests: propertyTests !== null,
     propertyTestsLoading,
-    hasDialecticalMap: dialecticalMap !== null,
-    dialecticalMapLoading,
+    hasPerspectiveBalance: perspectiveBalance !== null,
+    perspectiveBalanceLoading,
   });
 
   // --- Export All handler ---
   const hasExportableContent = Boolean(
     semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
-    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+    || causalGraph || statisticalModel || propertyTests || perspectiveBalance
   );
 
   const handleExportAll = useCallback(async () => {
@@ -460,9 +460,9 @@ export default function Home() {
       causalGraph,
       statisticalModel,
       propertyTests,
-      dialecticalMap,
+      perspectiveBalance,
     });
-  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, perspectiveBalance]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
@@ -572,11 +572,11 @@ export default function Home() {
             loading={propertyTestsLoading}
           />
         );
-      case "dialectical-map":
+      case "perspective-balance":
         return (
-          <DialecticalMapPanel
-            dialecticalMap={dialecticalMap}
-            loading={dialecticalMapLoading}
+          <PerspectiveBalancePanel
+            perspectiveBalance={perspectiveBalance}
+            loading={perspectiveBalanceLoading}
           />
         );
       case "analytics":
@@ -599,7 +599,7 @@ export default function Home() {
     causalGraph, causalGraphLoading,
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
-    dialecticalMap, dialecticalMapLoading,
+    perspectiveBalance, perspectiveBalanceLoading,
     analyticsEntries, analyticsSummary, clearAnalytics,
   ]);
 

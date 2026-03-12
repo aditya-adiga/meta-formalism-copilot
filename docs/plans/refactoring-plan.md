@@ -150,7 +150,7 @@ Each item gets its own `refactor/` feature branch off `dev`, merged back into `d
 **Problem:** 6+ panel components duplicate identical header/empty-state/loading-state boilerplate (~20 lines each).
 
 **Files:**
-- `CausalGraphPanel.tsx`, `DialecticalMapPanel.tsx`, `StatisticalModelPanel.tsx`, `PropertyTestsPanel.tsx`, `LeanPanel.tsx`, `SemiformalPanel.tsx`
+- `CausalGraphPanel.tsx`, `PerspectiveBalancePanel.tsx`, `StatisticalModelPanel.tsx`, `PropertyTestsPanel.tsx`, `LeanPanel.tsx`, `SemiformalPanel.tsx`
 
 **Plan:**
 1. Create `<ArtifactPanelShell title loading data emptyMessage>` component

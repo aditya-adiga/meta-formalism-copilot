@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Context:** The Metaformalism Copilot currently produces two artifact types from user input: semiformal proofs (structured mathematical prose) and Lean4 code (machine-verified deductive proofs). Many insights and arguments that users want to formalize are not well-served by Lean — they may be causal, statistical, dialectical, or constructive in nature. The tool needs additional formalization modes to fulfill its "generalization via inclusion" philosophy.
+**Context:** The Metaformalism Copilot currently produces two artifact types from user input: semiformal proofs (structured mathematical prose) and Lean4 code (machine-verified deductive proofs). Many insights and arguments that users want to formalize are not well-served by Lean — they may be causal, statistical, perspectival, or constructive in nature. The tool needs additional formalization modes to fulfill its "generalization via inclusion" philosophy.
 
 ## Decision
 
@@ -36,7 +36,7 @@ Expand the formalization pipeline to support four new artifact types alongside t
 
 **Best for:** Arguments with constructive content — "it's possible to build X satisfying Y" — where the claim can be checked against concrete examples. Planning requirements before developing software.
 
-### 4. Dialectical Map
+### 4. Balanced Perspectives
 
 **What it is:** A structured decomposition of an argument into multiple coherent perspectives (strains of argument), each articulated in its own direction, followed by a synthesis that identifies an equilibrium between those perspectives.
 
@@ -54,7 +54,7 @@ These four types plus the existing deductive (Lean) path span five dimensions of
 | Causal | Causal graph | "What causes what?" |
 | Statistical | Statistical model | "What does the data say?" |
 | Constructive | Property test suite | "What must hold if you build it?" |
-| Dialectical | Dialectical map | "What are the tensions and how do they resolve?" |
+| Perspectival | Perspectival map | "What are the tensions and how do they resolve?" |
 
 Each artifact type should:
 - Be generatable from the same source material the tool already ingests
@@ -68,16 +68,16 @@ Each artifact type should:
 A divergent design process generated 15 candidate artifact types. After matching against constraints (LLM-producible, panel-friendly, editable, useful without Lean, aids thinking), five were discarded for being too similar to existing artifacts (literate docs, multi-prover), too niche (TLA+/Alloy), or not addressing the problem (do nothing). The remaining candidates were consolidated around the four dimensions above, informed by both AI-generated options and the project maintainer's use cases.
 
 Notable alternatives that were folded into the final four:
-- **Argument maps (Toulmin structure)** — absorbed into Causal Graph and Dialectical Map
+- **Argument maps (Toulmin structure)** — absorbed into Causal Graph and Balanced Perspectives
 - **Bayesian/probabilistic models** — absorbed into Causal Graph (weights) and Statistical Model (distributions)
-- **Critique scaffolds** — absorbed into Dialectical Map (the adversarial perspective becomes one strand of the dialectic)
+- **Critique scaffolds** — absorbed into Balanced Perspectives (the adversarial perspective becomes one strand of the balanced perspective analysis)
 - **Executable algorithms** — reframed as Property Test Suites (specifications over implementations)
 - **Diagrams-as-code** — a presentation concern applicable to multiple artifact types, not a distinct formalization dimension
 
 ## Consequences
 
 **Makes easier:**
-- Formalizing non-mathematical arguments (causal, empirical, dialectical)
+- Formalizing non-mathematical arguments (causal, empirical, perspectival)
 - Getting value from the tool even when Lean verification is infeasible
 - Producing multiple complementary representations of the same idea
 - Generating precise specifications useful as input to other tools

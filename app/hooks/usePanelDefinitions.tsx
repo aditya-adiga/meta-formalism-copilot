@@ -11,7 +11,7 @@ import {
   CausalGraphIcon,
   StatisticalModelIcon,
   PropertyTestsIcon,
-  DialecticalMapIcon,
+  PerspectiveBalanceIcon,
   AnalyticsIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
@@ -32,8 +32,8 @@ type PanelDefsInput = {
   statisticalModelLoading?: boolean;
   hasPropertyTests?: boolean;
   propertyTestsLoading?: boolean;
-  hasDialecticalMap?: boolean;
-  dialecticalMapLoading?: boolean;
+  hasPerspectiveBalance?: boolean;
+  perspectiveBalanceLoading?: boolean;
 };
 
 export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
@@ -45,7 +45,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     hasCausalGraph, causalGraphLoading,
     hasStatisticalModel, statisticalModelLoading,
     hasPropertyTests, propertyTestsLoading,
-    hasDialecticalMap, dialecticalMapLoading,
+    hasPerspectiveBalance, perspectiveBalanceLoading,
   } = opts;
 
   const hasDecomp = nodes.length > 0;
@@ -137,12 +137,12 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hidden: !hasPropertyTests && !propertyTestsLoading,
     },
     {
-      id: "dialectical-map" as PanelId,
-      label: "Dialectical Map",
-      icon: <DialecticalMapIcon />,
+      id: "perspective-balance" as PanelId,
+      label: "Balanced Perspectives",
+      icon: <PerspectiveBalanceIcon />,
       group: "artifacts" as const,
-      statusSummary: dialecticalMapLoading ? "Generating..." : hasDialecticalMap ? "Map ready" : "No map yet",
-      hidden: !hasDialecticalMap && !dialecticalMapLoading,
+      statusSummary: perspectiveBalanceLoading ? "Generating..." : hasPerspectiveBalance ? "Perspectives ready" : "No perspectives yet",
+      hidden: !hasPerspectiveBalance && !perspectiveBalanceLoading,
     },
     // --- Meta group ---
     {
@@ -157,5 +157,5 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hasCausalGraph, causalGraphLoading,
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,
-      hasDialecticalMap, dialecticalMapLoading]);
+      hasPerspectiveBalance, perspectiveBalanceLoading]);
 }

@@ -55,7 +55,7 @@ The richer taxonomy enables downstream hints about which artifact types suit eac
 | Node kinds | Natural artifact affinity |
 |------------|--------------------------|
 | definition, lemma, theorem, proposition, corollary, axiom | Deductive (Lean) |
-| claim, evidence, assumption | Dialectical Map, Property Tests |
+| claim, evidence, assumption | Balanced Perspectives, Property Tests |
 | claim + evidence with causal language | Causal Graph |
 | methodology, observation with quantitative content | Statistical Model |
 

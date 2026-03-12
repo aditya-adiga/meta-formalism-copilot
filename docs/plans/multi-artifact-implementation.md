@@ -7,7 +7,7 @@ Implements decisions [002](../decisions/002-multi-artifact-ui-layout.md) (UI lay
 The type infrastructure is already in place:
 - `ArtifactType` includes all six types (`session.ts`)
 - `ArtifactData`, `NodeArtifact`, `ArtifactGenerationRequest`, `ArtifactVerificationResponse` defined (`session.ts`, `decomposition.ts`, `artifacts.ts`)
-- `PanelId` includes `statistical-model`, `property-tests`, `dialectical-map` (`panels.ts`)
+- `PanelId` includes `statistical-model`, `property-tests`, `perspective-balance` (`panels.ts`)
 - `PropositionNode` has `context`, `selectedArtifactTypes`, `artifacts` fields (declared, unused)
 - `FormalizationSession` has `artifacts: ArtifactData[]` (declared, always `[]`)
 - Causal graph: route + panel + panel definition all working
@@ -45,7 +45,7 @@ This avoids duplicating ~60 lines of error handling and message building across 
 
 **Edit:** `app/lib/types/artifacts.ts`
 
-Add `StatisticalModelResponse`, `PropertyTestsResponse`, `DialecticalMapResponse` (shapes from 003 §3). Add entries to `ARTIFACT_ROUTE` map.
+Add `StatisticalModelResponse`, `PropertyTestsResponse`, `PerspectiveBalanceResponse` (shapes from 003 §3). Add entries to `ARTIFACT_ROUTE` map.
 
 ### 1c. `app/api/formalization/statistical-model/route.ts`
 
@@ -59,10 +59,10 @@ Add `StatisticalModelResponse`, `PropertyTestsResponse`, `DialecticalMapResponse
 - Response key: `propertyTests`
 - Mock: 1 property with pseudocode, 1 data generator, summary
 
-### 1e. `app/api/formalization/dialectical-map/route.ts`
+### 1e. `app/api/formalization/perspective-balance/route.ts`
 
-- System prompt: dialectical analyst
-- Response key: `dialecticalMap`
+- System prompt: perspective balance analyst
+- Response key: `perspectiveBalance`
 - Mock: 2 perspectives, 1 tension, synthesis, summary
 
 ### 1f. Migrate semiformal route to uniform request shape
@@ -101,12 +101,12 @@ export const ARTIFACT_META: Record<ArtifactType, { label: string; chipLabel: str
   "causal-graph": { label: "Causal Graph", chipLabel: "Causal Graph" },
   "statistical-model": { label: "Statistical Model", chipLabel: "Statistical Model" },
   "property-tests": { label: "Property Tests", chipLabel: "Property Tests" },
-  "dialectical-map": { label: "Dialectical Map", chipLabel: "Dialectical Map" },
+  "perspective-balance": { label: "Balanced Perspectives", chipLabel: "Balanced Perspectives" },
 };
 
 // Selectable as chips (lean excluded — it's step 2 of the deductive pipeline)
 export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
-  "semiformal", "causal-graph", "statistical-model", "property-tests", "dialectical-map",
+  "semiformal", "causal-graph", "statistical-model", "property-tests", "perspective-balance",
 ];
 ```
 
@@ -148,7 +148,7 @@ Props:
 
 **Edit:** `app/components/ui/icons/PanelIcons.tsx`
 
-Add `StatisticalModelIcon`, `PropertyTestsIcon`, `DialecticalMapIcon`. Simple SVG icons following the existing icon pattern (16x16 or 20x20, stroke-based).
+Add `StatisticalModelIcon`, `PropertyTestsIcon`, `PerspectiveBalanceIcon`. Simple SVG icons following the existing icon pattern (16x16 or 20x20, stroke-based).
 
 ### 3b. `StatisticalModelPanel`
 
@@ -168,11 +168,11 @@ Props: `{ propertyTests: PropertyTestsResponse["propertyTests"] | null; loading:
 
 Renders: summary, properties list (name, description, preconditions, postcondition, pseudocode in monospace block), data generators list.
 
-### 3d. `DialecticalMapPanel`
+### 3d. `PerspectiveBalancePanel`
 
-**New file:** `app/components/panels/DialecticalMapPanel.tsx`
+**New file:** `app/components/panels/PerspectiveBalancePanel.tsx`
 
-Props: `{ dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null; loading: boolean }`
+Props: `{ perspectiveBalance: PerspectiveBalanceResponse["perspectiveBalance"] | null; loading: boolean }`
 
 Renders: topic heading, perspectives (label, core claim, supporting arguments, vulnerabilities), tensions between perspectives, synthesis (equilibrium + how each perspective is addressed).
 
@@ -191,7 +191,7 @@ Renders: topic heading, perspectives (label, core claim, supporting arguments, v
 
 **Edit:** `app/hooks/usePanelDefinitions.tsx`
 
-Add three new `PanelDef` entries for `statistical-model`, `property-tests`, `dialectical-map` — each with `hidden: true` until data exists. Add input props: `hasStatisticalModel`, `hasPropertyTests`, `hasDialecticalMap`, plus loading booleans.
+Add three new `PanelDef` entries for `statistical-model`, `property-tests`, `perspective-balance` — each with `hidden: true` until data exists. Add input props: `hasStatisticalModel`, `hasPropertyTests`, `hasPerspectiveBalance`, plus loading booleans.
 
 ### 4b. IconRail section separator
 
@@ -209,17 +209,17 @@ Add state:
 ```typescript
 const [statisticalModel, setStatisticalModel] = useState(null);
 const [propertyTests, setPropertyTests] = useState(null);
-const [dialecticalMap, setDialecticalMap] = useState(null);
+const [perspectiveBalance, setPerspectiveBalance] = useState(null);
 const [statisticalModelLoading, setStatisticalModelLoading] = useState(false);
 const [propertyTestsLoading, setPropertyTestsLoading] = useState(false);
-const [dialecticalMapLoading, setDialecticalMapLoading] = useState(false);
+const [perspectiveBalanceLoading, setPerspectiveBalanceLoading] = useState(false);
 ```
 
 Add panel content entries:
 ```typescript
 "statistical-model": <StatisticalModelPanel statisticalModel={statisticalModel} loading={statisticalModelLoading} />,
 "property-tests": <PropertyTestsPanel propertyTests={propertyTests} loading={propertyTestsLoading} />,
-"dialectical-map": <DialecticalMapPanel dialecticalMap={dialecticalMap} loading={dialecticalMapLoading} />,
+"perspective-balance": <PerspectiveBalancePanel perspectiveBalance={perspectiveBalance} loading={perspectiveBalanceLoading} />,
 ```
 
 Wire panel definitions with new `has*` / `*Loading` props.
@@ -444,7 +444,7 @@ After `generateArtifacts()` returns results, create `ArtifactData` entries and c
 
 **Edit:** `app/hooks/useWorkspacePersistence.ts`
 
-The persisted workspace shape already includes decomposition state (which includes nodes with artifacts). Ensure the new artifact state variables (statisticalModel, propertyTests, dialecticalMap) are also persisted, or alternatively, derive them from session artifacts on load.
+The persisted workspace shape already includes decomposition state (which includes nodes with artifacts). Ensure the new artifact state variables (statisticalModel, propertyTests, perspectiveBalance) are also persisted, or alternatively, derive them from session artifacts on load.
 
 ### Verification
 
