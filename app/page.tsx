@@ -507,13 +507,13 @@ export default function Home() {
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, hasDecomp, decomp.nodes, selectedNode]);
 
   // --- Session banner ---
-  const sessionBannerElement = currentScopeActiveSession ? (
+  const sessionBannerElement = useMemo(() => currentScopeActiveSession ? (
     <SessionBanner
       currentSession={currentScopeActiveSession}
       sessions={currentScopeSessions}
       onSelectSession={handleSelectSession}
     />
-  ) : null;
+  ) : null, [currentScopeActiveSession, currentScopeSessions, handleSelectSession]);
 
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
@@ -589,33 +589,11 @@ export default function Home() {
   }, [handleLeanIterate]);
 
   return (
-    <main className="relative grid h-screen grid-cols-2 gap-px overflow-hidden bg-[var(--ivory-cream)]">
-      <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Input panel">
-        <InputPanel
-          sourceText={sourceText}
-          onSourceTextChange={setSourceText}
-          contextText={contextText}
-          onContextTextChange={setContextText}
-          onFormalise={handleFormalise}
-          loading={loadingPhase !== "idle"}
-        />
-      </section>
-      <section className="flex flex-col overflow-hidden shadow-sm" aria-label="Output panel">
-        <OutputPanel
-          semiformalText={semiformalText}
-          onSemiformalTextChange={handleSemiformalTextChange}
-          semiformalDirty={semiformalDirty}
-          onRegenerateLean={handleRegenerateLean}
-          leanCode={leanCode}
-          onLeanCodeChange={setLeanCode}
-          loadingPhase={loadingPhase}
-          verificationStatus={verificationStatus}
-          verificationErrors={verificationErrors}
-          onReVerify={handleReVerify}
-          onLeanIterate={handleLeanIterate}
-        />
-      </section>
-      <BookSpineDivider />
-    </main>
+    <PanelShell
+      panels={panels}
+      activePanelId={activePanelId}
+      onSelectPanel={setActivePanelId}
+      panelContent={panelContent}
+    />
   );
 }
