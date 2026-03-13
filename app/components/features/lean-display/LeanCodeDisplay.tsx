@@ -153,6 +153,7 @@ export default function LeanCodeDisplay({
           </div>
         )}
       </div>
+      </div>
 
       {/* Iterate bar — visible whenever there is code */}
       {code && (
