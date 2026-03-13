@@ -63,7 +63,6 @@ export async function extractTextFromDocx(file: File): Promise<string> {
   return sanitizeText(result.value);
 }
 
-
 /** Dispatch text extraction based on file extension. */
 export async function extractTextFromFile(file: File): Promise<string> {
   const ext = file.name.split(".").pop()?.toLowerCase();

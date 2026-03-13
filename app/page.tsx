@@ -29,6 +29,21 @@ import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 
+/** Fetch a JSON API route. */
+async function fetchApi<T>(
+  url: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Request failed");
+  return data as T;
+}
+
 export default function Home() {
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
@@ -399,6 +414,34 @@ export default function Home() {
     setActivePanelId("lean");
     await nodePipeline.handleGenerateLean();
   }, [nodePipeline]);
+
+  /** Load a previous session's data into the current view */
+  const handleSelectSession = useCallback((sessionId: string) => {
+    selectSession(sessionId);
+    // Find the session data to load
+    const target = allSessionsSorted.find((s) => s.id === sessionId);
+    if (!target) return;
+
+    if (isDecompMode && selectedNode) {
+      // Map session verification status back to node status
+      const nodeStatus = target.verificationStatus === "valid" ? "verified"
+        : target.verificationStatus === "invalid" ? "failed"
+        : target.verificationStatus === "verifying" ? "in-progress"
+        : "unverified";
+      updateNode(selectedNode.id, {
+        semiformalProof: target.semiformalText,
+        leanCode: target.leanCode,
+        verificationStatus: nodeStatus,
+        verificationErrors: target.verificationErrors,
+      });
+    } else {
+      setSemiformalText(target.semiformalText);
+      setLeanCode(target.leanCode);
+      setVerificationStatus(target.verificationStatus);
+      setVerificationErrors(target.verificationErrors);
+      setSemiformalDirty(false);
+    }
+  }, [selectSession, allSessionsSorted, isDecompMode, selectedNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {

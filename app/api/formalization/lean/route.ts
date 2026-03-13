@@ -27,6 +27,8 @@ Guidelines:
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
+The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
+
 Guidelines:
 - Use Lean4 syntax (not Lean3)
 - Start with \`import Mathlib\`
@@ -47,7 +49,6 @@ Guidelines:
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
-
 function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
@@ -55,10 +56,8 @@ function mockResponse(informalProof: string, isRetry: boolean): string {
 
 import Mathlib
 
-theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
-  exact ⟨hp, hq⟩
-
-#check example_formalization`;
+theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q :=
+  ⟨hp, hq⟩`;
 }
 
 export async function POST(request: NextRequest) {

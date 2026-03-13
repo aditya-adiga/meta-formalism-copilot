@@ -71,6 +71,7 @@ export function CausalGraphIcon({ className }: IconProps) {
   );
 }
 
+
 /** Bar chart icon for Analytics */
 export function AnalyticsIcon({ className }: IconProps) {
   return (
