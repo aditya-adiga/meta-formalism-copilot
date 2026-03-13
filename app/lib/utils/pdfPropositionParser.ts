@@ -486,7 +486,10 @@ export async function extractStructuredItems(file: File): Promise<StructuredPage
  * Parse a TeX-compiled PDF into PropositionNodes.
  * Returns null if the PDF doesn't appear to be a structured math document.
  */
-export async function parsePdfPropositions(file: File): Promise<PropositionNode[] | null> {
+export async function parsePdfPropositions(
+  file: File,
+  source?: { sourceId: string; sourceLabel: string },
+): Promise<PropositionNode[] | null> {
   const pages = await extractStructuredItems(file);
 
   // Reconstruct lines across all pages
@@ -531,6 +534,8 @@ export async function parsePdfPropositions(file: File): Promise<PropositionNode[
       statement: seg.body,
       proofText: seg.proofText,
       dependsOn: deps.get(i) ?? [],
+      sourceId: source?.sourceId ?? "",
+      sourceLabel: source?.sourceLabel ?? "",
       semiformalProof: "",
       leanCode: "",
       verificationStatus: "unverified" as const,

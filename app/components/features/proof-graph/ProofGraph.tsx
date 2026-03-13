@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import ReactFlow, { Background, Controls, type NodeMouseHandler } from "reactflow";
 import "reactflow/dist/style.css";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
@@ -13,10 +13,22 @@ type ProofGraphProps = {
   propositions: PropositionNode[];
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
+  sourceColorMap: Record<string, string>;
 };
 
-export default function ProofGraph({ propositions, selectedNodeId, onSelectNode }: ProofGraphProps) {
+export default function ProofGraph({ propositions, selectedNodeId, onSelectNode, sourceColorMap }: ProofGraphProps) {
   const { nodes, edges } = useGraphLayout(propositions);
+
+  // Inject sourceColor into each node's data
+  const coloredNodes = useMemo(() => {
+    return nodes.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        sourceColor: sourceColorMap[n.data.sourceId] ?? undefined,
+      },
+    }));
+  }, [nodes, sourceColorMap]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
@@ -28,7 +40,7 @@ export default function ProofGraph({ propositions, selectedNodeId, onSelectNode 
   return (
     <div className="h-full w-full">
       <ReactFlow
-        nodes={nodes.map((n) => ({
+        nodes={coloredNodes.map((n) => ({
           ...n,
           selected: n.id === selectedNodeId,
         }))}

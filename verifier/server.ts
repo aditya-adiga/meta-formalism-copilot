@@ -50,6 +50,27 @@ function releaseBuildLock(): void {
 }
 
 // ------------------------------------------------------------------
+// Pre-process Lean code before verification.
+// When combining dependency context with newly generated code, `import Mathlib`
+// can appear multiple times. Lean rejects duplicate imports, so we keep only
+// the first occurrence.
+// ------------------------------------------------------------------
+
+function deduplicateImports(code: string): string {
+  const lines = code.split("\n");
+  const seenImports = new Set<string>();
+  const result = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (/^import\s+/.test(trimmed)) {
+      if (seenImports.has(trimmed)) return false;
+      seenImports.add(trimmed);
+    }
+    return true;
+  });
+  return result.join("\n");
+}
+
+// ------------------------------------------------------------------
 // Routes
 // ------------------------------------------------------------------
 
@@ -79,7 +100,7 @@ app.post("/verify", async (req: Request, res: Response) => {
   }
 
   try {
-    await writeFile(VERIFY_FILE, leanCode, "utf-8");
+    await writeFile(VERIFY_FILE, deduplicateImports(leanCode as string), "utf-8");
 
     const buildResult = await runLakeBuild();
 

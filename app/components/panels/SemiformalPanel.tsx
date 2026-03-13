@@ -9,9 +9,13 @@ import { downloadSemiformalAsMarkdown } from "@/app/lib/utils/export";
 type SemiformalPanelProps = {
   semiformalText: string;
   onSemiformalTextChange: (value: string) => void;
+  sessionBanner?: React.ReactNode;
+  onGenerateLean?: () => void;
+  showGenerateLean?: boolean;
+  leanLoading?: boolean;
 };
 
-export default function SemiformalPanel({ semiformalText, onSemiformalTextChange }: SemiformalPanelProps) {
+export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -81,12 +85,15 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
           Semiformal Proof
         </h2>
-        {semiformalText && (
-          <DownloadButton
-            label="Export .md"
-            onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {sessionBanner}
+          {semiformalText && (
+            <DownloadButton
+              label="Export .md"
+              onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
+            />
+          )}
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -99,6 +106,22 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         />
         {semiformalText && !editing && <WholeTextEditBar onApply={handleWholeTextEdit} />}
       </div>
+
+      {showGenerateLean && (
+        <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
+          <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+            Review and edit the semiformal proof above, then generate Lean4 code when ready.
+          </div>
+          <button
+            type="button"
+            onClick={onGenerateLean}
+            disabled={leanLoading}
+            className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          >
+            {leanLoading ? "Generating..." : "Generate Lean4 Code"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

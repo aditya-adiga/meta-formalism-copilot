@@ -58,6 +58,18 @@ export function GraphIcon({ className }: IconProps) {
   );
 }
 
+/** Bar chart icon for Analytics */
+export function AnalyticsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="10" width="3" height="7" rx="0.5" />
+      <rect x="8.5" y="6" width="3" height="11" rx="0.5" />
+      <rect x="14" y="3" width="3" height="14" rx="0.5" />
+    </svg>
+  );
+}
+
+
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {
   return (

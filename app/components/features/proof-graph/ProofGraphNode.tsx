@@ -19,7 +19,10 @@ const KIND_BADGE_COLORS: Record<string, string> = {
   corollary: "#D97706",
 };
 
-function ProofGraphNode({ data }: NodeProps<PropositionNode>) {
+// Extended data type that includes injected source color
+type ProofGraphNodeData = PropositionNode & { sourceColor?: string };
+
+function ProofGraphNode({ data }: NodeProps<ProofGraphNodeData>) {
   const statusColor = STATUS_COLORS[data.verificationStatus];
   const badgeColor = KIND_BADGE_COLORS[data.kind] ?? "#6B6560";
 
@@ -47,6 +50,15 @@ function ProofGraphNode({ data }: NodeProps<PropositionNode>) {
       <span className="mt-1 text-center text-xs font-semibold text-[var(--ink-black)]">
         {data.label}
       </span>
+
+      {data.sourceLabel && data.sourceColor && (
+        <span
+          className="mt-0.5 text-center text-[9px] font-medium"
+          style={{ color: data.sourceColor }}
+        >
+          {data.sourceLabel}
+        </span>
+      )}
 
       <Handle type="source" position={Position.Bottom} className="!bg-[#9A9590]" />
     </div>

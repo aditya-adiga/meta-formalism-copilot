@@ -17,11 +17,12 @@ describe('InputPanel', () => {
   const defaultProps = {
     sourceText: 'source',
     onSourceTextChange: vi.fn(),
+    extractedFiles: [] as { name: string; text: string }[],
+    onFilesChanged: vi.fn(),
     contextText: 'context',
     onContextTextChange: vi.fn(),
     onFormalise: vi.fn(),
     loading: false,
-    onFilesChanged: vi.fn(),
   }
 
   it('renders the Source Inputs heading', () => {
