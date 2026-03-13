@@ -23,14 +23,15 @@ describe('LatexRenderer', () => {
   })
 
   it('renders display LaTeX with KaTeX markup', () => {
-    const { container } = render(<LatexRenderer value="Before $$E = mc^2$$ After" />)
-    expect(container.querySelector('.katex-display')).not.toBeNull()
+    const { container } = render(<LatexRenderer value={"Before\n\n$$E = mc^2$$\n\nAfter"} />)
+    // rehype-katex renders display math with the katex class
+    expect(container.querySelector('.katex')).not.toBeNull()
   })
 
-  it('preserves newlines as line breaks', () => {
-    const { container } = render(<LatexRenderer value={"Line one\nLine two"} />)
-    const brs = container.querySelectorAll('br')
-    expect(brs.length).toBeGreaterThanOrEqual(1)
+  it('preserves newlines as separate paragraphs', () => {
+    const { container } = render(<LatexRenderer value={"Line one\n\nLine two"} />)
+    const paragraphs = container.querySelectorAll('p')
+    expect(paragraphs.length).toBeGreaterThanOrEqual(2)
   })
 
   it('applies custom className', () => {

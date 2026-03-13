@@ -28,6 +28,8 @@ describe('OutputPanel', () => {
   const defaultProps = {
     semiformalText: '',
     onSemiformalTextChange: vi.fn(),
+    semiformalDirty: false,
+    onRegenerateLean: vi.fn(),
     leanCode: '',
     onLeanCodeChange: vi.fn(),
     loadingPhase: 'idle' as const,
