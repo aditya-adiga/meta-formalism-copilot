@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --ivory-cream: #F9F5F1;
@@ -6,6 +7,19 @@
   --paper-shadow: rgba(26, 26, 26, 0.1);
   --background: var(--ivory-cream);
   --foreground: var(--ink-black);
+
+  /* Panel rail */
+  --rail-width: 48px;
+  --rail-expanded-width: 220px;
+  --rail-bg: #F0EBE6;
+  --rail-active: var(--ink-black);
+  --rail-hover: rgba(26, 26, 26, 0.06);
+
+  /* Node verification status colors */
+  --status-unverified: #9A9590;
+  --status-in-progress: #3B82F6;
+  --status-verified: #16A34A;
+  --status-failed: #DC2626;
 }
 
 @theme inline {
