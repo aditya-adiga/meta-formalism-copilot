@@ -47,11 +47,19 @@ theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
 }
 
 export async function POST(request: NextRequest) {
-  const { informalProof, previousAttempt, errors, instruction } = await request.json();
+  const { informalProof, previousAttempt, errors, instruction, contextLeanCode } = await request.json();
 
   const isRetry = Boolean(previousAttempt && errors);
   const systemPrompt = isRetry ? RETRY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
-  let userContent = isRetry
+  let userContent = "";
+
+  // When dependency context is available, prepend it so the LLM can reference
+  // already-verified definitions and theorems instead of redefining them.
+  if (contextLeanCode) {
+    userContent += `The following verified Lean4 code defines theorems and definitions you can reference. Build on these rather than redefining them:\n\n${contextLeanCode}\n\n---\n\n`;
+  }
+
+  userContent += isRetry
     ? `Original proof:\n${informalProof}\n\nPrevious Lean4 attempt:\n${previousAttempt}\n\nVerification errors:\n${errors}`
     : informalProof;
   if (instruction) {
@@ -63,7 +71,7 @@ export async function POST(request: NextRequest) {
     const client = new Anthropic({ apiKey: anthropicKey });
     const message = await client.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 2048,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
     });
