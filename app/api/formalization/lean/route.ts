@@ -18,13 +18,11 @@ Guidelines:
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
-The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
-
 Guidelines:
 - Use Lean4 syntax (not Lean3)
-- Start with \`import Mathlib\`
-- Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
-- Address all verification errors shown in the error output
+- Include necessary imports (e.g. import Mathlib)
+- Use tactic-style proofs where appropriate
+- Address all verification errors
 - Return only the corrected Lean4 code with no additional commentary`;
 
 /** Strip markdown code fences that LLMs sometimes wrap around Lean output.
@@ -42,8 +40,10 @@ function mockResponse(informalProof: string, isRetry: boolean): string {
 
 import Mathlib
 
-theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q :=
-  ⟨hp, hq⟩`;
+theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
+  exact ⟨hp, hq⟩
+
+#check example_formalization`;
 }
 
 export async function POST(request: NextRequest) {
