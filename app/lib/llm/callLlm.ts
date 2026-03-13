@@ -114,6 +114,7 @@ export async function callLlm({
       },
       body: JSON.stringify({
         model: openRouterModel,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
