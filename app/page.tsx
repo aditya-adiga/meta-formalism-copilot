@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
-import type { SessionScope } from "@/app/lib/types/session";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
@@ -110,14 +109,7 @@ export default function Home() {
     updateSession,
     selectSession,
     sessionsForScope,
-    activeSessionForScope,
   } = useFormalizationSessions();
-
-  const currentScope: SessionScope = isDecompMode
-    ? { type: "node", nodeId: selectedNode!.id, nodeLabel: selectedNode!.label }
-    : { type: "global" };
-  const currentScopeSessions = sessionsForScope(currentScope);
-  const currentScopeActiveSession = activeSessionForScope(currentScope);
 
   // When in decomposition mode, the semiformal/lean panels show selected node's data
   const activeSemiformal = isDecompMode ? selectedNode!.semiformalProof : semiformalText;
@@ -196,6 +188,8 @@ export default function Home() {
 
   /** Global single-proof: generate semiformal only, then stop for review */
   const handleGenerateSemiformal = useCallback(async () => {
+    // Deselect any decomposition node so the global semiformalText drives the panel
+    selectNode(null);
     createSession({ type: "global" });
     setLoadingPhase("semiformal");
     setSemiformalText("");
@@ -217,7 +211,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [combinedPaperText, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+  }, [combinedPaperText, selectNode, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
 
   /** Global single-proof: Lean generation + verification retry loop */
   const handleGenerateLean = useCallback(async () => {
@@ -464,33 +458,38 @@ export default function Home() {
     handleLeanIterate("");
   }, [handleLeanIterate]);
 
-  /** Load a previous session's data into the current view */
+  /** Load a previous session's data into the current view (supports cross-scope navigation) */
   const handleSelectSession = useCallback((sessionId: string) => {
     selectSession(sessionId);
-    // Find the session data to load
-    const target = currentScopeSessions.find((s) => s.id === sessionId);
+    const allSessions = sessionsForScope({ type: "global" }).concat(
+      decomp.nodes.flatMap((n) => sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label }))
+    );
+    const target = allSessions.find((s) => s.id === sessionId);
     if (!target) return;
 
-    if (isDecompMode && selectedNode) {
-      // Map session verification status back to node status
+    if (target.scope.type === "node") {
+      // Navigate into the target node
+      selectNode(target.scope.nodeId);
       const nodeStatus = target.verificationStatus === "valid" ? "verified"
         : target.verificationStatus === "invalid" ? "failed"
         : target.verificationStatus === "verifying" ? "in-progress"
         : "unverified";
-      updateNode(selectedNode.id, {
+      updateNode(target.scope.nodeId, {
         semiformalProof: target.semiformalText,
         leanCode: target.leanCode,
         verificationStatus: nodeStatus,
         verificationErrors: target.verificationErrors,
       });
     } else {
+      // Global session — exit decomposition mode
+      selectNode(null);
       setSemiformalText(target.semiformalText);
       setLeanCode(target.leanCode);
       setVerificationStatus(target.verificationStatus);
       setVerificationErrors(target.verificationErrors);
       setSemiformalDirty(false);
     }
-  }, [selectSession, currentScopeSessions, isDecompMode, selectedNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+  }, [selectSession, sessionsForScope, decomp.nodes, selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
@@ -595,11 +594,20 @@ export default function Home() {
   }, [semiformalText, leanCode, decomp.nodes]);
 
   // --- Panel content map ---
+  // Collect all sessions for the banner dropdown (global + all node scopes)
+  const allSessions = useMemo(() => {
+    const global = sessionsForScope({ type: "global" });
+    const nodeSessions = decomp.nodes.flatMap((n) =>
+      sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label })
+    );
+    return [...global, ...nodeSessions].sort((a, b) => b.runNumber - a.runNumber || b.updatedAt.localeCompare(a.updatedAt));
+  }, [sessionsForScope, decomp.nodes]);
+
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
-  const sessionBannerElement = currentScopeActiveSession ? (
+  const sessionBannerElement = activeSession ? (
     <SessionBanner
-      currentSession={currentScopeActiveSession}
-      sessions={currentScopeSessions}
+      currentSession={activeSession}
+      sessions={allSessions}
       onSelectSession={handleSelectSession}
     />
   ) : null;
@@ -682,7 +690,7 @@ export default function Home() {
     handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
     handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
-    currentScopeActiveSession, currentScopeSessions, handleSelectSession,
+    activeSession, allSessions, handleSelectSession,
   ]);
 
   return (

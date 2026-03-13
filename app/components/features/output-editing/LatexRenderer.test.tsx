@@ -23,12 +23,20 @@ describe('LatexRenderer', () => {
   })
 
   it('renders display LaTeX with KaTeX markup', () => {
+    // remark-math requires display math ($$) on its own paragraph (blank lines around it)
     const { container } = render(<LatexRenderer value={"Before\n\n$$E = mc^2$$\n\nAfter"} />)
-    // rehype-katex renders display math with the katex class
-    expect(container.querySelector('.katex')).not.toBeNull()
+    // rehype-katex renders display math into a dedicated paragraph;
+    // in jsdom the .katex-display wrapper may not appear, so verify
+    // the math is rendered in its own paragraph with KaTeX markup
+    const katexElements = container.querySelectorAll('.katex')
+    expect(katexElements.length).toBeGreaterThanOrEqual(1)
+    // The surrounding text should be in separate paragraphs
+    expect(screen.getByText('Before')).toBeInTheDocument()
+    expect(screen.getByText('After')).toBeInTheDocument()
   })
 
-  it('preserves newlines as separate paragraphs', () => {
+  it('preserves paragraph breaks', () => {
+    // ReactMarkdown converts double newlines to separate <p> elements (standard markdown)
     const { container } = render(<LatexRenderer value={"Line one\n\nLine two"} />)
     const paragraphs = container.querySelectorAll('p')
     expect(paragraphs.length).toBeGreaterThanOrEqual(2)
