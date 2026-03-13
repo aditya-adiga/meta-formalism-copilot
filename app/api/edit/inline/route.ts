@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       openRouterModel: OPENROUTER_MODEL,
     });
 
-    const text = usage.provider === "mock" ? mockResponse(selection, instruction) : responseText;
+    const text = usage.provider === "mock" ? mockResponse(fullText, selection, instruction) : responseText;
     return NextResponse.json({ text });
   } catch (err) {
     if (err instanceof OpenRouterError) {

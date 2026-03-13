@@ -511,6 +511,10 @@ export default function Home() {
     />
   ) : null, [currentScopeActiveSession, currentScopeSessions, handleSelectSession]);
 
+  const handleRegenerateLean = useCallback(() => {
+    handleLeanIterate("");
+  }, [handleLeanIterate]);
+
   // --- Panel content map ---
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
     source: (
@@ -579,10 +583,6 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeFormalise,
     sessionBannerElement,
   ]);
-
-  const handleRegenerateLean = useCallback(() => {
-    handleLeanIterate("");
-  }, [handleLeanIterate]);
 
   return (
     <PanelShell
