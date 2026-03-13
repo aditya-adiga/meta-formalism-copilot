@@ -111,7 +111,6 @@ export default function Home() {
     sessionsForScope,
   } = useFormalizationSessions();
 
-
   // When in decomposition mode, the semiformal/lean panels show selected node's data
   const activeSemiformal = isDecompMode ? selectedNode!.semiformalProof : semiformalText;
   const activeLeanCode = isDecompMode ? selectedNode!.leanCode : leanCode;
