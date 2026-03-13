@@ -25,5 +25,5 @@ export type PersistedWorkspace = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  perspectiveBalance: string | null;
 };

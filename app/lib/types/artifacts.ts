@@ -85,9 +85,9 @@ export type PropertyTestsResponse = {
   };
 };
 
-/** Dialectical Map response shape (003 §3) */
-export type DialecticalMapResponse = {
-  dialecticalMap: {
+/** Balanced Perspectives response shape (003 §3) */
+export type PerspectiveBalanceResponse = {
+  perspectiveBalance: {
     topic: string;
     perspectives: Array<{
       id: string;
@@ -118,7 +118,7 @@ export const ARTIFACT_META: Record<ArtifactType, { label: string; chipLabel: str
   "causal-graph": { label: "Causal Graph", chipLabel: "Causal Graph" },
   "statistical-model": { label: "Statistical Model", chipLabel: "Statistical Model" },
   "property-tests": { label: "Property Tests", chipLabel: "Property Tests" },
-  "dialectical-map": { label: "Dialectical Map", chipLabel: "Dialectical Map" },
+  "perspective-balance": { label: "Balanced Perspectives", chipLabel: "Balanced Perspectives" },
 };
 
 /** Artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
@@ -127,7 +127,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "perspective-balance",
 ];
 
 /** Maps artifact types to their API route paths */
@@ -135,7 +135,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
-  "dialectical-map": "/api/formalization/dialectical-map",
+  "perspective-balance": "/api/formalization/perspective-balance",
 };
 
 /** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
@@ -145,5 +145,5 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "causal-graph": "causalGraph",
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
-  "dialectical-map": "dialecticalMap",
+  "perspective-balance": "perspectiveBalance",
 };

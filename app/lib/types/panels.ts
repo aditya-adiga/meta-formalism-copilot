@@ -7,7 +7,7 @@ export type PanelId =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map"
+  | "perspective-balance"
   | "analytics";
 
 export type PanelGroup = "navigation" | "artifacts" | "meta";

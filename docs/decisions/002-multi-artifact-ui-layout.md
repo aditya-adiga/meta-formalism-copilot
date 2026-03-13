@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Context:** Decision [001](001-formal-artifact-types.md) introduced four new artifact types (Causal Graph, Statistical Model, Property Test Suite, Dialectical Map) alongside the existing Semiformal + Lean path. The current UI is structured around a single formalization pipeline: source input → context → "Formalise" → semiformal proof → Lean code. The workspace needs to accommodate multiple artifact types without overwhelming the user or breaking the existing flow.
+**Context:** Decision [001](001-formal-artifact-types.md) introduced four new artifact types (Causal Graph, Statistical Model, Property Test Suite, Balanced Perspectives) alongside the existing Semiformal + Lean path. The current UI is structured around a single formalization pipeline: source input → context → "Formalise" → semiformal proof → Lean code. The workspace needs to accommodate multiple artifact types without overwhelming the user or breaking the existing flow.
 
 **Companion decision:** [003](003-artifact-generation-api.md) defines the backend API contracts, session model changes, and data model evolution that support this UI design. Questions about request/response shapes, parallel generation, per-node context storage, and the deductive two-step pipeline are resolved there.
 
@@ -19,12 +19,12 @@ Replace the single "Formalise" button with an **artifact type selector** — a r
 The chips are:
 
 ```
-[Deductive (Lean)] [Causal Graph] [Statistical Model] [Property Tests] [Dialectical Map]
+[Deductive (Lean)] [Causal Graph] [Statistical Model] [Property Tests] [Balanced Perspectives]
 ```
 
 Multiple chips can be active simultaneously. "Deductive (Lean)" is the existing semiformal-then-Lean pipeline, presented as one of five peer options rather than the default.
 
-**Why chips over a dropdown:** Chips make the full set of options visible at a glance. This is critical for discoverability — users who don't know about causal graphs or dialectical maps will see them as options and can learn what they are. A dropdown hides these behind an extra click.
+**Why chips over a dropdown:** Chips make the full set of options visible at a glance. This is critical for discoverability — users who don't know about causal graphs or balanced perspectives will see them as options and can learn what they are. A dropdown hides these behind an extra click.
 
 The chip selector appears in two places:
 - **InputPanel** — for "formalise directly" (whole-source) generation
@@ -85,7 +85,7 @@ The rail gains a visual section separator between input/navigation panels and ar
 [Causal Graph]            ← hidden until generated
 [Statistical Model]       ← hidden until generated
 [Property Tests]          ← hidden until generated
-[Dialectical Map]         ← hidden until generated
+[Balanced Perspectives]         ← hidden until generated
 ─── ───
 [LLM Usage]               ← always visible
 ```
@@ -108,7 +108,7 @@ export type PanelId =
   | "causal-graph"       // new
   | "statistical-model"  // new
   | "property-tests"     // new
-  | "dialectical-map"    // new
+  | "perspective-balance"    // new
   | "analytics";
 ```
 

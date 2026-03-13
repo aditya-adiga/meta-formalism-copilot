@@ -107,8 +107,8 @@ export function PropertyTestsIcon({ className }: IconProps) {
   );
 }
 
-/** Scales/balance icon for Dialectical Map */
-export function DialecticalMapIcon({ className }: IconProps) {
+/** Scales/balance icon for Balanced Perspectives */
+export function PerspectiveBalanceIcon({ className }: IconProps) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="10" y1="2" x2="10" y2="18" />

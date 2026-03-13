@@ -11,7 +11,7 @@ export type ArtifactType =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map";
+  | "perspective-balance";
 
 export type ArtifactData = {
   type: ArtifactType;

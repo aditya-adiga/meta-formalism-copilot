@@ -59,7 +59,7 @@ export type ArtifactPersistenceData = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  perspectiveBalance: string | null;
 };
 
 export type SaveWorkspaceInput = {
@@ -76,7 +76,7 @@ export type SaveWorkspaceInput = {
 };
 
 export function saveWorkspace(input: SaveWorkspaceInput): boolean {
-  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null };
+  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, perspectiveBalance: null };
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
     sourceText: input.sourceText,
@@ -94,7 +94,7 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
     causalGraph: artifacts.causalGraph,
     statisticalModel: artifacts.statisticalModel,
     propertyTests: artifacts.propertyTests,
-    dialecticalMap: artifacts.dialecticalMap,
+    perspectiveBalance: artifacts.perspectiveBalance,
   };
 
   try {
@@ -178,7 +178,7 @@ export function loadWorkspace(): PersistedWorkspace | null {
       causalGraph: typeof parsed.causalGraph === "string" ? parsed.causalGraph : null,
       statisticalModel: typeof parsed.statisticalModel === "string" ? parsed.statisticalModel : null,
       propertyTests: typeof parsed.propertyTests === "string" ? parsed.propertyTests : null,
-      dialecticalMap: typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null,
+      perspectiveBalance: typeof parsed.perspectiveBalance === "string" ? parsed.perspectiveBalance : null,
     };
   } catch {
     return null;

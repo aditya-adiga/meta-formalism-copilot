@@ -8,7 +8,7 @@
 
 The existing backend follows a clear pattern: each API route is a Next.js route handler at `app/api/<domain>/<action>/route.ts` that calls `callLlm()` with a system prompt and user content, returning a domain-specific response shape. The existing formalization pipeline is sequential: `formalization/semiformal` produces prose, `formalization/lean` converts that prose to code, and `verification/lean` checks the code against a verifier service. Each step depends on the previous step's output.
 
-The four new artifact types (causal graph, statistical model, property test suite, dialectical map) are fundamentally different: they are **independent of each other and independent of the existing deductive pipeline**. A causal graph is not derived from a semiformal proof. This independence is the key architectural fact driving the API design.
+The four new artifact types (causal graph, statistical model, property test suite, balanced perspectives) are fundamentally different: they are **independent of each other and independent of the existing deductive pipeline**. A causal graph is not derived from a semiformal proof. This independence is the key architectural fact driving the API design.
 
 ## Decision
 
@@ -23,7 +23,7 @@ app/api/formalization/
   causal-graph/route.ts      # new
   statistical-model/route.ts # new
   property-tests/route.ts    # new
-  dialectical-map/route.ts   # new
+  perspective-balance/route.ts   # new
 ```
 
 **Why not a single `/formalization/generate` route with a `type` parameter:** Each artifact type has a different system prompt, different response shape, and different post-processing needs. A single route would become a large switch statement. Separate routes follow the existing pattern and keep each route handler focused.
@@ -128,11 +128,11 @@ type PropertyTestsResponse = {
 
 Property tests return pseudocode specifications, not runnable code in a specific language. This aligns with 001's principle that the tool produces specifications, not implementations.
 
-#### Dialectical Map
+#### Balanced Perspectives
 
 ```typescript
-type DialecticalMapResponse = {
-  dialecticalMap: {
+type PerspectiveBalanceResponse = {
+  perspectiveBalance: {
     topic: string;
     perspectives: Array<{
       id: string;
@@ -166,7 +166,7 @@ Deductive:    source + context  ->  semiformal  ->  lean  ->  verify
 Causal:       source + context  ->  causal graph  ->  verify (consistency)
 Statistical:  source + context  ->  statistical model  ->  verify (consistency)
 Constructive: source + context  ->  property tests  ->  verify (structural)
-Dialectical:  source + context  ->  dialectical map  ->  verify (coverage)
+Perspectival:  source + context  ->  balanced perspectives  ->  verify (coverage)
 ```
 
 This means the frontend can fire all selected artifact generation calls **in parallel**. There is no dependency between artifact types. The only sequential dependency that exists is within the deductive pipeline (semiformal must complete before Lean generation).
@@ -193,7 +193,7 @@ app/api/verification/
   causal-consistency/route.ts    # future — LLM-based consistency check
   statistical-consistency/route.ts # future — LLM-based assumption check
   property-structural/route.ts   # future — structural completeness check
-  dialectical-coverage/route.ts  # future — LLM-based coverage check
+  perspective-coverage/route.ts  # future — LLM-based coverage check
 ```
 
 All four new verification strategies are **LLM-based** (unlike Lean verification which uses an external tool). This means they can follow the same `callLlm()` pattern: send the artifact as user content with a verification-focused system prompt, receive a structured assessment.
@@ -223,7 +223,7 @@ export type ArtifactType =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map";
+  | "perspective-balance";
 
 export type ArtifactData = {
   type: ArtifactType;
