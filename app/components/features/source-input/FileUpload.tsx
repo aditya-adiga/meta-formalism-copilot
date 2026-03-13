@@ -16,7 +16,7 @@ type TrackedFile = {
 };
 
 type FileUploadProps = {
-  onFilesChanged?: (files: { name: string; text: string }[]) => void;
+  onFilesChanged?: (files: { name: string; text: string; file?: File }[]) => void;
 };
 
 export default function FileUpload({ onFilesChanged }: FileUploadProps) {
@@ -27,7 +27,7 @@ export default function FileUpload({ onFilesChanged }: FileUploadProps) {
   useEffect(() => {
     const readyFiles = trackedFiles
       .filter((f) => f.status === "ready")
-      .map((f) => ({ name: f.file.name, text: f.text }));
+      .map((f) => ({ name: f.file.name, text: f.text, file: f.file }));
     onFilesChanged?.(readyFiles);
   }, [trackedFiles, onFilesChanged]);
 

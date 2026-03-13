@@ -4,8 +4,8 @@ import FileUpload from "@/app/components/features/source-input/FileUpload";
 type SourcePanelProps = {
   sourceText: string;
   onSourceTextChange: (value: string) => void;
-  extractedFiles: { name: string; text: string }[];
-  onFilesChanged: (files: { name: string; text: string }[]) => void;
+  extractedFiles: { name: string; text: string; file?: File }[];
+  onFilesChanged: (files: { name: string; text: string; file?: File }[]) => void;
 };
 
 export default function SourcePanel({ sourceText, onSourceTextChange, extractedFiles, onFilesChanged }: SourcePanelProps) {

@@ -21,7 +21,7 @@ function createFile(name: string, content = ""): File {
 describe("FileUpload", () => {
   it("renders the upload button with accepted file types", () => {
     render(<FileUpload />);
-    expect(screen.getByText(".txt, .md, .docx, .pdf")).toBeInTheDocument();
+    expect(screen.getByText(".txt, .md, .tex, .docx, .pdf")).toBeInTheDocument();
   });
 
   it("does not show a file list when no files are uploaded", () => {
@@ -41,9 +41,9 @@ describe("FileUpload", () => {
     // Should show ready status (checkmark) after extraction completes
     expect(await screen.findByText("✓")).toBeInTheDocument();
 
-    // Callback should have been called with extracted text
+    // Callback should have been called with extracted text (includes File reference)
     expect(onFilesChanged).toHaveBeenCalledWith([
-      { name: "paper.txt", text: "extracted: paper.txt" },
+      expect.objectContaining({ name: "paper.txt", text: "extracted: paper.txt" }),
     ]);
   });
 

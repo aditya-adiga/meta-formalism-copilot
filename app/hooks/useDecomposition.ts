@@ -16,10 +16,10 @@ export function useDecomposition() {
   const selectedNode: PropositionNode | null =
     state.nodes.find((n) => n.id === state.selectedNodeId) ?? null;
 
-  const extractPropositions = useCallback(async (text: string) => {
+  const extractPropositions = useCallback(async (text: string, pdfFile?: File | null) => {
     setState((prev) => ({ ...prev, paperText: text, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
 
-    // Fast path: deterministic LaTeX parsing (no LLM call)
+    // Fast path 1: deterministic LaTeX source parsing (no LLM call)
     try {
       const { isLatexStructured, parseLatexPropositions } = await import("@/app/lib/utils/latexParser");
       if (isLatexStructured(text)) {
@@ -28,11 +28,27 @@ export function useDecomposition() {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
         }
-        // Zero nodes → fall through to LLM
+        // Zero nodes → fall through
       }
     } catch (err) {
       console.error("[decomposition/latex-parse]", err);
-      // Parse error → fall through to LLM
+      // Parse error → fall through
+    }
+
+    // Fast path 2: structured PDF parsing for TeX-compiled PDFs (no LLM call)
+    if (pdfFile) {
+      try {
+        const { parsePdfPropositions } = await import("@/app/lib/utils/pdfPropositionParser");
+        const nodes = await parsePdfPropositions(pdfFile);
+        if (nodes && nodes.length > 0) {
+          setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
+          return;
+        }
+        // null or empty → fall through to LLM
+      } catch (err) {
+        console.error("[decomposition/pdf-parse]", err);
+        // Parse error → fall through to LLM
+      }
     }
 
     try {

@@ -111,6 +111,16 @@ export default function Home() {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
 
+  // Extract the PDF File reference for structured parsing (non-persisted; only available
+  // when the user uploaded a PDF in this session and it hasn't been cleared)
+  const pdfFile = useMemo(() => {
+    const pdfFiles = extractedFiles.filter(
+      (f) => f.file && f.name.toLowerCase().endsWith(".pdf"),
+    );
+    // Only use structured parsing when there's exactly one PDF source
+    return pdfFiles.length === 1 ? pdfFiles[0].file ?? null : null;
+  }, [extractedFiles]);
+
   // --- Handlers ---
 
   const handleSemiformalTextChange = useCallback((text: string) => {
@@ -316,9 +326,9 @@ export default function Home() {
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
     if (combinedPaperText.trim()) {
-      extractPropositions(combinedPaperText);
+      extractPropositions(combinedPaperText, pdfFile);
     }
-  }, [combinedPaperText, extractPropositions]);
+  }, [combinedPaperText, pdfFile, extractPropositions]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);

@@ -8,7 +8,7 @@ type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 type WorkspaceState = {
   sourceText: string;
-  extractedFiles: { name: string; text: string }[];
+  extractedFiles: { name: string; text: string; file?: File }[];
   contextText: string;
   semiformalText: string;
   leanCode: string;
@@ -110,7 +110,7 @@ export function useWorkspacePersistence() {
 
   // --- Individual setters that match the useState API page.tsx expects ---
   const setSourceText = useCallback((v: string) => setState((s) => ({ ...s, sourceText: v })), []);
-  const setExtractedFiles = useCallback((v: { name: string; text: string }[]) => setState((s) => ({ ...s, extractedFiles: v })), []);
+  const setExtractedFiles = useCallback((v: { name: string; text: string; file?: File }[]) => setState((s) => ({ ...s, extractedFiles: v })), []);
   const setContextText = useCallback((v: string) => setState((s) => ({ ...s, contextText: v })), []);
   const setSemiformalText = useCallback((v: string | ((prev: string) => string)) =>
     setState((s) => ({ ...s, semiformalText: typeof v === "function" ? v(s.semiformalText) : v })), []);
