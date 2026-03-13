@@ -13,7 +13,6 @@ type InlineEditPopupProps = {
 export default function InlineEditPopup({
   onApply,
   onClose,
-  selectedText,
   position,
 }: InlineEditPopupProps) {
   const [instruction, setInstruction] = useState("");
