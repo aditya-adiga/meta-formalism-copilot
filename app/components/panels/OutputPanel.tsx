@@ -36,7 +36,8 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
-  // Switch back to rendered view when new semiformal content arrives, but not while user is editing (raw mode)
+  // Switch back to rendered view when new semiformal content arrives, but not while user is editing (raw mode).
+  // renderMode intentionally omitted from deps to avoid re-triggering on mode change.
   useEffect(() => {
     if (semiformalText && renderMode !== "raw") setRenderMode("rendered");
     // eslint-disable-next-line react-hooks/exhaustive-deps

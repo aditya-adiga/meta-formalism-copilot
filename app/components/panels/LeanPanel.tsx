@@ -16,6 +16,7 @@ type LeanPanelProps = {
   onRegenerateLean: () => void;
   onReVerify: () => void;
   onLeanIterate: (instruction: string) => void;
+  sessionBanner?: React.ReactNode;
 };
 
 function VerificationBadge({ status }: { status: VerificationStatus }) {
@@ -40,16 +41,18 @@ export default function LeanPanel({
   onRegenerateLean,
   onReVerify,
   onLeanIterate,
+  sessionBanner,
 }: LeanPanelProps) {
   const showLean = leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying" || loadingPhase === "iterating";
 
   if (!showLean) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
+        <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Lean4 Code
           </h2>
+          {sessionBanner}
         </div>
         <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
           {semiformalReady
@@ -63,9 +66,12 @@ export default function LeanPanel({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Lean4 Code
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
+            Lean4 Code
+          </h2>
+          {sessionBanner}
+        </div>
         <div className="flex items-center gap-2">
           <VerificationBadge status={verificationStatus} />
           {verificationStatus === "invalid" && loadingPhase === "idle" && (
