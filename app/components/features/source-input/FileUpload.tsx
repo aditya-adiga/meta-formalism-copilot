@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import PaperClipIcon from "@/app/components/ui/icons/PaperClipIcon";
 import { extractTextFromFile } from "@/app/lib/utils/fileExtraction";
 
-const ACCEPT = ".txt,.doc,.docx,application/pdf";
+const ACCEPT = ".txt,.md,.markdown,.tex,.docx,application/pdf";
 
 type FileStatus = "extracting" | "ready" | "error";
 
@@ -16,7 +16,7 @@ type TrackedFile = {
 };
 
 type FileUploadProps = {
-  onFilesChanged?: (files: { name: string; text: string }[]) => void;
+  onFilesChanged?: (files: { name: string; text: string; file?: File }[]) => void;
 };
 
 export default function FileUpload({ onFilesChanged }: FileUploadProps) {
@@ -27,7 +27,7 @@ export default function FileUpload({ onFilesChanged }: FileUploadProps) {
   useEffect(() => {
     const readyFiles = trackedFiles
       .filter((f) => f.status === "ready")
-      .map((f) => ({ name: f.file.name, text: f.text }));
+      .map((f) => ({ name: f.file.name, text: f.text, file: f.file }));
     onFilesChanged?.(readyFiles);
   }, [trackedFiles, onFilesChanged]);
 
@@ -94,7 +94,7 @@ export default function FileUpload({ onFilesChanged }: FileUploadProps) {
         className="inline-flex w-fit items-center gap-2 rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-2 text-sm font-medium text-[var(--ink-black)] shadow-md transition-shadow duration-200 hover:shadow-lg active:shadow-xl focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)]"
       >
         <PaperClipIcon />
-        <span>.txt, .doc, .docx, .pdf</span>
+        <span>.txt, .md, .tex, .docx, .pdf</span>
       </button>
       {trackedFiles.length > 0 && (
         <ul className="mt-2 space-y-1">

@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
+import DownloadButton from "@/app/components/ui/DownloadButton";
+import { downloadSemiformalAsMarkdown } from "@/app/lib/utils/export";
 
 type SemiformalPanelProps = {
   semiformalText: string;
   onSemiformalTextChange: (value: string) => void;
+  sessionBanner?: React.ReactNode;
   onGenerateLean?: () => void;
   showGenerateLean?: boolean;
   leanLoading?: boolean;
 };
 
-export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, onGenerateLean, showGenerateLean, leanLoading }: SemiformalPanelProps) {
+export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -78,10 +81,19 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         </div>
       )}
 
-      <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
+      <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
           Semiformal Proof
         </h2>
+        <div className="flex items-center gap-2">
+          {sessionBanner}
+          {semiformalText && (
+            <DownloadButton
+              label="Export .md"
+              onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
+            />
+          )}
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
