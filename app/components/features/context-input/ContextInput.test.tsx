@@ -34,7 +34,7 @@ describe('ContextInput', () => {
 
   it('disables the Formalise button when loading', () => {
     render(<ContextInput {...defaultProps} loading={true} />)
-    expect(screen.getByText('Formalising...')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /formalising/i })).toBeDisabled()
   })
 
   it('calls onFormalise when the button is clicked', async () => {
