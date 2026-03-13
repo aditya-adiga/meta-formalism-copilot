@@ -11,7 +11,9 @@ import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
+import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
+import { formalizeNode } from "@/app/lib/formalization/formalizeNode";
 import {
   SourceIcon,
   ContextIcon,
@@ -70,6 +72,10 @@ export default function Home() {
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
+
+  // --- Auto-formalize queue ---
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode);
+  const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from localStorage once on mount
   const decompRestoredRef = useRef(false);
@@ -190,66 +196,11 @@ export default function Home() {
   const handleNodeFormalise = useCallback(async () => {
     if (!selectedNode) return;
 
-    updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" });
     setLoadingPhase("semiformal");
     setActivePanelId("semiformal");
 
     try {
-      const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
-
-      // Step 1: semiformal proof
-      const semiformalRes = await fetch("/api/formalization/semiformal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: nodeText }),
-      });
-      const semiformalData = await semiformalRes.json();
-      if (!semiformalRes.ok) {
-        updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: semiformalData.error ?? "Unknown error" });
-        return;
-      }
-      const proof = semiformalData.proof as string;
-      updateNode(selectedNode.id, { semiformalProof: proof });
-
-      // Step 2: Lean generation with dependency context
-      setLoadingPhase("lean");
-      setActivePanelId("lean");
-      const depContext = gatherDependencyContext(decomp.nodes, selectedNode.id);
-
-      let currentCode = "";
-      let lastErrors = "";
-
-      for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
-        if (attempt > 1) setLoadingPhase("retrying");
-        currentCode = await generateLean(
-          proof,
-          attempt > 1 ? currentCode : undefined,
-          attempt > 1 ? lastErrors : undefined,
-          undefined,
-          depContext || undefined,
-        );
-        updateNode(selectedNode.id, { leanCode: currentCode });
-
-        setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
-
-        // Verify with dependency context prepended
-        const fullCode = depContext ? `${depContext}\n\n${currentCode}` : currentCode;
-        const { valid, errors } = await verifyLean(fullCode);
-
-        if (valid) {
-          updateNode(selectedNode.id, { verificationStatus: "verified", verificationErrors: "" });
-          return;
-        }
-
-        lastErrors = errors || "Verification failed";
-        updateNode(selectedNode.id, { verificationErrors: lastErrors });
-        if (attempt === MAX_LEAN_ATTEMPTS) {
-          updateNode(selectedNode.id, { verificationStatus: "failed" });
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
+      await formalizeNode(selectedNode, decomp.nodes, updateNode);
     } finally {
       setLoadingPhase("idle");
     }
@@ -496,6 +447,11 @@ export default function Home() {
         paperText={combinedPaperText}
         extractionStatus={decomp.extractionStatus}
         onDecompose={handleDecompose}
+        queueProgress={queueProgress}
+        onFormalizeAll={startQueue}
+        onPauseQueue={pauseQueue}
+        onResumeQueue={resumeQueue}
+        onCancelQueue={cancelQueue}
       />
     ),
     "node-detail": selectedNode ? (
@@ -503,14 +459,15 @@ export default function Home() {
         node={selectedNode}
         dependencies={selectedNodeDeps}
         onFormalise={handleNodeFormalise}
-        loading={loadingPhase !== "idle"}
+        loading={loadingPhase !== "idle" || queueRunning}
       />
     ) : undefined,
   }), [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
-    semiformalDirty, isDecompMode, decomp,
+    semiformalDirty, isDecompMode, decomp, queueRunning,
     selectedNode, selectedNodeDeps, combinedPaperText,
+    queueProgress, startQueue, pauseQueue, resumeQueue, cancelQueue,
     setSourceText, setExtractedFiles, setContextText,
     handleFormalise, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,

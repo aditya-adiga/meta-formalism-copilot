@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
+import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
 // Dynamic import to avoid SSR issues with ReactFlow
@@ -18,6 +19,11 @@ type GraphPanelProps = {
   paperText: string;
   extractionStatus: "idle" | "extracting" | "done" | "error";
   onDecompose: () => void;
+  queueProgress: QueueProgress;
+  onFormalizeAll: () => void;
+  onPauseQueue: () => void;
+  onResumeQueue: () => void;
+  onCancelQueue: () => void;
 };
 
 export default function GraphPanel({
@@ -27,10 +33,19 @@ export default function GraphPanel({
   paperText,
   extractionStatus,
   onDecompose,
+  queueProgress,
+  onFormalizeAll,
+  onPauseQueue,
+  onResumeQueue,
+  onCancelQueue,
 }: GraphPanelProps) {
   const hasText = paperText.trim().length > 0;
   const hasNodes = propositions.length > 0;
   const [exporting, setExporting] = useState(false);
+
+  const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
+  const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
+  const progressPct = queueProgress.total > 0 ? (processed / queueProgress.total) * 100 : 0;
 
   const handleExportGraph = useCallback(async () => {
     setExporting(true);
@@ -60,10 +75,45 @@ export default function GraphPanel({
               disabled={exporting}
             />
           )}
+          {/* Formalize All / queue controls */}
+          {hasNodes && !queueActive && queueProgress.status !== "done" && (
+            <button
+              onClick={onFormalizeAll}
+              disabled={extractionStatus === "extracting"}
+              className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+            >
+              Formalize All
+            </button>
+          )}
+          {queueActive && (
+            <>
+              {queueProgress.status === "running" ? (
+                <button
+                  onClick={onPauseQueue}
+                  className="rounded-full border border-[#DDD9D5] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+                >
+                  Pause
+                </button>
+              ) : (
+                <button
+                  onClick={onResumeQueue}
+                  className="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:shadow-md"
+                >
+                  Resume
+                </button>
+              )}
+              <button
+                onClick={onCancelQueue}
+                className="rounded-full border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50"
+              >
+                Cancel
+              </button>
+            </>
+          )}
           {hasText && (
             <button
               onClick={onDecompose}
-              disabled={extractionStatus === "extracting"}
+              disabled={extractionStatus === "extracting" || queueActive}
               className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
               {extractionStatus === "extracting" ? "Decomposing..." : "Decompose Paper"}
@@ -71,6 +121,35 @@ export default function GraphPanel({
           )}
         </div>
       </div>
+
+      {/* Progress bar — shown when queue is active or just finished */}
+      {(queueActive || queueProgress.status === "done") && queueProgress.total > 0 && (
+        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-2">
+          <div className="flex items-center justify-between text-xs text-[#6B6560]">
+            <span>
+              {queueProgress.completed} verified
+              {queueProgress.failed > 0 && `, ${queueProgress.failed} failed`}
+              {queueProgress.skipped > 0 && `, ${queueProgress.skipped} skipped`}
+              {" / "}
+              {queueProgress.total} total
+            </span>
+            <span>
+              {queueProgress.status === "paused" && "Paused"}
+              {queueProgress.status === "running" && "Running..."}
+              {queueProgress.status === "done" && "Done"}
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#DDD9D5]">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${progressPct}%`,
+                backgroundColor: queueProgress.failed > 0 ? "#dc2626" : "#15803d",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {!hasText && (
