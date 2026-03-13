@@ -2,24 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
+import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
+import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
-const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
+const SYSTEM_PROMPT = `You are a document structure analyzer. Given one or more source documents, decompose the content into its key structural units and their dependency/support relationships.
 
-const SYSTEM_PROMPT = `You are a mathematical paper analyzer. Given one or more source documents, extract all formal propositions (definitions, lemmas, theorems, propositions, corollaries, axioms) and their dependency relationships.
+Adapt your extraction to the document type:
+- For mathematical papers: extract definitions, lemmas, theorems, propositions, corollaries, axioms
+- For argumentative essays: extract the thesis (as "claim"), supporting arguments (as "claim" or "evidence"), assumptions, objections, and rebuttals
+- For empirical/scientific writing: extract hypotheses (as "claim"), methodology, observations, evidence, and conclusions
+- For mixed or informal content: extract claims, questions, assumptions, observations, and narrative context
 
-Each document is identified by a sourceId. Return a JSON array of propositions. Each proposition has:
-- "id": a globally unique identifier using the format "<sourceId>/<localId>", e.g. "doc-0/def-1", "doc-1/thm-3"
-- "label": the label as it appears in the paper, e.g. "Definition 2.1", "Theorem 3"
-- "kind": one of "definition", "lemma", "theorem", "proposition", "corollary", "axiom"
-- "statement": the full statement text
-- "proofText": the proof text if present, or empty string if none
-- "dependsOn": array of IDs this proposition directly depends on (references, uses)
-- "sourceId": the sourceId of the document this proposition was extracted from
+Each document is identified by a sourceId. Return a JSON array of nodes. Each node has:
+- "id": a globally unique identifier using the format "<sourceId>/<localId>", e.g. "doc-0/claim-1", "doc-0/def-1"
+- "label": a short descriptive label, e.g. "Main Thesis", "Definition 2.1", "Supporting Evidence 3"
+- "kind": one of "definition", "lemma", "theorem", "proposition", "corollary", "axiom", "claim", "evidence", "assumption", "objection", "rebuttal", "question", "observation", "narrative", "methodology", "conclusion"
+- "statement": the full text of this unit
+- "proofText": supporting reasoning, proof, or elaboration if present, or empty string if none
+- "dependsOn": array of IDs this node directly depends on or references
+- "sourceId": the sourceId of the document this node was extracted from
 
 Important:
+- Choose the kind that best fits each unit — use mathematical kinds for formal math, argumentative kinds for arguments and essays
 - Only include direct dependencies, not transitive ones
 - IDs must be consistent across the dependsOn references
-- Extract ALL formal statements, even if unnumbered
+- Extract ALL meaningful structural units, even if unlabeled in the source
+- Aim for 3-15 nodes per document — enough to capture structure without excessive fragmentation
 - Dependencies should be intra-document by default; only create cross-document dependencies if there is an explicit reference
 - Return ONLY the JSON array, no commentary or markdown fences`;
 
@@ -41,43 +49,36 @@ function mockResponse(documents: SourceDocument[]) {
     const snippet = doc.text.slice(0, 60).replace(/\n/g, " ");
     propositions.push(
       {
-        id: `${doc.sourceId}/def-1`,
-        label: "Definition 1",
-        kind: "definition",
-        statement: `Mock definition from "${doc.sourceLabel}": "${snippet}..."`,
+        id: `${doc.sourceId}/claim-1`,
+        label: "Main Claim",
+        kind: "claim",
+        statement: `Mock claim from "${doc.sourceLabel}": "${snippet}..."`,
         proofText: "",
         dependsOn: [],
         sourceId: doc.sourceId,
       },
       {
-        id: `${doc.sourceId}/lemma-1`,
-        label: "Lemma 1",
-        kind: "lemma",
-        statement: `Mock lemma from "${doc.sourceLabel}" depending on Definition 1`,
-        proofText: "Mock proof using Definition 1.",
-        dependsOn: [`${doc.sourceId}/def-1`],
+        id: `${doc.sourceId}/evidence-1`,
+        label: "Supporting Evidence 1",
+        kind: "evidence",
+        statement: `Mock evidence from "${doc.sourceLabel}" supporting Main Claim`,
+        proofText: "",
+        dependsOn: [`${doc.sourceId}/claim-1`],
         sourceId: doc.sourceId,
       },
       {
-        id: `${doc.sourceId}/thm-1`,
-        label: "Theorem 1",
-        kind: "theorem",
-        statement: `Mock theorem from "${doc.sourceLabel}" depending on Lemma 1`,
-        proofText: "Mock proof using Lemma 1.",
-        dependsOn: [`${doc.sourceId}/lemma-1`],
+        id: `${doc.sourceId}/conclusion-1`,
+        label: "Conclusion",
+        kind: "conclusion",
+        statement: `Mock conclusion from "${doc.sourceLabel}" based on evidence`,
+        proofText: "",
+        dependsOn: [`${doc.sourceId}/evidence-1`],
         sourceId: doc.sourceId,
       },
     );
   }
 
   return propositions;
-}
-
-/** Strip markdown code fences if present */
-function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?[\r\n]([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  return raw.trim();
 }
 
 /** Parse request body with backward compatibility for { text } format */
@@ -116,11 +117,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const propositions = JSON.parse(extractJson(responseText));
+      const propositions = JSON.parse(stripCodeFences(responseText));
       return NextResponse.json({ propositions });
     } catch {
       if (cacheKey) {
-        try { removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
+        try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
       }
       const preview = responseText.slice(0, 500);
       console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);

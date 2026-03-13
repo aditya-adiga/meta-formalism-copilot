@@ -28,7 +28,7 @@ describe("useWorkspacePersistence", () => {
 
   it("restores saved values on mount", () => {
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify({
-      version: 1,
+      version: 2,
       sourceText: "restored source",
       extractedFiles: [{ name: "f.txt", text: "content" }],
       contextText: "restored ctx",

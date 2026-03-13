@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-
-const OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324";
+import { DEEPSEEK_CHAT as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const ACTION_PROMPTS: Record<string, string> = {
   elaborate: "Expand this context description with more detail, examples, and specificity. Keep the same intent but make it richer and more thorough.",

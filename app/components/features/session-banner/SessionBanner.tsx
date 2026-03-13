@@ -78,7 +78,7 @@ export default function SessionBanner({ currentSession, sessions, onSelectSessio
               }`}
             >
               {statusDot(s.verificationStatus)}
-              <span>Run #{s.runNumber}</span>
+              <span>{scopeLabel(s)} — Run #{s.runNumber}</span>
               <span className="ml-auto text-[#9A9590]">
                 {new Date(s.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>

@@ -11,12 +11,25 @@ const STATUS_COLORS: Record<NodeVerificationStatus, string> = {
 };
 
 const KIND_BADGE_COLORS: Record<string, string> = {
+  // Mathematical
   definition: "#7C3AED",
   axiom: "#7C3AED",
   lemma: "#2563EB",
   proposition: "#2563EB",
   theorem: "#DC2626",
   corollary: "#D97706",
+  // Argumentative
+  claim: "#DC2626",
+  evidence: "#059669",
+  assumption: "#D97706",
+  objection: "#E11D48",
+  rebuttal: "#0891B2",
+  // Structural
+  question: "#6366F1",
+  observation: "#059669",
+  narrative: "#6B6560",
+  methodology: "#0891B2",
+  conclusion: "#7C3AED",
 };
 
 // Extended data type that includes injected source color

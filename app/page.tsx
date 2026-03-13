@@ -1,13 +1,20 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import type { PanelDef, PanelId } from "@/app/lib/types/panels";
-import type { SessionScope } from "@/app/lib/types/session";
-import type { SourceDocument } from "@/app/lib/types/decomposition";
+import type { PanelId } from "@/app/lib/types/panels";
+import type { ArtifactType } from "@/app/lib/types/session";
+import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
+import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
+import WorkspaceSessionBar from "@/app/components/features/workspace-session/WorkspaceSessionBar";
 import InputPanel from "@/app/components/panels/InputPanel";
 import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
+import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
+import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
+import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
+import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -16,50 +23,17 @@ import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
-import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
+import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
+import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
+import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
+import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
+import { useAnalytics } from "@/app/hooks/useAnalytics";
+import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
-import {
-  SourceIcon,
-  SemiformalIcon,
-  LeanIcon,
-  GraphIcon,
-  NodeDetailIcon,
-  AnalyticsIcon,
-} from "@/app/components/ui/icons/PanelIcons";
-
-type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
-
-const MAX_LEAN_ATTEMPTS = 3;
-
-async function verifyLean(leanCode: string) {
-  const res = await fetch("/api/verification/lean", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ leanCode }),
-  });
-  const data = await res.json();
-  return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
-}
-
-/** Fetch a JSON API route. */
-async function fetchApi<T>(
-  url: string,
-  body: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Request failed");
-  return data as T;
-}
 
 export default function Home() {
   // --- Panel navigation ---
-  const [activePanelId, setActivePanelId] = useState<PanelId>("source");
+  const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
 
   // --- Persisted state (survives page refresh) ---
   const {
@@ -72,10 +46,55 @@ export default function Home() {
     verificationStatus, setVerificationStatus,
     verificationErrors, setVerificationErrors,
     restoredDecompState, persistDecompState,
+    getSnapshot: getWorkspaceSnapshot, resetToSnapshot: resetWorkspaceToSnapshot, clearWorkspace,
+    causalGraph: persistedCausalGraph, setCausalGraph: setPersistedCausalGraph,
+    statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
+    propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
+    dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
   } = useWorkspacePersistence();
 
-  // --- Ephemeral state (not persisted) ---
-  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
+  // --- Artifact data (persisted as JSON strings, parsed for display) ---
+  const causalGraph = useMemo(() => {
+    if (!persistedCausalGraph) return null;
+    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+    catch { return null; }
+  }, [persistedCausalGraph]);
+
+  const statisticalModel = useMemo(() => {
+    if (!persistedStatisticalModel) return null;
+    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
+    catch { return null; }
+  }, [persistedStatisticalModel]);
+
+  const propertyTests = useMemo(() => {
+    if (!persistedPropertyTests) return null;
+    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
+    catch { return null; }
+  }, [persistedPropertyTests]);
+
+  const dialecticalMap = useMemo(() => {
+    if (!persistedDialecticalMap) return null;
+    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+    catch { return null; }
+  }, [persistedDialecticalMap]);
+
+  // --- Artifact type selection + parallel generation ---
+  const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
+  const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
+
+  // --- Analytics ---
+  const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
+
+  const setActivePanelId = useCallback((id: PanelId) => {
+    if (id === "analytics") refreshAnalytics();
+    setActivePanelIdRaw(id);
+  }, [refreshAnalytics]);
+
+  // Derive per-type loading booleans from artifactLoadingState
+  const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
+  const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
+  const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
+  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
@@ -104,34 +123,114 @@ export default function Home() {
   }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
 
   // --- Session state ---
+  // Restore callback: applies a session's data to global or per-node state
+  const handleRestoreSession = useCallback((session: FormalizationSession) => {
+    if (session.scope.type === "node") {
+      selectNode(session.scope.nodeId);
+      updateNode(session.scope.nodeId, {
+        semiformalProof: session.semiformalText,
+        leanCode: session.leanCode,
+        verificationStatus: toNodeVerificationStatus(session.verificationStatus),
+        verificationErrors: session.verificationErrors,
+      });
+    } else {
+      selectNode(null);
+      setSemiformalText(session.semiformalText);
+      setLeanCode(session.leanCode);
+      setVerificationStatus(session.verificationStatus);
+      setVerificationErrors(session.verificationErrors);
+      setSemiformalDirty(false);
+    }
+
+    // Restore artifact data from session's artifacts[]
+    for (const artifact of session.artifacts) {
+      switch (artifact.type) {
+        case "causal-graph": setPersistedCausalGraph(artifact.content); break;
+        case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
+        case "property-tests": setPersistedPropertyTests(artifact.content); break;
+        case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+      }
+    }
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+
   const {
     activeSession,
+    allSessionsSorted,
     createSession,
-    updateSession,
+    syncToActiveSession,
+    updateSessionArtifact,
     selectSession,
+    selectAndRestore,
     sessionsForScope,
-    activeSessionForScope,
-  } = useFormalizationSessions();
+    getSnapshot: getSessionsSnapshot,
+    resetToSnapshot: resetSessionsToSnapshot,
+    clearAllSessions,
+  } = useFormalizationSessions(handleRestoreSession);
 
-  const currentScope: SessionScope = isDecompMode
-    ? { type: "node", nodeId: selectedNode!.id, nodeLabel: selectedNode!.label }
-    : { type: "global" };
-  const currentScopeSessions = sessionsForScope(currentScope);
-  const currentScopeActiveSession = activeSessionForScope(currentScope);
 
-  // When in decomposition mode, the semiformal/lean panels show selected node's data
-  const activeSemiformal = isDecompMode ? selectedNode!.semiformalProof : semiformalText;
-  const activeLeanCode = isDecompMode ? selectedNode!.leanCode : leanCode;
-  const activeVerificationStatus: VerificationStatus = isDecompMode
-    ? (selectedNode!.verificationStatus === "verified" ? "valid"
-      : selectedNode!.verificationStatus === "failed" ? "invalid"
-      : selectedNode!.verificationStatus === "in-progress" ? "verifying"
-      : "none")
-    : verificationStatus;
-  const activeVerificationErrors = isDecompMode ? selectedNode!.verificationErrors : verificationErrors;
+  /** Store artifact results in session and (optionally) node */
+  const storeArtifactResults = useCallback((
+    results: Partial<Record<ArtifactType, unknown>>,
+    nodeId?: string,
+  ) => {
+    for (const [type, value] of Object.entries(results)) {
+      if (value == null) continue;
+      const artifactType = type as ArtifactType;
+      const content = typeof value === "string" ? value : JSON.stringify(value);
 
-  // Semiformal exists but Lean hasn't been generated yet — ready for user review
-  const semiformalReadyForLean = activeSemiformal !== "" && activeLeanCode === "" && loadingPhase === "idle";
+      // Store in active session
+      updateSessionArtifact(artifactType, content);
+
+      // Store in node artifacts if per-node generation
+      if (nodeId) {
+        const nodeArtifact: NodeArtifact = {
+          type: artifactType,
+          content,
+          verificationStatus: "unverified",
+          verificationErrors: "",
+        };
+        // Upsert: replace existing artifact of same type, or append
+        updateNode(nodeId, {
+          artifacts: [
+            ...(decomp.nodes.find((n) => n.id === nodeId)?.artifacts.filter((a) => a.type !== artifactType) ?? []),
+            nodeArtifact,
+          ],
+        });
+      }
+    }
+
+    // Also update persisted display state (JSON strings)
+    if (results["causal-graph"]) {
+      setPersistedCausalGraph(JSON.stringify(results["causal-graph"]));
+    }
+    if (results["statistical-model"]) {
+      setPersistedStatisticalModel(JSON.stringify(results["statistical-model"]));
+    }
+    if (results["property-tests"]) {
+      setPersistedPropertyTests(JSON.stringify(results["property-tests"]));
+    }
+    if (results["dialectical-map"]) {
+      setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+
+  // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
+  const {
+    workspaceSessions,
+    activeWorkspaceSession,
+    createNewSession: createNewWorkspaceSession,
+    switchToSession: switchWorkspaceSession,
+    renameSession: renameWorkspaceSession,
+    deleteSession: deleteWorkspaceSession,
+  } = useWorkspaceSessions({
+    getWorkspaceSnapshot: getWorkspaceSnapshot,
+    getSessionsSnapshot: getSessionsSnapshot,
+    resetWorkspaceToSnapshot: resetWorkspaceToSnapshot,
+    resetSessionsToSnapshot: resetSessionsToSnapshot,
+    clearWorkspace,
+    clearAllSessions,
+    resetDecomp,
+  });
 
   // --- Combined paper text for single-proof formalization ---
   const combinedPaperText = useMemo(() => {
@@ -163,15 +262,72 @@ export default function Home() {
     return docs;
   }, [sourceText, extractedFiles]);
 
-  // --- LLM call helpers that record usage ---
+  // --- Formalization pipelines ---
+  // Global pipeline: reads/writes global persisted state
+  const globalPipeline = useFormalizationPipeline({
+    getSemiformal: () => semiformalText,
+    setSemiformal: setSemiformalText,
+    getLeanCode: () => leanCode,
+    setLeanCode: setLeanCode,
+    getVerificationErrors: () => verificationErrors,
+    setVerificationStatus,
+    setVerificationErrors,
+    onResetForSemiformal: () => { setSemiformalDirty(false); },
+    onResetForLean: () => { setSemiformalDirty(false); },
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
+  });
 
-  async function generateLean(informalProof: string, previousAttempt?: string, errors?: string, instruction?: string, contextLeanCode?: string) {
-    const data = await fetchApi<{ leanCode: string }>(
-      "/api/formalization/lean",
-      { informalProof, previousAttempt, errors, instruction, contextLeanCode },
-    );
-    return data.leanCode;
-  }
+  // Node pipeline: reads/writes selected node state
+  const nodePipeline = useFormalizationPipeline({
+    getSemiformal: () => selectedNode?.semiformalProof ?? "",
+    setSemiformal: (text) => { if (selectedNode) updateNode(selectedNode.id, { semiformalProof: text, verificationStatus: "unverified" }); },
+    getLeanCode: () => selectedNode?.leanCode ?? "",
+    setLeanCode: (code) => { if (selectedNode) updateNode(selectedNode.id, { leanCode: code }); },
+    getVerificationErrors: () => selectedNode?.verificationErrors ?? "",
+    setVerificationStatus: (status) => {
+      if (!selectedNode) return;
+      updateNode(selectedNode.id, { verificationStatus: toNodeVerificationStatus(status) });
+    },
+    setVerificationErrors: (errors) => { if (selectedNode) updateNode(selectedNode.id, { verificationErrors: errors }); },
+    onResetForLean: () => { if (selectedNode) updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" }); },
+    getDependencyContext: () => selectedNode ? gatherDependencyContext(decomp.nodes, selectedNode.id) || undefined : undefined,
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
+  });
+
+  // Active pipeline resolves based on decomposition mode
+  const activePipeline = isDecompMode ? nodePipeline : globalPipeline;
+
+  // Resolve which artifact state to display
+  const {
+    activeSemiformal, activeLeanCode,
+    activeVerificationStatus, activeVerificationErrors,
+    loadingPhase, semiformalReadyForLean,
+  } = useActiveArtifactState(
+    { semiformalText, leanCode, verificationStatus, verificationErrors },
+    selectedNode,
+    isDecompMode,
+    globalPipeline.loadingPhase,
+    nodePipeline.loadingPhase,
+  );
+
+  // Determine if any RPC is in flight (for workspace session-switch guard)
+  const isAnyRpcBusy = loadingPhase !== "idle" || isAnyGenerating || queueRunning;
 
   // --- Handlers ---
 
@@ -182,8 +338,8 @@ export default function Home() {
       setSemiformalText(text);
       setSemiformalDirty((prev) => prev || leanCode !== "");
     }
-    if (activeSession) updateSession(activeSession.id, { semiformalText: text });
-  }, [isDecompMode, selectedNode, updateNode, leanCode, setSemiformalText, setSemiformalDirty, activeSession, updateSession]);
+    syncToActiveSession({ semiformalText: text });
+  }, [isDecompMode, selectedNode, updateNode, leanCode, setSemiformalText, setSemiformalDirty, syncToActiveSession]);
 
   const handleLeanCodeChange = useCallback((code: string) => {
     if (isDecompMode && selectedNode) {
@@ -191,306 +347,97 @@ export default function Home() {
     } else {
       setLeanCode(code);
     }
-    if (activeSession) updateSession(activeSession.id, { leanCode: code });
-  }, [isDecompMode, selectedNode, updateNode, setLeanCode, activeSession, updateSession]);
+    syncToActiveSession({ leanCode: code });
+  }, [isDecompMode, selectedNode, updateNode, setLeanCode, syncToActiveSession]);
 
-  /** Global single-proof: generate semiformal only, then stop for review */
-  const handleGenerateSemiformal = useCallback(async () => {
-    createSession({ type: "global" });
-    setLoadingPhase("semiformal");
-    setSemiformalText("");
-    setLeanCode("");
-    setSemiformalDirty(false);
-    setVerificationStatus("none");
-    setVerificationErrors("");
-    setActivePanelId("semiformal");
+  /** Shared generation logic: fire semiformal + other artifacts in parallel */
+  const executeGeneration = useCallback(async (
+    text: string,
+    context: string,
+    artifactTypes: ArtifactType[],
+    pipeline: typeof globalPipeline,
+    nodeId?: string,
+    nodeLabel?: string,
+  ) => {
+    const request = { sourceText: text, context, nodeId, nodeLabel };
 
-    try {
-      const semiformalData = await fetchApi<{ proof: string }>(
-        "/api/formalization/semiformal",
-        { text: combinedPaperText },
-      );
-      setSemiformalText(semiformalData.proof);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      setSemiformalText(`Error: ${msg}`);
-    } finally {
-      setLoadingPhase("idle");
+    // Navigate to the first selected artifact panel
+    const firstType = artifactTypes[0];
+    if (firstType === "semiformal") setActivePanelId("semiformal");
+    else if (firstType) setActivePanelId(firstType as PanelId);
+
+    const nonSemiformalTypes = artifactTypes.filter((t) => t !== "semiformal");
+    const hasSemiformal = artifactTypes.includes("semiformal");
+
+    const [, artifactResults] = await Promise.all([
+      hasSemiformal
+        ? pipeline.handleGenerateSemiformal(text)
+        : Promise.resolve(),
+      nonSemiformalTypes.length > 0
+        ? generateArtifacts(nonSemiformalTypes, request)
+        : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
+    ]);
+
+    if (artifactResults) {
+      storeArtifactResults(artifactResults, nodeId);
     }
-  }, [combinedPaperText, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+  }, [generateArtifacts, storeArtifactResults]);
 
-  /** Global single-proof: Lean generation + verification retry loop */
+  /** Unified: generate all selected artifact types in parallel */
+  const handleGenerate = useCallback(async () => {
+    const text = isDecompMode && selectedNode
+      ? `${selectedNode.statement}\n\n${selectedNode.proofText}`
+      : combinedPaperText;
+    if (!text.trim()) return;
+
+    if (!isDecompMode) {
+      selectNode(null);
+      createSession({ type: "global" });
+    } else if (selectedNode) {
+      createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
+    }
+
+    await executeGeneration(
+      text, contextText, selectedArtifactTypes,
+      isDecompMode ? nodePipeline : globalPipeline,
+      selectedNode?.id, selectedNode?.label,
+    );
+  }, [
+    isDecompMode, selectedNode, combinedPaperText, contextText,
+    selectedArtifactTypes, selectNode, createSession,
+    globalPipeline, nodePipeline, executeGeneration,
+  ]);
+
+  /** Global: generate Lean from semiformal, navigate to panel */
   const handleGenerateLean = useCallback(async () => {
-    if (!semiformalText) return;
-
-    setLoadingPhase("lean");
-    setLeanCode("");
-    setSemiformalDirty(false);
-    setVerificationStatus("none");
-    setVerificationErrors("");
     setActivePanelId("lean");
+    await globalPipeline.handleGenerateLean();
+  }, [globalPipeline]);
 
-    try {
-      let currentCode = "";
-      let lastErrors = "";
-
-      for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
-        if (attempt > 1) setLoadingPhase("retrying");
-        currentCode = await generateLean(
-          semiformalText,
-          attempt > 1 ? currentCode : undefined,
-          attempt > 1 ? lastErrors : undefined,
-        );
-        setLeanCode(currentCode);
-        if (activeSession) updateSession(activeSession.id, { leanCode: currentCode });
-
-        setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
-        setVerificationStatus("verifying");
-        if (activeSession) updateSession(activeSession.id, { verificationStatus: "verifying" });
-        const { valid, errors } = await verifyLean(currentCode);
-
-        if (valid) {
-          setVerificationStatus("valid");
-          setVerificationErrors("");
-          if (activeSession) updateSession(activeSession.id, { verificationStatus: "valid", verificationErrors: "" });
-          return;
-        }
-
-        lastErrors = errors || "Verification failed";
-        setVerificationErrors(lastErrors);
-        if (activeSession) updateSession(activeSession.id, { verificationErrors: lastErrors });
-        if (attempt === MAX_LEAN_ATTEMPTS) {
-          setVerificationStatus("invalid");
-          if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid" });
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      if (!leanCode) setLeanCode(`-- Error: ${msg}`);
-      else { setVerificationStatus("invalid"); setVerificationErrors(msg); }
-      if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid", verificationErrors: msg });
-    } finally {
-      setLoadingPhase("idle");
-    }
-  }, [semiformalText, leanCode, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, activeSession, updateSession]);
-
-  /** Per-node: generate semiformal only, then stop for review */
-  const handleNodeGenerateSemiformal = useCallback(async () => {
+  /** Per-node: generate selected artifacts using node-level context + chip selection */
+  const handleNodeGenerate = useCallback(async () => {
     if (!selectedNode) return;
+    const text = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
+    if (!text.trim()) return;
+
+    const nodeContext = selectedNode.context || contextText;
+    const nodeTypes = selectedNode.selectedArtifactTypes.length > 0
+      ? selectedNode.selectedArtifactTypes
+      : selectedArtifactTypes;
 
     createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
-    setLoadingPhase("semiformal");
-    setActivePanelId("semiformal");
 
-    try {
-      const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
-      const semiformalData = await fetchApi<{ proof: string }>(
-        "/api/formalization/semiformal",
-        { text: nodeText },
-      );
-      updateNode(selectedNode.id, { semiformalProof: semiformalData.proof, verificationStatus: "unverified" });
-      if (activeSession) updateSession(activeSession.id, { semiformalText: semiformalData.proof });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
-    } finally {
-      setLoadingPhase("idle");
-    }
-  }, [selectedNode, updateNode, createSession, activeSession, updateSession]);
+    await executeGeneration(
+      text, nodeContext, nodeTypes, nodePipeline,
+      selectedNode.id, selectedNode.label,
+    );
+  }, [selectedNode, contextText, selectedArtifactTypes, createSession, nodePipeline, executeGeneration]);
 
-  /** Per-node: Lean generation + verification retry loop */
+  /** Per-node: generate Lean + verify, navigate to panel */
   const handleNodeGenerateLean = useCallback(async () => {
-    if (!selectedNode || !selectedNode.semiformalProof) return;
-
-    updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" });
-    setLoadingPhase("lean");
     setActivePanelId("lean");
-
-    try {
-      const depContext = gatherDependencyContext(decomp.nodes, selectedNode.id);
-      let currentCode = "";
-      let lastErrors = "";
-
-      for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
-        if (attempt > 1) setLoadingPhase("retrying");
-        currentCode = await generateLean(
-          selectedNode.semiformalProof,
-          attempt > 1 ? currentCode : undefined,
-          attempt > 1 ? lastErrors : undefined,
-          undefined,
-          depContext || undefined,
-        );
-        updateNode(selectedNode.id, { leanCode: currentCode });
-
-        setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
-
-        const fullCode = depContext ? `${depContext}\n\n${currentCode}` : currentCode;
-        const { valid, errors } = await verifyLean(fullCode);
-
-        if (valid) {
-          updateNode(selectedNode.id, { verificationStatus: "verified", verificationErrors: "" });
-          return;
-        }
-
-        lastErrors = errors || "Verification failed";
-        updateNode(selectedNode.id, { verificationErrors: lastErrors });
-        if (attempt === MAX_LEAN_ATTEMPTS) {
-          updateNode(selectedNode.id, { verificationStatus: "failed" });
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
-    } finally {
-      setLoadingPhase("idle");
-    }
-  }, [selectedNode, decomp.nodes, updateNode]);
-
-  const handleReVerify = useCallback(async () => {
-    const code = isDecompMode && selectedNode ? selectedNode.leanCode : leanCode;
-    if (!code) return;
-
-    setLoadingPhase("verifying");
-    if (isDecompMode && selectedNode) {
-      updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" });
-    } else {
-      setVerificationStatus("verifying");
-      setVerificationErrors("");
-    }
-    if (activeSession) updateSession(activeSession.id, { verificationStatus: "verifying", verificationErrors: "" });
-
-    try {
-      let fullCode = code;
-      if (isDecompMode && selectedNode) {
-        const depContext = gatherDependencyContext(decomp.nodes, selectedNode.id);
-        if (depContext) fullCode = `${depContext}\n\n${code}`;
-      }
-      const { valid, errors } = await verifyLean(fullCode);
-      const vStatus = valid ? "valid" : "invalid";
-      const vErrors = valid ? "" : errors || "Verification failed";
-
-      if (isDecompMode && selectedNode) {
-        updateNode(selectedNode.id, {
-          verificationStatus: valid ? "verified" : "failed",
-          verificationErrors: vErrors,
-        });
-      } else {
-        setVerificationStatus(vStatus);
-        setVerificationErrors(vErrors);
-      }
-      if (activeSession) updateSession(activeSession.id, { verificationStatus: vStatus, verificationErrors: vErrors });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Verification request failed";
-      if (isDecompMode && selectedNode) {
-        updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
-      } else {
-        setVerificationStatus("invalid");
-        setVerificationErrors(msg);
-      }
-      if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid", verificationErrors: msg });
-    } finally {
-      setLoadingPhase("idle");
-    }
-  }, [isDecompMode, selectedNode, leanCode, decomp.nodes, updateNode, setVerificationStatus, setVerificationErrors, activeSession, updateSession]);
-
-  const handleLeanIterate = useCallback(async (instruction: string) => {
-    const currentSemiformal = isDecompMode && selectedNode ? selectedNode.semiformalProof : semiformalText;
-    const currentLean = isDecompMode && selectedNode ? selectedNode.leanCode : leanCode;
-    const currentErrors = isDecompMode && selectedNode ? selectedNode.verificationErrors : verificationErrors;
-
-    if (!currentSemiformal) return;
-
-    if (!isDecompMode) setSemiformalDirty(false);
-    setLoadingPhase("iterating");
-
-    if (isDecompMode && selectedNode) {
-      updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" });
-    } else {
-      setVerificationStatus("verifying");
-      setVerificationErrors("");
-    }
-    if (activeSession) updateSession(activeSession.id, { verificationStatus: "verifying", verificationErrors: "" });
-
-    try {
-      const depContext = isDecompMode && selectedNode
-        ? gatherDependencyContext(decomp.nodes, selectedNode.id)
-        : undefined;
-
-      const newCode = await generateLean(
-        currentSemiformal,
-        currentLean || undefined,
-        currentErrors || undefined,
-        instruction || undefined,
-        depContext || undefined,
-      );
-
-      if (isDecompMode && selectedNode) {
-        updateNode(selectedNode.id, { leanCode: newCode });
-      } else {
-        setLeanCode(newCode);
-      }
-      if (activeSession) updateSession(activeSession.id, { leanCode: newCode });
-
-      const fullCode = depContext ? `${depContext}\n\n${newCode}` : newCode;
-      const { valid, errors } = await verifyLean(fullCode);
-      const vStatus = valid ? "valid" : "invalid";
-      const vErrors = valid ? "" : errors || "Verification failed";
-
-      if (isDecompMode && selectedNode) {
-        updateNode(selectedNode.id, {
-          verificationStatus: valid ? "verified" : "failed",
-          verificationErrors: vErrors,
-        });
-      } else {
-        setVerificationStatus(vStatus);
-        setVerificationErrors(vErrors);
-      }
-      if (activeSession) updateSession(activeSession.id, { verificationStatus: vStatus, verificationErrors: vErrors });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Iteration failed";
-      if (isDecompMode && selectedNode) {
-        updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
-      } else {
-        setVerificationStatus("invalid");
-        setVerificationErrors(msg);
-      }
-      if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid", verificationErrors: msg });
-    } finally {
-      setLoadingPhase("idle");
-    }
-  }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setLeanCode, activeSession, updateSession]);
-
-  const handleRegenerateLean = useCallback(() => {
-    handleLeanIterate("");
-  }, [handleLeanIterate]);
-
-  /** Load a previous session's data into the current view */
-  const handleSelectSession = useCallback((sessionId: string) => {
-    selectSession(sessionId);
-    // Find the session data to load
-    const target = currentScopeSessions.find((s) => s.id === sessionId);
-    if (!target) return;
-
-    if (isDecompMode && selectedNode) {
-      // Map session verification status back to node status
-      const nodeStatus = target.verificationStatus === "valid" ? "verified"
-        : target.verificationStatus === "invalid" ? "failed"
-        : target.verificationStatus === "verifying" ? "in-progress"
-        : "unverified";
-      updateNode(selectedNode.id, {
-        semiformalProof: target.semiformalText,
-        leanCode: target.leanCode,
-        verificationStatus: nodeStatus,
-        verificationErrors: target.verificationErrors,
-      });
-    } else {
-      setSemiformalText(target.semiformalText);
-      setLeanCode(target.leanCode);
-      setVerificationStatus(target.verificationStatus);
-      setVerificationErrors(target.verificationErrors);
-      setSemiformalDirty(false);
-    }
-  }, [selectSession, currentScopeSessions, isDecompMode, selectedNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+    await nodePipeline.handleGenerateLean();
+  }, [nodePipeline]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
@@ -521,68 +468,26 @@ export default function Home() {
   }, [selectedNode, decomp.nodes]);
 
   // --- Panel definitions ---
-  const hasDecomp = decomp.nodes.length > 0;
-  const panels: PanelDef[] = useMemo(() => [
-    {
-      id: "source" as PanelId,
-      label: "Source Input",
-      icon: <SourceIcon />,
-      statusSummary: [
-        sourceText || extractedFiles.length > 0
-          ? `${extractedFiles.length} file${extractedFiles.length !== 1 ? "s" : ""} uploaded`
-          : "No input yet",
-        contextText ? "Context defined" : null,
-      ].filter(Boolean).join(" · "),
-    },
-    {
-      id: "graph" as PanelId,
-      label: "Proof Graph",
-      icon: <GraphIcon />,
-      statusSummary: hasDecomp
-        ? `${decomp.nodes.filter((n) => n.verificationStatus === "verified").length}/${decomp.nodes.length} verified`
-        : "No graph",
-    },
-    {
-      id: "node-detail" as PanelId,
-      label: "Node Detail",
-      icon: <NodeDetailIcon />,
-      statusSummary: selectedNode ? selectedNode.label : "",
-      hidden: !selectedNode,
-    },
-    {
-      id: "semiformal" as PanelId,
-      label: "Semiformal Proof",
-      icon: <SemiformalIcon />,
-      statusSummary: loadingPhase === "semiformal"
-        ? "Generating..."
-        : semiformalReadyForLean
-          ? "Ready for review"
-          : activeSemiformal
-            ? "Proof ready"
-            : "No proof yet",
-    },
-    {
-      id: "lean" as PanelId,
-      label: "Lean4 Code",
-      icon: <LeanIcon />,
-      statusSummary: activeVerificationStatus === "valid"
-        ? "Verified"
-        : activeVerificationStatus === "invalid"
-          ? "Failed"
-          : activeLeanCode
-            ? "Code ready"
-            : "No code yet",
-    },
-    {
-      id: "analytics" as PanelId,
-      label: "LLM Usage",
-      icon: <AnalyticsIcon />,
-      statusSummary: "Cost estimates",
-    },
-  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, decomp.nodes, selectedNode]);
+  const panels = usePanelDefinitions({
+    sourceText, extractedFiles, contextText,
+    activeSemiformal, activeLeanCode, loadingPhase,
+    activeVerificationStatus, semiformalReadyForLean,
+    nodes: decomp.nodes, selectedNode,
+    hasCausalGraph: causalGraph !== null,
+    causalGraphLoading,
+    hasStatisticalModel: statisticalModel !== null,
+    statisticalModelLoading,
+    hasPropertyTests: propertyTests !== null,
+    propertyTestsLoading,
+    hasDialecticalMap: dialecticalMap !== null,
+    dialecticalMapLoading,
+  });
 
   // --- Export All handler ---
-  const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
+  const hasExportableContent = Boolean(
+    semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
+    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+  );
 
   const handleExportAll = useCallback(async () => {
     // Dynamic import so jszip is only loaded when user clicks Export All
@@ -591,107 +496,168 @@ export default function Home() {
       semiformalText,
       leanCode,
       nodes: decomp.nodes,
+      causalGraph,
+      statisticalModel,
+      propertyTests,
+      dialecticalMap,
     });
-  }, [semiformalText, leanCode, decomp.nodes]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
 
-  // --- Panel content map ---
-  const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
-  const sessionBannerElement = currentScopeActiveSession ? (
-    <SessionBanner
-      currentSession={currentScopeActiveSession}
-      sessions={currentScopeSessions}
-      onSelectSession={handleSelectSession}
-    />
-  ) : null;
+  // --- Panel render function (only creates JSX for the active panel) ---
+  const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
+    const sessionBannerElement = activeSession ? (
+      <SessionBanner
+        currentSession={activeSession}
+        sessions={allSessionsSorted}
+        onSelectSession={selectAndRestore}
+      />
+    ) : null;
 
-  return ({
-    source: (
-      <InputPanel
-        sourceText={sourceText}
-        onSourceTextChange={setSourceText}
-        extractedFiles={extractedFiles}
-        onFilesChanged={setExtractedFiles}
-        contextText={contextText}
-        onContextTextChange={setContextText}
-        onFormalise={handleGenerateSemiformal}
-        loading={loadingPhase !== "idle"}
-      />
-    ),
-    semiformal: (
-      <SemiformalPanel
-        semiformalText={activeSemiformal}
-        onSemiformalTextChange={handleSemiformalTextChange}
-        sessionBanner={sessionBannerElement}
-        onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
-        showGenerateLean={semiformalReadyForLean}
-        leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
-      />
-    ),
-    lean: (
-      <LeanPanel
-        leanCode={activeLeanCode}
-        onLeanCodeChange={handleLeanCodeChange}
-        loadingPhase={loadingPhase}
-        verificationStatus={activeVerificationStatus}
-        verificationErrors={activeVerificationErrors}
-        semiformalDirty={!isDecompMode && semiformalDirty}
-        semiformalReady={semiformalReadyForLean}
-        onRegenerateLean={handleRegenerateLean}
-        onReVerify={handleReVerify}
-        onLeanIterate={handleLeanIterate}
-        sessionBanner={sessionBannerElement}
-      />
-    ),
-    graph: (
-      <GraphPanel
-        propositions={decomp.nodes}
-        selectedNodeId={decomp.selectedNodeId}
-        onSelectNode={handleSelectNode}
-        hasContent={sourceDocuments.length > 0}
-        sourceDocuments={sourceDocuments}
-        extractionStatus={decomp.extractionStatus}
-        onDecompose={handleDecompose}
-        queueProgress={queueProgress}
-        onFormalizeAll={startQueue}
-        onPauseQueue={pauseQueue}
-        onResumeQueue={resumeQueue}
-        onCancelQueue={cancelQueue}
-      />
-    ),
-    "node-detail": selectedNode ? (
-      <NodeDetailPanel
-        node={selectedNode}
-        dependencies={selectedNodeDeps}
-        onFormalise={handleNodeGenerateSemiformal}
-        onGenerateLean={handleNodeGenerateLean}
-        loading={loadingPhase !== "idle" || queueRunning}
-      />
-    ) : undefined,
-    analytics: (
-      <AnalyticsPanel
-        endpointPriors={ENDPOINT_PRIORS}
-      />
-    ),
-  });}, [
+    switch (panelId) {
+      case "source":
+        return (
+          <InputPanel
+            sourceText={sourceText}
+            onSourceTextChange={setSourceText}
+            onFilesChanged={setExtractedFiles}
+            existingFiles={extractedFiles}
+            contextText={contextText}
+            onContextTextChange={setContextText}
+            onFormalise={handleGenerate}
+            loading={loadingPhase !== "idle" || isAnyGenerating}
+            onDecompose={handleDecompose}
+            decomposing={decomp.extractionStatus === "extracting"}
+            selectedArtifactTypes={selectedArtifactTypes}
+            onArtifactTypesChange={setSelectedArtifactTypes}
+            loadingState={artifactLoadingState}
+          />
+        );
+      case "semiformal":
+        return (
+          <SemiformalPanel
+            semiformalText={activeSemiformal}
+            onSemiformalTextChange={handleSemiformalTextChange}
+            sessionBanner={sessionBannerElement}
+            onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
+            showGenerateLean={semiformalReadyForLean}
+            leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+          />
+        );
+      case "lean":
+        return (
+          <LeanPanel
+            leanCode={activeLeanCode}
+            onLeanCodeChange={handleLeanCodeChange}
+            loadingPhase={loadingPhase}
+            verificationStatus={activeVerificationStatus}
+            verificationErrors={activeVerificationErrors}
+            semiformalDirty={!isDecompMode && semiformalDirty}
+            semiformalReady={semiformalReadyForLean}
+            onRegenerateLean={activePipeline.handleRegenerateLean}
+            onReVerify={activePipeline.handleReVerify}
+            onLeanIterate={activePipeline.handleLeanIterate}
+            sessionBanner={sessionBannerElement}
+          />
+        );
+      case "decomposition":
+        return (
+          <GraphPanel
+            propositions={decomp.nodes}
+            selectedNodeId={decomp.selectedNodeId}
+            onSelectNode={handleSelectNode}
+            hasContent={sourceDocuments.length > 0}
+            sourceDocuments={sourceDocuments}
+            extractionStatus={decomp.extractionStatus}
+            onDecompose={handleDecompose}
+            queueProgress={queueProgress}
+            onFormalizeAll={startQueue}
+            onPauseQueue={pauseQueue}
+            onResumeQueue={resumeQueue}
+            onCancelQueue={cancelQueue}
+          />
+        );
+      case "node-detail":
+        return selectedNode ? (
+          <NodeDetailPanel
+            node={selectedNode}
+            dependencies={selectedNodeDeps}
+            onFormalise={handleNodeGenerate}
+            onGenerateLean={handleNodeGenerateLean}
+            loading={loadingPhase !== "idle" || queueRunning}
+            globalContextText={contextText}
+            onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
+            onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
+            loadingState={artifactLoadingState}
+          />
+        ) : undefined;
+      case "causal-graph":
+        return (
+          <CausalGraphPanel
+            causalGraph={causalGraph}
+            loading={causalGraphLoading}
+          />
+        );
+      case "statistical-model":
+        return (
+          <StatisticalModelPanel
+            statisticalModel={statisticalModel}
+            loading={statisticalModelLoading}
+          />
+        );
+      case "property-tests":
+        return (
+          <PropertyTestsPanel
+            propertyTests={propertyTests}
+            loading={propertyTestsLoading}
+          />
+        );
+      case "dialectical-map":
+        return (
+          <DialecticalMapPanel
+            dialecticalMap={dialecticalMap}
+            loading={dialecticalMapLoading}
+          />
+        );
+      case "analytics":
+        return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
+      default:
+        return undefined;
+    }
+  }, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
     selectedNode, selectedNodeDeps, sourceDocuments,
     queueProgress, startQueue, pauseQueue, resumeQueue, cancelQueue,
     setSourceText, setExtractedFiles, setContextText,
-    handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
-    handleRegenerateLean, handleReVerify, handleLeanIterate,
-    handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
-    currentScopeActiveSession, currentScopeSessions, handleSelectSession,
+    handleGenerate, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
+    activePipeline, isAnyGenerating,
+    handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
+    selectedArtifactTypes, artifactLoadingState,
+    activeSession, allSessionsSorted, selectAndRestore,
+    causalGraph, causalGraphLoading,
+    statisticalModel, statisticalModelLoading,
+    propertyTests, propertyTestsLoading,
+    dialecticalMap, dialecticalMapLoading,
+    analyticsEntries, analyticsSummary, clearAnalytics,
   ]);
 
   return (
-    <main>
+    <main className="flex h-screen flex-col">
+      <WorkspaceSessionBar
+        sessions={workspaceSessions}
+        activeSession={activeWorkspaceSession}
+        onNewSession={createNewWorkspaceSession}
+        onSwitchSession={switchWorkspaceSession}
+        onRenameSession={renameWorkspaceSession}
+        onDeleteSession={deleteWorkspaceSession}
+        isBusy={isAnyRpcBusy}
+      />
       <PanelShell
         panels={panels}
         activePanelId={activePanelId}
         onSelectPanel={setActivePanelId}
-        panelContent={panelContent}
+        renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
       />

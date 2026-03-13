@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-
-const OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324";
+import { DEEPSEEK_CHAT as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const SYSTEM_PROMPT = "You are an editing assistant. The user will give you a text document and an instruction. Rewrite the entire document according to the instruction. Return only the edited document with no additional commentary.";
 

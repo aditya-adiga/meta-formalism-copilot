@@ -2,12 +2,12 @@ import type { PanelId } from "@/app/lib/types/panels";
 
 type FocusPaneProps = {
   activePanelId: PanelId;
-  /** Map of panelId → React element to render */
-  panelContent: Partial<Record<PanelId, React.ReactNode>>;
+  /** Render function: called with the active panel ID to produce content */
+  renderPanel: (id: PanelId) => React.ReactNode;
 };
 
-export default function FocusPane({ activePanelId, panelContent }: FocusPaneProps) {
-  const content = panelContent[activePanelId];
+export default function FocusPane({ activePanelId, renderPanel }: FocusPaneProps) {
+  const content = renderPanel(activePanelId);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--ivory-cream)]">

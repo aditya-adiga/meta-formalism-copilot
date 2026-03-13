@@ -1,10 +1,13 @@
-import type { PropositionKind, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+
+/** The subset of NodeKind that LaTeX theorem environments map to. */
+type MathKind = "definition" | "lemma" | "theorem" | "proposition" | "corollary" | "axiom";
 
 /**
- * Map of LaTeX environment names to PropositionKind.
+ * Map of LaTeX environment names to MathKind.
  * "proof" is handled specially (associated with preceding node).
  */
-const ENV_TO_KIND: Record<string, PropositionKind> = {
+const ENV_TO_KIND: Record<string, MathKind> = {
   definition: "definition",
   defn: "definition",
   deftn: "definition",
@@ -23,7 +26,7 @@ const ENV_TO_KIND: Record<string, PropositionKind> = {
 const ALL_ENV_NAMES = [...Object.keys(ENV_TO_KIND), "proof"];
 
 /** Short prefix per kind for counter-based IDs (e.g. "thm-1"). */
-const KIND_PREFIX: Record<PropositionKind, string> = {
+const KIND_PREFIX: Record<MathKind, string> = {
   definition: "def",
   lemma: "lem",
   theorem: "thm",
@@ -33,7 +36,7 @@ const KIND_PREFIX: Record<PropositionKind, string> = {
 };
 
 /** Human-readable label prefix per kind. */
-const KIND_LABEL: Record<PropositionKind, string> = {
+const KIND_LABEL: Record<MathKind, string> = {
   definition: "Definition",
   lemma: "Lemma",
   theorem: "Theorem",
@@ -161,7 +164,7 @@ export function parseLatexPropositions(text: string, documents?: SourceDocument[
   }
 
   // Per-kind counters for numbering
-  const counters: Record<PropositionKind, number> = {
+  const counters: Record<MathKind, number> = {
     definition: 0,
     lemma: 0,
     theorem: 0,
@@ -219,6 +222,9 @@ export function parseLatexPropositions(text: string, documents?: SourceDocument[
       leanCode: "",
       verificationStatus: "unverified",
       verificationErrors: "",
+      context: "",
+      selectedArtifactTypes: [],
+      artifacts: [],
     });
   }
 
