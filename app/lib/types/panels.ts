@@ -1,9 +1,13 @@
 export type PanelId =
   | "source"
+  | "decomposition" // renamed from "graph"
+  | "node-detail"
   | "semiformal"
   | "lean"
-  | "graph"
-  | "node-detail"
+  | "causal-graph"
+  | "statistical-model"
+  | "property-tests"
+  | "dialectical-map"
   | "analytics";
 
 export type PanelDef = {

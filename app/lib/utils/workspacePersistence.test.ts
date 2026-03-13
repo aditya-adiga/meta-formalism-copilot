@@ -91,6 +91,7 @@ describe("saveWorkspace", () => {
       semiformalProof: "", leanCode: "",
       verificationStatus: "in-progress" as const,
       verificationErrors: "",
+      context: "", selectedArtifactTypes: [], artifacts: [],
     };
     saveWorkspace(
       "", [], "", "", "", false, "none", "",

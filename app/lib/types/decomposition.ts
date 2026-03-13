@@ -18,6 +18,13 @@ export type SourceDocument = {
   text: string;
 };
 
+export type NodeArtifact = {
+  type: import("./session").ArtifactType;
+  content: string;
+  verificationStatus: NodeVerificationStatus;
+  verificationErrors: string;
+};
+
 export type PropositionNode = {
   id: string;
   label: string;
@@ -27,10 +34,15 @@ export type PropositionNode = {
   dependsOn: string[];
   sourceId: string;
   sourceLabel: string;
+  // Legacy deductive-only fields (will migrate to artifacts[] in a follow-up)
   semiformalProof: string;
   leanCode: string;
   verificationStatus: NodeVerificationStatus;
   verificationErrors: string;
+  // New: multi-artifact support
+  context: string; // per-node context (empty = inherit global)
+  selectedArtifactTypes: import("./session").ArtifactType[];
+  artifacts: NodeArtifact[];
 };
 
 export type DecompositionState = {
