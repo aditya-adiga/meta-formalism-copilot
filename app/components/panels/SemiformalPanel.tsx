@@ -12,9 +12,10 @@ type SemiformalPanelProps = {
   onGenerateLean?: () => void;
   showGenerateLean?: boolean;
   leanLoading?: boolean;
+  sessionBanner?: React.ReactNode;
 };
 
-export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, onGenerateLean, showGenerateLean, leanLoading }: SemiformalPanelProps) {
+export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, onGenerateLean, showGenerateLean, leanLoading, sessionBanner }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
 
@@ -84,12 +85,15 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
           Semiformal Proof
         </h2>
-        {semiformalText && (
-          <DownloadButton
-            label="Export .md"
-            onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {semiformalText && (
+            <DownloadButton
+              label="Export .md"
+              onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
+            />
+          )}
+          {sessionBanner}
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

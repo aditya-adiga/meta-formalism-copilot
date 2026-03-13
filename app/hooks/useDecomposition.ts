@@ -28,7 +28,7 @@ export function useDecomposition() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Extraction failed");
 
-      // Build a lookup from sourceId -> sourceLabel for filling in node fields
+      // Build a lookup from sourceId → sourceLabel for filling in node fields
       const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
 
       // API returns partial nodes without client-side fields; fill defaults
@@ -68,12 +68,12 @@ export function useDecomposition() {
 
   /** Restore persisted decomposition state (called once on mount) */
   const resetState = useCallback(
-    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string }) => {
+    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources: SourceDocument[] }) => {
       setState({
         nodes: restored.nodes,
         selectedNodeId: restored.selectedNodeId,
         paperText: restored.paperText,
-        sources: [],
+        sources: restored.sources ?? [],
         extractionStatus: restored.nodes.length > 0 ? "done" : "idle",
       });
     },

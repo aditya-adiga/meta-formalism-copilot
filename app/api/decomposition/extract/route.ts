@@ -1,10 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `You are a mathematical paper analyzer. Given one or more source documents, extract all formal propositions (definitions, lemmas, theorems, propositions, corollaries, axioms) and their dependency relationships.
 
@@ -103,52 +102,46 @@ export async function POST(request: NextRequest) {
 
   const userMessage = formatDocuments(documents);
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const message = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 16384,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
+  try {
+    const { text: responseText, usage, cacheKey } = await callLlm({
+      endpoint: "decomposition/extract",
+      systemPrompt: SYSTEM_PROMPT,
+      userContent: userMessage,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
     });
-    const raw = message.content[0].type === "text" ? message.content[0].text : "";
-    const propositions = JSON.parse(extractJson(raw));
-    return NextResponse.json({ propositions });
-  }
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterKey) {
-    console.warn("[decomposition/extract] No API key configured — returning mock response.");
-    return NextResponse.json({ propositions: mockResponse(documents) });
-  }
+    if (usage.provider === "mock") {
+      return NextResponse.json({ propositions: mockResponse(documents) });
+    }
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openRouterKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error("[decomposition/extract] OpenRouter error:", response.status, errorBody);
+    try {
+      const propositions = JSON.parse(extractJson(responseText));
+      return NextResponse.json({ propositions });
+    } catch {
+      // JSON parse failed — invalidate the cached bad response
+      if (cacheKey) {
+        try { removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
+      }
+      const preview = responseText.slice(0, 500);
+      console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);
+      return NextResponse.json(
+        { error: "LLM response was not valid JSON", details: preview },
+        { status: 502 },
+      );
+    }
+  } catch (err) {
+    if (err instanceof OpenRouterError) {
+      return NextResponse.json(
+        { error: err.message, details: err.details },
+        { status: 502 },
+      );
+    }
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[decomposition/extract] Unexpected error:", message);
     return NextResponse.json(
-      { error: `OpenRouter API error: ${response.status}`, details: errorBody },
+      { error: `LLM call failed: ${message}` },
       { status: 502 },
     );
   }
-
-  const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content ?? "";
-  const propositions = JSON.parse(extractJson(raw));
-  return NextResponse.json({ propositions });
 }

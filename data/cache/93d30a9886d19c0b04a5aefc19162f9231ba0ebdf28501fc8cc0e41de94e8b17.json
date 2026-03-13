@@ -1,0 +1,17 @@
+{
+  "text": "## Mathematical Reasoning Output\n\n### Input Analysis\n\nLet $S$ = \"test input that probably has no cache\"\n\nThis is a **natural language string** with no explicit mathematical content.\n\n---\n\n### Formal Characterization\n\nLet $\\Sigma$ denote the standard ASCII alphabet. Then:\n\n$$S \\in \\Sigma^* \\quad \\text{with} \\quad |S| = 38 \\text{ characters}$$\n\nThe word count gives a sequence of tokens:\n$$W = (w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8)$$\n$$= (\\text{\"test\"}, \\text{\"input\"}, \\text{\"that\"}, \\text{\"probably\"}, \\text{\"has\"}, \\text{\"no\"}, \\text{\"cache\"})$$\n\nSo $|W| = 7$ words.\n\n---\n\n### Key Observation\n\nThe claim **\"has no cache\"** can be modeled as:\n\n$$\\Pr[\\text{cache hit}] \\approx 0$$\n\nor in a formal caching model, if $C$ is the cache state space:\n\n$$S \\notin C \\implies \\text{cache miss with probability } 1$$\n\n---\n\n### Conclusion\n\n$$\\boxed{\\text{No mathematically testable content detected.} \\quad \\text{Cache status: undefined.}}$$\n\nIf you have an actual problem to reason about, please provide it. ✓",
+  "usage": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6",
+    "inputTokens": 66,
+    "outputTokens": 339,
+    "costUsd": 0.005283,
+    "latencyMs": 7452
+  },
+  "cacheKey": {
+    "model": "claude-sonnet-4-6",
+    "systemPrompt": "You are a mathematical reasoning assistant. The user will provide text from a conversation or document. Generate semiformal mathematical reasoning that captures the key ideas — using mathematical notation, logical structure, and proof sketches where appropriate. Return structured output with the mathematical reasoning.",
+    "userContent": "test input that probably has no cache",
+    "maxTokens": 16384
+  }
+}

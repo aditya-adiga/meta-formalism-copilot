@@ -1,10 +1,10 @@
 export type PanelId =
   | "source"
-  | "context"
   | "semiformal"
   | "lean"
   | "graph"
-  | "node-detail";
+  | "node-detail"
+  | "analytics";
 
 export type PanelDef = {
   id: PanelId;
