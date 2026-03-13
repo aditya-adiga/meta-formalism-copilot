@@ -85,6 +85,9 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
         leanCode: typeof n.leanCode === "string" ? n.leanCode : "",
         verificationStatus: sanitizeNodeStatus(typeof n.verificationStatus === "string" ? n.verificationStatus : ""),
         verificationErrors: typeof n.verificationErrors === "string" ? n.verificationErrors : "",
+        context: typeof n.context === "string" ? n.context : "",
+        selectedArtifactTypes: Array.isArray(n.selectedArtifactTypes) ? n.selectedArtifactTypes as import("@/app/lib/types/session").ArtifactType[] : [],
+        artifacts: Array.isArray(n.artifacts) ? n.artifacts as import("@/app/lib/types/decomposition").NodeArtifact[] : [],
       } as PropositionNode))
     : [];
 

@@ -540,6 +540,9 @@ export async function parsePdfPropositions(
       leanCode: "",
       verificationStatus: "unverified" as const,
       verificationErrors: "",
+      context: "",
+      selectedArtifactTypes: [],
+      artifacts: [],
     };
   });
 
