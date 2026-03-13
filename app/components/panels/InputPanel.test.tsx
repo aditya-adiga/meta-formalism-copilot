@@ -21,6 +21,7 @@ describe('InputPanel', () => {
     onContextTextChange: vi.fn(),
     onFormalise: vi.fn(),
     loading: false,
+    onFilesChanged: vi.fn(),
   }
 
   it('renders the Source Inputs heading', () => {

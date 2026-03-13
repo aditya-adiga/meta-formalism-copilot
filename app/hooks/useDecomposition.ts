@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { DecompositionState, PropositionNode } from "@/app/lib/types/decomposition";
+import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 
 const INITIAL_STATE: DecompositionState = {
   nodes: [],
   selectedNodeId: null,
   paperText: "",
+  sources: [],
   extractionStatus: "idle",
 };
 
@@ -16,16 +17,19 @@ export function useDecomposition() {
   const selectedNode: PropositionNode | null =
     state.nodes.find((n) => n.id === state.selectedNodeId) ?? null;
 
-  const extractPropositions = useCallback(async (text: string) => {
-    setState((prev) => ({ ...prev, paperText: text, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
+  const extractPropositions = useCallback(async (documents: SourceDocument[]) => {
+    setState((prev) => ({ ...prev, sources: documents, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
     try {
       const res = await fetch("/api/decomposition/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ documents }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Extraction failed");
+
+      // Build a lookup from sourceId → sourceLabel for filling in node fields
+      const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
 
       // API returns partial nodes without client-side fields; fill defaults
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +40,8 @@ export function useDecomposition() {
         statement: p.statement,
         proofText: p.proofText ?? "",
         dependsOn: p.dependsOn ?? [],
+        sourceId: p.sourceId ?? "",
+        sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
         semiformalProof: "",
         leanCode: "",
         verificationStatus: "unverified" as const,
@@ -67,6 +73,7 @@ export function useDecomposition() {
         nodes: restored.nodes,
         selectedNodeId: restored.selectedNodeId,
         paperText: restored.paperText,
+        sources: [],
         extractionStatus: restored.nodes.length > 0 ? "done" : "idle",
       });
     },

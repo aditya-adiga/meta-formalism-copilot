@@ -87,6 +87,7 @@ describe("saveWorkspace", () => {
     const node = {
       id: "1", label: "T1", kind: "theorem" as const,
       statement: "s", proofText: "p", dependsOn: [],
+      sourceId: "", sourceLabel: "",
       semiformalProof: "", leanCode: "",
       verificationStatus: "in-progress" as const,
       verificationErrors: "",

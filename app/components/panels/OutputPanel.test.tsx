@@ -35,6 +35,8 @@ describe('OutputPanel', () => {
     verificationErrors: '',
     onReVerify: vi.fn(),
     onLeanIterate: vi.fn(),
+    semiformalDirty: false,
+    onRegenerateLean: vi.fn(),
   }
 
   beforeEach(() => {
