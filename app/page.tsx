@@ -95,8 +95,8 @@ export default function Home() {
   const activeVerificationStatus: VerificationStatus = isDecompMode
     ? (selectedNode!.verificationStatus === "verified" ? "valid"
       : selectedNode!.verificationStatus === "failed" ? "invalid"
-      : selectedNode!.verificationStatus === "in-progress" ? "verifying"
-      : "none")
+        : selectedNode!.verificationStatus === "in-progress" ? "verifying"
+          : "none")
     : verificationStatus;
   const activeVerificationErrors = isDecompMode ? selectedNode!.verificationErrors : verificationErrors;
 
@@ -387,10 +387,6 @@ export default function Home() {
     }
   }, [isDecompMode, selectedNode, semiformalText, leanCode, verificationErrors, decomp.nodes, updateNode, activeSession, updateSession]);
 
-  const handleRegenerateLean = useCallback(() => {
-    handleLeanIterate("");
-  }, [handleLeanIterate]);
-
   /** Load a previous session's data into the current view */
   const handleSelectSession = useCallback((sessionId: string) => {
     selectSession(sessionId);
@@ -402,8 +398,8 @@ export default function Home() {
       // Map session verification status back to node status
       const nodeStatus = target.verificationStatus === "valid" ? "verified"
         : target.verificationStatus === "invalid" ? "failed"
-        : target.verificationStatus === "verifying" ? "in-progress"
-        : "unverified";
+          : target.verificationStatus === "verifying" ? "in-progress"
+            : "unverified";
       updateNode(selectedNode.id, {
         semiformalProof: target.semiformalText,
         leanCode: target.leanCode,
