@@ -30,6 +30,8 @@ export default function LeanCodeDisplay({
   const [localCode, setLocalCode] = useState(code);
   const [leanEdited, setLeanEdited] = useState(false);
   const [instruction, setInstruction] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [explaining, setExplaining] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // When the parent pushes a new code value, reset local state during render
@@ -44,6 +46,12 @@ export default function LeanCodeDisplay({
       setLeanEdited(false);
     }
   }
+
+  // Clear explanation when errors change (e.g. after re-verify or fix)
+  useEffect(() => {
+    setExplanation("");
+    setExplaining(false);
+  }, [verificationErrors]);
 
   // Focus textarea on entering edit mode
   useEffect(() => {
@@ -68,6 +76,24 @@ export default function LeanCodeDisplay({
       handleIterateSubmit();
     }
   }, [handleIterateSubmit]);
+
+  const handleExplainError = useCallback(async () => {
+    if (explaining) return;
+    setExplaining(true);
+    try {
+      const res = await fetch("/api/explanation/lean-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leanCode: code, errors: verificationErrors }),
+      });
+      const data = await res.json();
+      setExplanation(data.explanation ?? "Unable to generate explanation.");
+    } catch {
+      setExplanation("Failed to fetch explanation. Please try again.");
+    } finally {
+      setExplaining(false);
+    }
+  }, [explaining, code, verificationErrors]);
 
   const canReVerify = !iterating && verificationStatus !== "verifying";
 
@@ -106,6 +132,21 @@ export default function LeanCodeDisplay({
               <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
                 {verificationErrors}
               </pre>
+              <button
+                onClick={handleExplainError}
+                disabled={explaining || !!explanation}
+                className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                {explaining ? "Explaining…" : "Explain this error"}
+              </button>
+              {explanation && (
+                <>
+                  <hr className="my-3 border-red-200" />
+                  <div className="prose prose-sm max-w-none text-sm leading-relaxed text-red-900">
+                    {explanation}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -130,27 +171,6 @@ export default function LeanCodeDisplay({
               aria-label="Lean4 code"
               spellCheck={false}
             />
-          )}
-
-          {/* Verification errors */}
-          {verificationStatus === "invalid" && verificationErrors && (
-            <div className="mt-4 rounded border border-red-300 bg-red-50 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
-                  lake build output
-                </h3>
-                <button
-                  onClick={onReVerify}
-                  disabled={!canReVerify}
-                  className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
-                >
-                  Re-verify
-                </button>
-              </div>
-              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
-                {verificationErrors}
-              </pre>
-            </div>
           )}
         </div>
 
