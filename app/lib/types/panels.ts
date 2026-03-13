@@ -1,6 +1,7 @@
 export type PanelId =
   | "source"
   | "decomposition" // renamed from "graph"
+  | "graph" // alias kept for backward compatibility
   | "node-detail"
   | "semiformal"
   | "lean"
