@@ -11,6 +11,7 @@ Guidelines:
 - Use Lean4 syntax (not Lean3)
 - Start with \`import Mathlib\`
 - Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
+- Mark \`def\` declarations as \`noncomputable\` when they use Real.exp, Finset.sum, division, or other Mathlib constructs that depend on classical axioms (e.g. \`noncomputable def gaussianKernel ...\`). Theorems and proofs do not need this tag — only \`def\`, \`abbrev\`, and \`instance\` declarations that produce data.
 - Return only the Lean4 code with no additional commentary`;
 
 const BASE_SYSTEM_PROMPT_WITH_CONTEXT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof along with verified Lean4 code from dependency nodes. Convert the proof into valid Lean4 code that builds on the provided context.
@@ -26,12 +27,11 @@ Guidelines:
 
 const RETRY_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. Your previous attempt to formalize a proof failed verification. The user will provide the original proof, your previous attempt, and the verification errors. Fix the Lean4 code so it passes verification.
 
-The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
-
 Guidelines:
 - Use Lean4 syntax (not Lean3)
 - Start with \`import Mathlib\`
 - Use tactic-style proofs where appropriate (e.g. \`by simp\`, \`by ring\`, \`by omega\`, \`by norm_num\`, \`by exact\`, \`by linarith\`, \`by aesop\`)
+- Mark \`def\` declarations as \`noncomputable\` when they use Real.exp, Finset.sum, division, or other Mathlib constructs that depend on classical axioms (e.g. \`noncomputable def gaussianKernel ...\`). Theorems and proofs do not need this tag — only \`def\`, \`abbrev\`, and \`instance\` declarations that produce data.
 - Address all verification errors shown in the error output
 - Return only the corrected Lean4 code with no additional commentary`;
 
@@ -61,8 +61,10 @@ function mockResponse(informalProof: string, isRetry: boolean): string {
 
 import Mathlib
 
-theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q :=
-  ⟨hp, hq⟩`;
+theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
+  exact ⟨hp, hq⟩
+
+#check example_formalization`;
 }
 
 export async function POST(request: NextRequest) {
