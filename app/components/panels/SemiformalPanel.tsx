@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
+import DownloadButton from "@/app/components/ui/DownloadButton";
+import { downloadSemiformalAsMarkdown } from "@/app/lib/utils/export";
 
 type SemiformalPanelProps = {
   semiformalText: string;
@@ -83,7 +85,15 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
           Semiformal Proof
         </h2>
-        {sessionBanner}
+        <div className="flex items-center gap-2">
+          {semiformalText && (
+            <DownloadButton
+              label="Export .md"
+              onClick={() => downloadSemiformalAsMarkdown(semiformalText)}
+            />
+          )}
+          {sessionBanner}
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

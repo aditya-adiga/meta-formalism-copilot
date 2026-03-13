@@ -14,6 +14,7 @@ import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
+import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
@@ -79,6 +80,10 @@ export default function Home() {
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
+
+  // --- Auto-formalize queue ---
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode);
+  const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from localStorage once on mount
   const decompRestoredRef = useRef(false);
@@ -578,6 +583,19 @@ export default function Home() {
     },
   ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, decomp.nodes, selectedNode]);
 
+  // --- Export All handler ---
+  const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
+
+  const handleExportAll = useCallback(async () => {
+    // Dynamic import so jszip is only loaded when user clicks Export All
+    const { exportAllAsZip } = await import("@/app/lib/utils/exportAll");
+    await exportAllAsZip({
+      semiformalText,
+      leanCode,
+      nodes: decomp.nodes,
+    });
+  }, [semiformalText, leanCode, decomp.nodes]);
+
   // --- Session banner ---
   const sessionBannerElement = currentScopeActiveSession ? (
     <SessionBanner
@@ -635,6 +653,11 @@ export default function Home() {
         sourceDocuments={sourceDocuments}
         extractionStatus={decomp.extractionStatus}
         onDecompose={handleDecompose}
+        queueProgress={queueProgress}
+        onFormalizeAll={startQueue}
+        onPauseQueue={pauseQueue}
+        onResumeQueue={resumeQueue}
+        onCancelQueue={cancelQueue}
       />
     ),
     "node-detail": selectedNode ? (
@@ -643,7 +666,7 @@ export default function Home() {
         dependencies={selectedNodeDeps}
         onFormalise={handleNodeGenerateSemiformal}
         onGenerateLean={handleNodeGenerateLean}
-        loading={loadingPhase !== "idle"}
+        loading={loadingPhase !== "idle" || queueRunning}
       />
     ) : undefined,
     analytics: (
@@ -654,8 +677,9 @@ export default function Home() {
   }), [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
-    semiformalDirty, semiformalReadyForLean, isDecompMode, decomp,
+    semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
     selectedNode, selectedNodeDeps, sourceDocuments,
+    queueProgress, startQueue, pauseQueue, resumeQueue, cancelQueue,
     setSourceText, setExtractedFiles, setContextText,
     handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
@@ -670,6 +694,8 @@ export default function Home() {
         activePanelId={activePanelId}
         onSelectPanel={setActivePanelId}
         panelContent={panelContent}
+        onExportAll={handleExportAll}
+        exportAllDisabled={!hasExportableContent}
       />
     </main>
   );
