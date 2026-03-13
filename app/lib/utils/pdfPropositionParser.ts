@@ -1,4 +1,7 @@
-import type { PropositionKind, PropositionNode } from "@/app/lib/types/decomposition";
+import type { PropositionNode } from "@/app/lib/types/decomposition";
+
+/** The subset of NodeKind that PDF proposition headers map to. */
+type MathKind = "definition" | "lemma" | "theorem" | "proposition" | "corollary" | "axiom";
 import type { TextItem, TextStyle } from "pdfjs-dist/types/src/display/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -23,7 +26,7 @@ export type Line = {
 
 /** A proposition header identified from a line. */
 export type HeaderMatch = {
-  kind: PropositionKind;
+  kind: MathKind;
   /** The number string, e.g. "1", "2.3". */
   number: string;
   /** Optional title text after the number, e.g. "(Cauchy–Schwarz)". */
@@ -36,7 +39,7 @@ export type HeaderMatch = {
 
 /** A raw segment of the document between two headers. */
 export type RawSegment = {
-  kind: PropositionKind;
+  kind: MathKind;
   number: string;
   title: string;
   /** The body text (statement) lines, joined. */
@@ -65,7 +68,7 @@ export type AnnotationLink = {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const KIND_MAP: Record<string, PropositionKind> = {
+const KIND_MAP: Record<string, MathKind> = {
   theorem: "theorem",
   thm: "theorem",
   lemma: "lemma",
@@ -81,7 +84,7 @@ const KIND_MAP: Record<string, PropositionKind> = {
   ax: "axiom",
 };
 
-const KIND_PREFIX: Record<PropositionKind, string> = {
+const KIND_PREFIX: Record<MathKind, string> = {
   definition: "def",
   lemma: "lem",
   theorem: "thm",
@@ -90,7 +93,7 @@ const KIND_PREFIX: Record<PropositionKind, string> = {
   axiom: "ax",
 };
 
-const KIND_LABEL: Record<PropositionKind, string> = {
+const KIND_LABEL: Record<MathKind, string> = {
   definition: "Definition",
   lemma: "Lemma",
   theorem: "Theorem",
@@ -348,7 +351,7 @@ type PropositionIndex = Map<string, string>; // "theorem-1" → node ID
  */
 function buildPropositionIndex(segments: RawSegment[]): PropositionIndex {
   const index: PropositionIndex = new Map();
-  const counters: Record<PropositionKind, number> = {
+  const counters: Record<MathKind, number> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
@@ -381,7 +384,7 @@ export function extractDependencies(
   const index = buildPropositionIndex(segments);
   const deps = new Map<number, string[]>();
 
-  const counters: Record<PropositionKind, number> = {
+  const counters: Record<MathKind, number> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
@@ -514,7 +517,7 @@ export async function parsePdfPropositions(
   const deps = extractDependencies(segments, allAnnotations);
 
   // Build PropositionNodes
-  const counters: Record<PropositionKind, number> = {
+  const counters: Record<MathKind, number> = {
     definition: 0, lemma: 0, theorem: 0, proposition: 0, corollary: 0, axiom: 0,
   };
 
