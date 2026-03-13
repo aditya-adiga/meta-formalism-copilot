@@ -43,6 +43,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# data/cache
+/data/
+
 # verifier
 verifier/lean-project/.lake/
 verifier/node_modules/
