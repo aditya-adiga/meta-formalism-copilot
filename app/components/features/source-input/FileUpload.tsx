@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import PaperClipIcon from "@/app/components/ui/icons/PaperClipIcon";
 import { extractTextFromFile } from "@/app/lib/utils/fileExtraction";
 
-const ACCEPT = ".txt,.doc,.docx,application/pdf";
+const ACCEPT = ".txt,.md,.markdown,.docx,application/pdf";
 
 type FileStatus = "extracting" | "ready" | "error";
 
@@ -94,7 +94,7 @@ export default function FileUpload({ onFilesChanged }: FileUploadProps) {
         className="inline-flex w-fit items-center gap-2 rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-2 text-sm font-medium text-[var(--ink-black)] shadow-md transition-shadow duration-200 hover:shadow-lg active:shadow-xl focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)]"
       >
         <PaperClipIcon />
-        <span>.txt, .doc, .docx, .pdf</span>
+        <span>.txt, .md, .docx, .pdf</span>
       </button>
       {trackedFiles.length > 0 && (
         <ul className="mt-2 space-y-1">

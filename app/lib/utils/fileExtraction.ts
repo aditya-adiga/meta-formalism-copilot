@@ -1,4 +1,5 @@
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
+import mammoth from "mammoth";
 
 /**
  * Sanitize text extracted from PDFs for safe JSON serialization.
@@ -49,10 +50,17 @@ export async function extractTextFromPDF(file: File): Promise<string> {
   return sanitizeText(pages.join("\n"));
 }
 
-/** Extract text from a plain text file using FileReader. */
+/** Extract text from a plain text file (including markdown). */
 export async function extractTextFromTxt(file: File): Promise<string> {
   const text = await file.text();
   return sanitizeText(text);
+}
+
+/** Extract text from a .docx file using mammoth. */
+export async function extractTextFromDocx(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+  return sanitizeText(result.value);
 }
 
 /** Dispatch text extraction based on file extension. */
@@ -63,11 +71,14 @@ export async function extractTextFromFile(file: File): Promise<string> {
     case "pdf":
       return extractTextFromPDF(file);
     case "txt":
+    case "md":
+    case "markdown":
       return extractTextFromTxt(file);
-    case "doc":
     case "docx":
+      return extractTextFromDocx(file);
+    case "doc":
       throw new Error(
-        `.${ext} support is not yet implemented. Please convert to PDF or .txt.`,
+        ".doc (legacy Word) is not supported. Please save as .docx, .pdf, or .txt.",
       );
     default:
       throw new Error(`Unsupported file type: .${ext ?? "(unknown)"}`);
