@@ -15,9 +15,6 @@
   --rail-active: var(--ink-black);
   --rail-hover: rgba(26, 26, 26, 0.06);
 
-  /* Borders */
-  --border-light: #DDD9D5;
-
   /* Node verification status colors */
   --status-unverified: #9A9590;
   --status-in-progress: #3B82F6;

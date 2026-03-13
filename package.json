@@ -27,7 +27,6 @@
     "react-markdown": "^10.1.0",
     "reactflow": "^11.11.4",
     "rehype-katex": "^7.0.1",
-    "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0"
   },
   "devDependencies": {
@@ -41,7 +40,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
-    "eslint": "^9.39.3",
+    "eslint": "^10.0.2",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^28.1.0",
     "tailwindcss": "^4",
