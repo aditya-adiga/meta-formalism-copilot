@@ -14,6 +14,7 @@ type LeanPanelProps = {
   verificationStatus: VerificationStatus;
   verificationErrors: string;
   semiformalDirty: boolean;
+  semiformalReady?: boolean;
   onRegenerateLean: () => void;
   onReVerify: () => void;
   onLeanIterate: (instruction: string) => void;
@@ -37,6 +38,7 @@ export default function LeanPanel({
   verificationStatus,
   verificationErrors,
   semiformalDirty,
+  semiformalReady,
   onRegenerateLean,
   onReVerify,
   onLeanIterate,
@@ -51,8 +53,10 @@ export default function LeanPanel({
             Lean4 Code
           </h2>
         </div>
-        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590]">
-          Lean4 code will appear here after formalization
+        <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
+          {semiformalReady
+            ? "Review the semiformal proof, then generate Lean4 code from the Semiformal panel."
+            : "Lean4 code will appear here after formalization."}
         </div>
       </div>
     );
