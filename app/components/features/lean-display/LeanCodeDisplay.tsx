@@ -101,8 +101,6 @@ export default function LeanCodeDisplay({
       {/* Code area */}
       <div className="relative flex-1 overflow-hidden">
         {/* Edit / Done toggle + Re-verify — outside scroll container so they stay visible */}
-        <div className="relative flex-1 overflow-hidden">
-          {/* Edit / Done toggle + Re-verify — outside scroll container so they stay visible */}
           {code && (
             <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
               {(leanEdited || verificationStatus === "invalid") && editMode === "rendered" && (
@@ -202,6 +200,6 @@ export default function LeanCodeDisplay({
             </div>
           </div>
         )}
-      </div>
-      );
+    </div>
+  );
 }

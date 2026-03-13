@@ -3,11 +3,6 @@ import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
-// const OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
-
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
 The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
