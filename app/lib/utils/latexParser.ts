@@ -219,6 +219,9 @@ export function parseLatexPropositions(text: string, documents?: SourceDocument[
       leanCode: "",
       verificationStatus: "unverified",
       verificationErrors: "",
+      context: "",
+      selectedArtifactTypes: [],
+      artifacts: [],
     });
   }
 
