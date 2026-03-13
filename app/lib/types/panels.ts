@@ -1,5 +1,6 @@
 export type PanelId =
   | "source"
+  | "context"
   | "semiformal"
   | "lean"
   | "graph"

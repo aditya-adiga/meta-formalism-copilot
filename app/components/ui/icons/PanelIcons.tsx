@@ -69,6 +69,7 @@ export function AnalyticsIcon({ className }: IconProps) {
   );
 }
 
+
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {
   return (
