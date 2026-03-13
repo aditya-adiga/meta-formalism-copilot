@@ -4,11 +4,11 @@ import FileUpload from "@/app/components/features/source-input/FileUpload";
 type SourcePanelProps = {
   sourceText: string;
   onSourceTextChange: (value: string) => void;
-  extractedFiles: { name: string; text: string; file?: File }[];
   onFilesChanged: (files: { name: string; text: string; file?: File }[]) => void;
+  extractedFiles?: { name: string; text: string }[];
 };
 
-export default function SourcePanel({ sourceText, onSourceTextChange, extractedFiles, onFilesChanged }: SourcePanelProps) {
+export default function SourcePanel({ sourceText, onSourceTextChange, onFilesChanged, extractedFiles }: SourcePanelProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
@@ -20,7 +20,7 @@ export default function SourcePanel({ sourceText, onSourceTextChange, extractedF
         <TextInput value={sourceText} onChange={onSourceTextChange} />
         <FileUpload onFilesChanged={onFilesChanged} />
 
-        {extractedFiles.length > 0 && (
+        {extractedFiles && extractedFiles.length > 0 && (
           <section>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
               Uploaded Documents

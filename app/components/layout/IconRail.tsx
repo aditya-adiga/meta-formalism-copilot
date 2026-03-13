@@ -39,11 +39,16 @@ export default function IconRail({ panels, activePanelId, onSelectPanel, onExpor
         </svg>
       </button>
 
-      {visiblePanels.map((panel) => {
+      {visiblePanels.map((panel, idx) => {
         const isActive = panel.id === activePanelId;
+        const prevPanel = idx > 0 ? visiblePanels[idx - 1] : null;
+        const showSeparator = prevPanel && prevPanel.group && panel.group && prevPanel.group !== panel.group;
         return (
+          <div key={panel.id}>
+          {showSeparator && (
+            <div className="mx-3 my-1 border-t border-[#DDD9D5]" />
+          )}
           <button
-            key={panel.id}
             onClick={() => onSelectPanel(panel.id)}
             title={expanded ? undefined : panel.label}
             className={`
@@ -75,6 +80,7 @@ export default function IconRail({ panels, activePanelId, onSelectPanel, onExpor
               </span>
             )}
           </button>
+          </div>
         );
       })}
 

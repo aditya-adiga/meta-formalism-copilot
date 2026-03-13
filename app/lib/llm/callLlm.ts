@@ -1,9 +1,20 @@
+import { randomUUID } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { computeCost } from "./costs";
-import { getCachedResult, setCachedResult } from "./cache";
+import { appendAnalyticsEntry } from "@/app/lib/analytics/persist";
+import { computeHash, getCachedResult, setCachedResult } from "./cache";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
+
+// Lazy-initialized Anthropic client — reused across calls
+let _anthropicClient: Anthropic | null = null;
+function getAnthropicClient(apiKey: string): Anthropic {
+  if (!_anthropicClient) {
+    _anthropicClient = new Anthropic({ apiKey });
+  }
+  return _anthropicClient;
+}
 
 export class OpenRouterError extends Error {
   status: number;
@@ -47,6 +58,31 @@ type CallLlmResult = {
   cacheKey?: CacheKey;
 };
 
+/** Record analytics and cache the result. Failures are swallowed so they
+ *  never break LLM calls. Shared across all provider branches. */
+async function finalizeResult(
+  endpoint: string,
+  text: string,
+  usage: LlmCallUsage,
+  cacheHash: string,
+  cacheKey: CacheKey,
+): Promise<CallLlmResult> {
+  try {
+    appendAnalyticsEntry({
+      id: randomUUID(),
+      endpoint,
+      ...usage,
+      timestamp: new Date().toISOString(),
+    });
+  } catch { /* persistence failure must not break LLM calls */ }
+
+  const result: CallLlmResult = { text, usage, cacheKey };
+  if (text) {
+    try { await setCachedResult(cacheHash, result); } catch { /* cache write failure is non-fatal */ }
+  }
+  return result;
+}
+
 /** Centralized LLM call with Anthropic -> OpenRouter -> mock fallback.
  *  Returns the raw text response and usage/cost metadata.
  *  On mock fallback, returns text: "" — the caller provides its own mock text. */
@@ -67,17 +103,21 @@ export async function callLlm({
       ? openRouterModel
       : "mock";
 
+  // Compute hash once, reuse for cache get and set
+  const cacheHash = computeHash(effectiveModel, systemPrompt, userContent, maxTokens);
+  const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
+
   // Check cache before making any LLM call
-  const cached = getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
+  const cached = await getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
   if (cached) {
-    console.log(`[${endpoint}] cache hit (model: ${effectiveModel}, hash: ${cached.cacheHash.slice(0, 8)})`);
+    console.log(`[${endpoint}] cache hit (model: ${effectiveModel}, hash: ${cacheHash.slice(0, 8)})`);
     return { text: cached.text, usage: cached.usage };
   }
 
   if (anthropicKey) {
     const model = anthropicModel ?? DEFAULT_ANTHROPIC_MODEL;
     const start = Date.now();
-    const client = new Anthropic({ apiKey: anthropicKey });
+    const client = getAnthropicClient(anthropicKey);
     const message = await client.messages.create({
       model,
       max_tokens: maxTokens,
@@ -88,7 +128,7 @@ export async function callLlm({
     const text = message.content[0].type === "text" ? message.content[0].text : "";
     const inputTokens = message.usage.input_tokens;
     const outputTokens = message.usage.output_tokens;
-    const usage: CallLlmResult["usage"] = {
+    const usage: LlmCallUsage = {
       provider: "anthropic",
       model,
       inputTokens,
@@ -96,12 +136,7 @@ export async function callLlm({
       costUsd: computeCost(model, inputTokens, outputTokens),
       latencyMs,
     };
-    const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
-    const result = { text, usage, cacheKey };
-    if (text) {
-      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
-    }
-    return result;
+    return finalizeResult(endpoint, text, usage, cacheHash, cacheKey);
   }
 
   if (openRouterKey && openRouterModel) {
@@ -132,7 +167,7 @@ export async function callLlm({
     const text = data.choices?.[0]?.message?.content ?? "";
     const inputTokens = data.usage?.prompt_tokens ?? 0;
     const outputTokens = data.usage?.completion_tokens ?? 0;
-    const usage: CallLlmResult["usage"] = {
+    const usage: LlmCallUsage = {
       provider: "openrouter",
       model: openRouterModel,
       inputTokens,
@@ -140,17 +175,12 @@ export async function callLlm({
       costUsd: computeCost(openRouterModel, inputTokens, outputTokens),
       latencyMs,
     };
-    const cacheKey: CacheKey = { model: effectiveModel, systemPrompt, userContent, maxTokens };
-    const result = { text, usage, cacheKey };
-    if (text) {
-      try { setCachedResult(effectiveModel, systemPrompt, userContent, maxTokens, result); } catch { /* cache write failure must not break LLM calls */ }
-    }
-    return result;
+    return finalizeResult(endpoint, text, usage, cacheHash, cacheKey);
   }
 
   // Mock fallback — caller provides its own mock text
   console.warn(`[${endpoint}] No API key configured — returning mock response.\n\n To generate real responses, add ANTHROPIC_API_KEY or OPENROUTER_API_KEY to .env.local`);
-  const usage: CallLlmResult["usage"] = {
+  const usage: LlmCallUsage = {
     provider: "mock",
     model: "mock",
     inputTokens: 0,
@@ -158,5 +188,5 @@ export async function callLlm({
     costUsd: 0,
     latencyMs: 0,
   };
-  return { text: "", usage };
+  return finalizeResult(endpoint, "", usage, cacheHash, cacheKey);
 }

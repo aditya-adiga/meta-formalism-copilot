@@ -1,8 +1,9 @@
-import type { EndpointPrior } from "@/app/lib/types/analytics";
-import { computeCost } from "@/app/lib/llm/costs";
+import type { AnalyticsEntry, AnalyticsSummary } from "@/app/lib/types/analytics";
 
 type AnalyticsPanelProps = {
-  endpointPriors: Record<string, EndpointPrior>;
+  entries: AnalyticsEntry[];
+  summary: AnalyticsSummary;
+  onClear: () => void;
 };
 
 function formatCost(usd: number): string {
@@ -22,70 +23,99 @@ function formatLatency(ms: number): string {
   return `${Math.round(ms)}ms`;
 }
 
-/** Short endpoint label: "formalization/semiformal" -> "semiformal" */
-function shortEndpoint(endpoint: string): string {
-  const parts = endpoint.split("/");
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/** Extract last path segment: "formalization/semiformal" -> "semiformal" */
+function lastSegment(path: string): string {
+  const parts = path.split("/");
   return parts[parts.length - 1];
 }
 
-export default function AnalyticsPanel({ endpointPriors }: AnalyticsPanelProps) {
+export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsPanelProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          LLM Usage Estimates
+          LLM Usage
         </h2>
+        <button
+          onClick={onClear}
+          className="rounded px-2 py-1 text-xs text-[#6B6560] hover:bg-[#E8E4E0] hover:text-[var(--ink-black)]"
+        >
+          Clear Session
+        </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto p-6">
-        {/* Typical Ranges table from prior data */}
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-          Typical Ranges
-        </h3>
-        <div className="overflow-auto rounded border border-[#E8E4E0]">
-          <table className="w-full text-xs font-mono">
-            <thead>
-              <tr className="border-b border-[#E8E4E0] bg-[#F5F1ED] text-left text-[#6B6560]">
-                <th className="px-3 py-2">Endpoint</th>
-                <th className="px-3 py-2 text-right">Data Pts</th>
-                <th className="px-3 py-2 text-right">Output Tokens</th>
-                <th className="px-3 py-2 text-right">Cost Range</th>
-                <th className="px-3 py-2 text-right">Latency Range</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(endpointPriors).map(([endpoint, prior]) => {
-                const lowOut = Math.max(50, prior.meanOutputTokens - prior.stddevOutputTokens);
-                const highOut = prior.meanOutputTokens + prior.stddevOutputTokens;
-                const lowLat = Math.max(0, prior.meanLatencyMs - prior.stddevLatencyMs);
-                const highLat = prior.meanLatencyMs + prior.stddevLatencyMs;
-                return (
-                  <tr key={endpoint} className="border-b border-[#F0EBE6] hover:bg-[#F5F1ED]">
-                    <td className="px-3 py-1.5">{shortEndpoint(endpoint)}</td>
-                    <td className="px-3 py-1.5 text-right">
-                      {prior.n === 0 ? (
-                        <span className="text-[#9A9590]">est.</span>
-                      ) : (
-                        prior.n
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      {formatTokens(lowOut)}&ndash;{formatTokens(highOut)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      {formatCost(computeCost(prior.model, 0, lowOut))}&ndash;{formatCost(computeCost(prior.model, 0, highOut))}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      {formatLatency(lowLat)}&ndash;{formatLatency(highLat)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Summary cards */}
+        <div className="mb-6 grid grid-cols-4 gap-3">
+          <SummaryCard label="API Calls" value={String(summary.totalCalls)} />
+          <SummaryCard
+            label="Total Tokens"
+            value={formatTokens(summary.totalInputTokens + summary.totalOutputTokens)}
+          />
+          <SummaryCard label="Est. Cost" value={formatCost(summary.totalCostUsd)} />
+          <SummaryCard label="Avg Latency" value={formatLatency(summary.averageLatencyMs)} />
         </div>
+
+        {/* Detail table */}
+        {entries.length === 0 ? (
+          <p className="text-center text-sm text-[#9A9590]">
+            No LLM calls yet. Use the app to see usage data here.
+          </p>
+        ) : (
+          <div className="overflow-auto rounded border border-[#E8E4E0]">
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="border-b border-[#E8E4E0] bg-[#F5F1ED] text-left text-[#6B6560]">
+                  <th className="px-3 py-2">Time</th>
+                  <th className="px-3 py-2">Endpoint</th>
+                  <th className="px-3 py-2">Model</th>
+                  <th className="px-3 py-2 text-right">In Tok</th>
+                  <th className="px-3 py-2 text-right">Out Tok</th>
+                  <th className="px-3 py-2 text-right">Cost</th>
+                  <th className="px-3 py-2 text-right">Latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...entries].reverse().map((e) => (
+                  <tr key={e.id} className="border-b border-[#F0EBE6] hover:bg-[#F5F1ED]">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-[#6B6560]">{formatTime(e.timestamp)}</td>
+                    <td className="px-3 py-1.5">{lastSegment(e.endpoint)}</td>
+                    <td className="px-3 py-1.5 text-[#6B6560]">{lastSegment(e.model)}</td>
+                    <td className="px-3 py-1.5 text-right">{e.inputTokens.toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right">{e.outputTokens.toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right">{formatCost(e.costUsd)}</td>
+                    <td className="px-3 py-1.5 text-right">{formatLatency(e.latencyMs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-[#DDD9D5] bg-[#F5F1ED] font-semibold">
+                  <td className="px-3 py-2" colSpan={3}>Total ({entries.length} calls)</td>
+                  <td className="px-3 py-2 text-right">{summary.totalInputTokens.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right">{summary.totalOutputTokens.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right">{formatCost(summary.totalCostUsd)}</td>
+                  <td className="px-3 py-2 text-right">{formatLatency(summary.averageLatencyMs)} avg</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[#E8E4E0] bg-white px-3 py-2 shadow-sm">
+      <div className="text-[10px] uppercase tracking-wide text-[#9A9590]">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold text-[var(--ink-black)]">{value}</div>
     </div>
   );
 }

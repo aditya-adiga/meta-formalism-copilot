@@ -1,10 +1,16 @@
 export type PanelId =
   | "source"
+  | "decomposition" // renamed from "graph"
+  | "node-detail"
   | "semiformal"
   | "lean"
-  | "graph"
-  | "node-detail"
+  | "causal-graph"
+  | "statistical-model"
+  | "property-tests"
+  | "perspective-balance"
   | "analytics";
+
+export type PanelGroup = "navigation" | "artifacts" | "meta";
 
 export type PanelDef = {
   id: PanelId;
@@ -13,4 +19,6 @@ export type PanelDef = {
   statusSummary: string;
   /** Hide from the rail until the panel has content */
   hidden?: boolean;
+  /** Group for visual separation in the rail */
+  group?: PanelGroup;
 };

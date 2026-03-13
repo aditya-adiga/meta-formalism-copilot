@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import SendIcon from "@/app/components/ui/icons/SendIcon";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+import type { VerificationStatus } from "@/app/lib/types/session";
 
 type LeanCodeDisplayProps = {
   code: string;
@@ -102,76 +101,77 @@ export default function LeanCodeDisplay({
       {/* Code area */}
       <div className="relative flex-1 overflow-hidden">
         {/* Edit / Done toggle + Re-verify — outside scroll container so they stay visible */}
-        {code && (
-          <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
-            {(leanEdited || verificationStatus === "invalid") && editMode === "rendered" && (
-              <button
-                onClick={() => { onReVerify(); setLeanEdited(false); }}
-                disabled={!canReVerify}
-                className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              >
-                Re-verify ↺
-              </button>
-            )}
-            <button
-              onClick={editMode === "rendered" ? () => setEditMode("raw") : handleDoneEditing}
-              className="rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-1 text-xs text-[#6B6560] shadow-sm transition-shadow hover:shadow-md hover:text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
-            >
-              {editMode === "rendered" ? "Edit" : "Done"}
-            </button>
-          </div>
-        )}
-        <div className="h-full overflow-auto px-8 py-6">
-
-          {/* Verification errors */}
-          {verificationStatus === "invalid" && verificationErrors && (
-            <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
-                lake build output
-              </h3>
-              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
-                {verificationErrors}
-              </pre>
-              <button
-                onClick={handleExplainError}
-                disabled={explaining || !!explanation}
-                className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
-              >
-                {explaining ? "Explaining…" : "Explain this error"}
-              </button>
-              {explanation && (
-                <>
-                  <hr className="my-3 border-red-200" />
-                  <div className="prose prose-sm max-w-none text-sm leading-relaxed text-red-900">
-                    {explanation}
-                  </div>
-                </>
+          {code && (
+            <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+              {(leanEdited || verificationStatus === "invalid") && editMode === "rendered" && (
+                <button
+                  onClick={() => { onReVerify(); setLeanEdited(false); }}
+                  disabled={!canReVerify}
+                  className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                >
+                  Re-verify ↺
+                </button>
               )}
+              <button
+                onClick={editMode === "rendered" ? () => setEditMode("raw") : handleDoneEditing}
+                className="rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-1 text-xs text-[#6B6560] shadow-sm transition-shadow hover:shadow-md hover:text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
+              >
+                {editMode === "rendered" ? "Edit" : "Done"}
+              </button>
             </div>
           )}
+          <div className="h-full overflow-auto px-8 py-6">
 
-          {editMode === "rendered" ? (
-            <>
-              {verificationStatus === "invalid" && (
-                <p className="mb-2 font-mono text-xs text-[#6B6560]">
-                  {code.length} chars · {code.split("\n").length} lines submitted to verifier
-                </p>
-              )}
-              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--ink-black)]">
-                {code}
-              </pre>
-            </>
-          ) : (
-            <textarea
-              ref={textareaRef}
-              value={localCode}
-              onChange={(e) => setLocalCode(e.target.value)}
-              className="min-h-full w-full resize-none border-0 bg-transparent font-mono text-sm leading-relaxed text-[var(--ink-black)] focus:outline-none focus:ring-0"
-              style={{ caretColor: "#000000" }}
-              aria-label="Lean4 code"
-              spellCheck={false}
-            />
-          )}
+            {/* Verification errors */}
+            {verificationStatus === "invalid" && verificationErrors && (
+              <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
+                  lake build output
+                </h3>
+                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
+                  {verificationErrors}
+                </pre>
+                <button
+                  onClick={handleExplainError}
+                  disabled={explaining || !!explanation}
+                  className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
+                >
+                  {explaining ? "Explaining…" : "Explain this error"}
+                </button>
+                {explanation && (
+                  <>
+                    <hr className="my-3 border-red-200" />
+                    <div className="prose prose-sm max-w-none text-sm leading-relaxed text-red-900">
+                      {explanation}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {editMode === "rendered" ? (
+              <>
+                {verificationStatus === "invalid" && (
+                  <p className="mb-2 font-mono text-xs text-[#6B6560]">
+                    {code.length} chars · {code.split("\n").length} lines submitted to verifier
+                  </p>
+                )}
+                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--ink-black)]">
+                  {code}
+                </pre>
+              </>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={localCode}
+                onChange={(e) => setLocalCode(e.target.value)}
+                className="min-h-full w-full resize-none border-0 bg-transparent font-mono text-sm leading-relaxed text-[var(--ink-black)] focus:outline-none focus:ring-0"
+                style={{ caretColor: "#000000" }}
+                aria-label="Lean4 code"
+                spellCheck={false}
+              />
+            )}
+          </div>
         </div>
 
         {/* Iterate bar — visible whenever there is code */}
@@ -200,7 +200,6 @@ export default function LeanCodeDisplay({
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

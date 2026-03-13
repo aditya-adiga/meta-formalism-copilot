@@ -6,12 +6,12 @@ type PanelShellProps = {
   panels: PanelDef[];
   activePanelId: PanelId;
   onSelectPanel: (id: PanelId) => void;
-  panelContent: Partial<Record<PanelId, React.ReactNode>>;
+  renderPanel: (id: PanelId) => React.ReactNode;
   onExportAll?: () => void;
   exportAllDisabled?: boolean;
 };
 
-export default function PanelShell({ panels, activePanelId, onSelectPanel, panelContent, onExportAll, exportAllDisabled }: PanelShellProps) {
+export default function PanelShell({ panels, activePanelId, onSelectPanel, renderPanel, onExportAll, exportAllDisabled }: PanelShellProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--ivory-cream)]">
       <IconRail
@@ -23,7 +23,7 @@ export default function PanelShell({ panels, activePanelId, onSelectPanel, panel
       />
       <FocusPane
         activePanelId={activePanelId}
-        panelContent={panelContent}
+        renderPanel={renderPanel}
       />
     </div>
   );
