@@ -4,6 +4,7 @@ import { useState } from "react";
 import RefinementButtons from "@/app/components/features/context-input/RefinementButtons";
 import RefinementPreview from "@/app/components/features/context-input/RefinementPreview";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type ContextInputProps = {
   value: string;
@@ -16,6 +17,7 @@ type ContextInputProps = {
 export default function ContextInput({ value, onChange, onFormalise, loading, waitEstimate }: ContextInputProps) {
   const [refinedValue, setRefinedValue] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
+  const refineWaitEstimate = useWaitTimeEstimate(refining ? "refine/context" : null, value.length);
 
   const handleRefinement = async (actionId: string) => {
     setRefining(true);
@@ -77,7 +79,11 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
         />
         {value && !refining && <RefinementButtons onRefine={handleRefinement} />}
-        {refining && <p className="text-xs text-[#6B6560]">Refining...</p>}
+        {refining && (
+          <p className="text-xs text-[#6B6560]">
+            Refining...{refineWaitEstimate ? ` ${refineWaitEstimate.remainingLabel}` : ""}
+          </p>
+        )}
       </div>
 
       {/* Docked Formalise button */}

@@ -23,6 +23,23 @@ import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
+import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
+
+function phaseToEndpoint(phase: LoadingPhase): string | null {
+  switch (phase) {
+    case "semiformal":
+      return "formalization/semiformal";
+    case "lean":
+    case "retrying":
+    case "iterating":
+      return "formalization/lean";
+    case "verifying":
+    case "reverifying":
+      return "verification/lean";
+    case "idle":
+      return null;
+  }
+}
 
 export default function Home() {
   // --- Panel navigation ---
@@ -301,11 +318,16 @@ export default function Home() {
     }
   }, [isDecompMode, selectedNode, combinedPaperText, contextText]);
 
-  // --- Wait time estimate ---
+  // --- Wait time estimates ---
   const inputCharCount = useMemo(() => {
     return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
   }, [sourceText, extractedFiles]);
-  const waitEstimate = useWaitTimeEstimate(loadingPhase, inputCharCount);
+  const pipelineEndpoint = phaseToEndpoint(loadingPhase);
+  const waitEstimate = useWaitTimeEstimate(pipelineEndpoint, inputCharCount);
+  const causalGraphWaitEstimate = useWaitTimeEstimate(
+    causalGraphLoading ? "formalization/causal-graph" : null,
+    inputCharCount,
+  );
 
   // --- Panel definitions ---
   const panels = usePanelDefinitions({
@@ -411,6 +433,7 @@ export default function Home() {
       <CausalGraphPanel
         causalGraph={causalGraph}
         loading={causalGraphLoading}
+        waitEstimate={causalGraphWaitEstimate}
       />
     ),
     analytics: (
@@ -429,7 +452,7 @@ export default function Home() {
     activePipeline,
     handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
     waitEstimate,
   ]);
 

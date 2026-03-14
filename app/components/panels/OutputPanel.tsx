@@ -5,6 +5,7 @@ import EditableOutput from "@/app/components/features/output-editing/EditableOut
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
@@ -36,7 +37,10 @@ function VerificationBadge({ status }: { status: VerificationStatus }) {
 
 export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate, waitEstimate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
+  const [editEndpoint, setEditEndpoint] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
+
+  const editWaitEstimate = useWaitTimeEstimate(editEndpoint, semiformalText.length);
 
   // Switch back to rendered view when new semiformal content arrives, but not while user is editing (raw mode).
   // renderMode intentionally omitted from deps to avoid re-triggering on mode change.
@@ -51,6 +55,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
 
   const handleInlineEdit = useCallback(async (instruction: string, selection: { start: number; end: number; text: string }) => {
     setEditing(true);
+    setEditEndpoint("edit/inline");
     try {
       const response = await fetch("/api/edit/inline", {
         method: "POST",
@@ -69,11 +74,13 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
       console.error("[inline edit]", err);
     } finally {
       setEditing(false);
+      setEditEndpoint(null);
     }
   }, [semiformalText, onSemiformalTextChange]);
 
   const handleWholeTextEdit = useCallback(async (instruction: string) => {
     setEditing(true);
+    setEditEndpoint("edit/whole");
     try {
       const response = await fetch("/api/edit/whole", {
         method: "POST",
@@ -91,14 +98,23 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
       console.error("[whole edit]", err);
     } finally {
       setEditing(false);
+      setEditEndpoint(null);
     }
   }, [semiformalText, onSemiformalTextChange]);
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {editing && (
-        <div className="absolute inset-x-0 top-0 z-40 bg-[var(--ink-black)] px-4 py-1.5 text-center text-xs text-white/90">
-          Applying edit...
+        <div className="absolute inset-x-0 top-0 z-40 overflow-hidden bg-[var(--ink-black)] px-4 py-1.5 text-center text-xs text-white/90">
+          {editWaitEstimate && (
+            <span
+              className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-1000 ease-linear"
+              style={{ width: `${Math.round(editWaitEstimate.progress * 100)}%` }}
+            />
+          )}
+          <span className="relative">
+            Applying edit...{editWaitEstimate ? ` ${editWaitEstimate.remainingLabel}` : ""}
+          </span>
         </div>
       )}
 

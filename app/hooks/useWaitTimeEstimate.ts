@@ -1,66 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer } from "react";
-
-type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-
-/**
- * Hardcoded latency priors extracted from analytics data (47 data points, 2026-02-26).
- * Re-extracted via scripts/analyze-analytics.mjs when enough new data accumulates.
- */
-type LatencyPrior = {
-  n: number;
-  meanOutputTokens: number;
-  inputToOutput: { slope: number; intercept: number; r2: number };
-  outputToLatency: { slope: number; intercept: number };
-};
-
-const LATENCY_PRIORS: Record<string, LatencyPrior> = {
-  "formalization/semiformal": {
-    n: 10,
-    meanOutputTokens: 2299,
-    inputToOutput: { slope: 0.037133, intercept: 2211.16, r2: 0.0135 },
-    outputToLatency: { slope: 21.253476, intercept: -5038.24 },
-  },
-  "formalization/lean": {
-    n: 32,
-    meanOutputTokens: 2687,
-    inputToOutput: { slope: 0.336795, intercept: 713.78, r2: 0.6514 },
-    outputToLatency: { slope: 10.819042, intercept: 3328.33 },
-  },
-};
-
-function phaseToEndpoint(phase: LoadingPhase): string | null {
-  switch (phase) {
-    case "semiformal":
-      return "formalization/semiformal";
-    case "lean":
-    case "retrying":
-    case "iterating":
-      return "formalization/lean";
-    case "verifying":
-    case "reverifying":
-    case "idle":
-      return null;
-  }
-}
-
-function predictLatencyMs(endpoint: string, inputCharCount: number): number {
-  const prior = LATENCY_PRIORS[endpoint];
-  if (!prior) return 0;
-
-  const estimatedInputTokens = Math.round(inputCharCount / 4);
-  const useRegression = prior.inputToOutput.r2 >= 0.3 && prior.n >= 3;
-  let outputTokens: number;
-  if (useRegression) {
-    outputTokens = prior.inputToOutput.slope * estimatedInputTokens + prior.inputToOutput.intercept;
-  } else {
-    outputTokens = prior.meanOutputTokens;
-  }
-  outputTokens = Math.round(Math.max(50, Math.min(8192, outputTokens)));
-
-  return Math.max(0, Math.round(prior.outputToLatency.slope * outputTokens + prior.outputToLatency.intercept));
-}
+import { predictCall } from "@/app/lib/llm/predict";
 
 export type WaitTimeEstimate = {
   estimatedMs: number;
@@ -92,23 +33,28 @@ function timerReducer(seconds: number, action: TimerAction): number {
 }
 
 /**
- * Tracks estimated wait time for the current loading phase.
- * Returns null when idle or when prediction is too short to display.
+ * Tracks estimated wait time for an active LLM call.
+ * Returns null when no endpoint is active or when prediction is too short to display.
+ *
+ * @param activeEndpoint - The API endpoint currently loading (e.g. "formalization/semiformal"),
+ *   or null when idle. Uses ENDPOINT_PRIORS from predict.ts for latency estimation.
+ * @param inputCharCount - Character count of the input text being processed.
  *
  * Uses a reducer for the seconds counter so dispatch calls in effects
  * are lint-safe (dispatches are allowed, unlike setState).
  */
 export function useWaitTimeEstimate(
-  loadingPhase: LoadingPhase,
+  activeEndpoint: string | null,
   inputCharCount: number,
 ): WaitTimeEstimate | null {
   const [elapsedSeconds, dispatch] = useReducer(timerReducer, 0);
 
-  const endpoint = phaseToEndpoint(loadingPhase);
-  const estimatedMs = endpoint ? predictLatencyMs(endpoint, inputCharCount) : 0;
-  const isActive = endpoint !== null && estimatedMs >= 3000;
+  const estimatedMs = activeEndpoint
+    ? predictCall(activeEndpoint, inputCharCount).estimatedLatencyMs
+    : 0;
+  const isActive = activeEndpoint !== null && estimatedMs >= 3000;
 
-  // Reset counter and start ticking when phase changes
+  // Reset counter and start ticking when endpoint changes
   useEffect(() => {
     dispatch({ type: "reset" });
 
@@ -118,7 +64,7 @@ export function useWaitTimeEstimate(
       dispatch({ type: "tick" });
     }, 1000);
     return () => clearInterval(id);
-  }, [isActive, loadingPhase]);
+  }, [isActive, activeEndpoint]);
 
   // Derive the estimate purely from elapsedSeconds
   return useMemo(() => {

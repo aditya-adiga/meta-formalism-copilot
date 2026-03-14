@@ -6,6 +6,7 @@ import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/W
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import { downloadSemiformalAsMarkdown } from "@/app/lib/utils/export";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type SemiformalPanelProps = {
   semiformalText: string;
@@ -19,7 +20,10 @@ type SemiformalPanelProps = {
 
 export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading, waitEstimate }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
+  const [editEndpoint, setEditEndpoint] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
+
+  const editWaitEstimate = useWaitTimeEstimate(editEndpoint, semiformalText.length);
 
   // Switch back to rendered view when new semiformal content arrives
   useEffect(() => {
@@ -32,6 +36,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
 
   const handleInlineEdit = useCallback(async (instruction: string, selection: { start: number; end: number; text: string }) => {
     setEditing(true);
+    setEditEndpoint("edit/inline");
     try {
       const response = await fetch("/api/edit/inline", {
         method: "POST",
@@ -50,11 +55,13 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       console.error("[inline edit]", err);
     } finally {
       setEditing(false);
+      setEditEndpoint(null);
     }
   }, [semiformalText, onSemiformalTextChange]);
 
   const handleWholeTextEdit = useCallback(async (instruction: string) => {
     setEditing(true);
+    setEditEndpoint("edit/whole");
     try {
       const response = await fetch("/api/edit/whole", {
         method: "POST",
@@ -72,14 +79,23 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       console.error("[whole edit]", err);
     } finally {
       setEditing(false);
+      setEditEndpoint(null);
     }
   }, [semiformalText, onSemiformalTextChange]);
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {editing && (
-        <div className="absolute inset-x-0 top-0 z-40 bg-[var(--ink-black)] px-4 py-1.5 text-center text-xs text-white/90">
-          Applying edit...
+        <div className="absolute inset-x-0 top-0 z-40 overflow-hidden bg-[var(--ink-black)] px-4 py-1.5 text-center text-xs text-white/90">
+          {editWaitEstimate && (
+            <span
+              className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-1000 ease-linear"
+              style={{ width: `${Math.round(editWaitEstimate.progress * 100)}%` }}
+            />
+          )}
+          <span className="relative">
+            Applying edit...{editWaitEstimate ? ` ${editWaitEstimate.remainingLabel}` : ""}
+          </span>
         </div>
       )}
 
