@@ -277,6 +277,7 @@ export default function Home() {
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
+    cancelQueue,
   });
 
   // --- Combined paper text for single-proof formalization ---
