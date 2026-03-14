@@ -20,7 +20,7 @@ Important:
 - Only include direct dependencies, not transitive ones
 - IDs must be consistent across the dependsOn references
 - Extract ALL formal statements, even if unnumbered
-- Dependencies should be intra-document by default; only create cross-document dependencies if there is an explicit reference
+- When multiple documents are provided, look for cross-document dependencies where one document's propositions build on, reference, or share concepts with another's. Dependencies may be explicit (direct citation) or implicit (shared definitions, overlapping claims)
 - Return ONLY the JSON array, no commentary or markdown fences`;
 
 /** Format documents array into labeled sections for the user message */
@@ -37,8 +37,13 @@ function mockResponse(documents: SourceDocument[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const propositions: any[] = [];
 
-  for (const doc of documents) {
+  for (let i = 0; i < documents.length; i++) {
+    const doc = documents[i];
     const snippet = doc.text.slice(0, 60).replace(/\n/g, " ");
+    // For multi-doc, later documents depend on the first document's definition
+    // to demonstrate cross-document connectivity
+    const defDeps: string[] =
+      i > 0 ? [`${documents[0].sourceId}/def-1`] : [];
     propositions.push(
       {
         id: `${doc.sourceId}/def-1`,
@@ -46,7 +51,7 @@ function mockResponse(documents: SourceDocument[]) {
         kind: "definition",
         statement: `Mock definition from "${doc.sourceLabel}": "${snippet}..."`,
         proofText: "",
-        dependsOn: [],
+        dependsOn: defDeps,
         sourceId: doc.sourceId,
       },
       {
