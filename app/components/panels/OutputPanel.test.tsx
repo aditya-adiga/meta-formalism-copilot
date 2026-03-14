@@ -84,12 +84,12 @@ describe('OutputPanel', () => {
     render(<OutputPanel {...defaultProps} semiformalText="text" />)
     await userEvent.click(screen.getByText('Apply Whole'))
 
-    expect(screen.getByText('Applying edit...')).toBeInTheDocument()
+    expect(screen.getByText(/Applying edit\.\.\./)).toBeInTheDocument()
 
     // Resolve to clean up
     resolvePromise!(new Response(JSON.stringify({ text: 'edited' }), { status: 200 }))
     await waitFor(() => {
-      expect(screen.queryByText('Applying edit...')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Applying edit\.\.\./)).not.toBeInTheDocument()
     })
   })
 
