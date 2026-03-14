@@ -3,6 +3,7 @@
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import { downloadLeanCode } from "@/app/lib/utils/export";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
@@ -19,6 +20,7 @@ type LeanPanelProps = {
   onReVerify: () => void;
   onLeanIterate: (instruction: string) => void;
   sessionBanner?: React.ReactNode;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 function VerificationBadge({ status }: { status: VerificationStatus }) {
@@ -44,6 +46,7 @@ export default function LeanPanel({
   onReVerify,
   onLeanIterate,
   sessionBanner,
+  waitEstimate,
 }: LeanPanelProps) {
   const showLean = leanCode || loadingPhase === "lean" || loadingPhase === "verifying" || loadingPhase === "retrying" || loadingPhase === "reverifying" || loadingPhase === "iterating";
 
@@ -76,6 +79,9 @@ export default function LeanPanel({
         </div>
         <div className="flex items-center gap-2">
           <VerificationBadge status={verificationStatus} />
+          {(loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "iterating") && waitEstimate && (
+            <span className="text-xs text-[#6B6560]">{waitEstimate.remainingLabel}</span>
+          )}
           {leanCode && loadingPhase === "idle" && (
             <DownloadButton
               label="Export .lean"
@@ -102,7 +108,7 @@ export default function LeanPanel({
       </div>
       {loadingPhase === "lean" && !leanCode ? (
         <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating Lean4 code...
+          Generating Lean4 code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
         </div>
       ) : (
         <LeanCodeDisplay
