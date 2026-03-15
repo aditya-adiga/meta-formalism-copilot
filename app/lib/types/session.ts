@@ -11,7 +11,8 @@ export type ArtifactType =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map";
+  | "dialectical-map"
+  | "counterexamples";
 
 export type ArtifactData = {
   type: ArtifactType;

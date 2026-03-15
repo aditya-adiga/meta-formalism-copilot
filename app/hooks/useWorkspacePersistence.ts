@@ -19,6 +19,7 @@ type WorkspaceState = {
   statisticalModel: string | null;
   propertyTests: string | null;
   dialecticalMap: string | null;
+  counterexamples: string | null;
 };
 
 const DEFAULT_STATE: WorkspaceState = {
@@ -34,6 +35,7 @@ const DEFAULT_STATE: WorkspaceState = {
   statisticalModel: null,
   propertyTests: null,
   dialecticalMap: null,
+  counterexamples: null,
 };
 
 export function useWorkspacePersistence() {
@@ -71,6 +73,7 @@ export function useWorkspacePersistence() {
       statisticalModel: data.statisticalModel,
       propertyTests: data.propertyTests,
       dialecticalMap: data.dialecticalMap,
+      counterexamples: data.counterexamples,
     });
 
     decompRef.current = data.decomposition;
@@ -88,7 +91,8 @@ export function useWorkspacePersistence() {
     statisticalModel: state.statisticalModel,
     propertyTests: state.propertyTests,
     dialecticalMap: state.dialecticalMap,
-  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap]);
+    counterexamples: state.counterexamples,
+  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap, state.counterexamples]);
 
   const artifactRef = useRef(artifactData);
   useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
@@ -143,6 +147,7 @@ export function useWorkspacePersistence() {
   const setStatisticalModel = useCallback((v: string | null) => setState((s) => ({ ...s, statisticalModel: v })), []);
   const setPropertyTests = useCallback((v: string | null) => setState((s) => ({ ...s, propertyTests: v })), []);
   const setDialecticalMap = useCallback((v: string | null) => setState((s) => ({ ...s, dialecticalMap: v })), []);
+  const setCounterexamples = useCallback((v: string | null) => setState((s) => ({ ...s, counterexamples: v })), []);
 
   /** Build a PersistedWorkspace snapshot of the current state (synchronous) */
   const getSnapshot = useCallback((): PersistedWorkspace => {
@@ -163,6 +168,7 @@ export function useWorkspacePersistence() {
       statisticalModel: a.statisticalModel,
       propertyTests: a.propertyTests,
       dialecticalMap: a.dialecticalMap,
+      counterexamples: a.counterexamples,
     };
   }, []);
 
@@ -184,6 +190,7 @@ export function useWorkspacePersistence() {
       statisticalModel: data.statisticalModel,
       propertyTests: data.propertyTests,
       dialecticalMap: data.dialecticalMap,
+      counterexamples: data.counterexamples,
     });
 
     decompRef.current = data.decomposition;
@@ -204,6 +211,7 @@ export function useWorkspacePersistence() {
         statisticalModel: data.statisticalModel,
         propertyTests: data.propertyTests,
         dialecticalMap: data.dialecticalMap,
+        counterexamples: data.counterexamples,
       },
     });
 
@@ -253,10 +261,12 @@ export function useWorkspacePersistence() {
     setPropertyTests,
     dialecticalMap: state.dialecticalMap,
     setDialecticalMap,
+    counterexamples: state.counterexamples,
+    setCounterexamples,
     restoredDecompState,
     persistDecompState,
     getSnapshot,
     resetToSnapshot,
     clearWorkspace,
-  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap, getSnapshot, resetToSnapshot, clearWorkspace]);
+  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap, setCounterexamples, getSnapshot, resetToSnapshot, clearWorkspace]);
 }

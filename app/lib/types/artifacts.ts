@@ -111,14 +111,71 @@ export type DialecticalMapResponse = {
   };
 };
 
+/** Counterexamples response shape */
+export type CounterexamplesResponse = {
+  counterexamples: {
+    claim: string;
+    counterexamples: Array<{
+      id: string;
+      scenario: string;
+      targetAssumption: string;
+      explanation: string;
+      plausibility: "high" | "medium" | "low";
+    }>;
+    robustnessAssessment: string;
+    summary: string;
+  };
+};
+
 /** Display metadata for each artifact type */
-export const ARTIFACT_META: Record<ArtifactType, { label: string; chipLabel: string }> = {
-  semiformal: { label: "Semiformal Proof", chipLabel: "Deductive (Lean)" },
-  lean: { label: "Lean4 Code", chipLabel: "Lean4 Code" },
-  "causal-graph": { label: "Causal Graph", chipLabel: "Causal Graph" },
-  "statistical-model": { label: "Statistical Model", chipLabel: "Statistical Model" },
-  "property-tests": { label: "Property Tests", chipLabel: "Property Tests" },
-  "dialectical-map": { label: "Dialectical Map", chipLabel: "Dialectical Map" },
+export const ARTIFACT_META: Record<ArtifactType, {
+  label: string;
+  chipLabel: string;
+  description: string;
+  whenToUse: string;
+}> = {
+  semiformal: {
+    label: "Semiformal Proof",
+    chipLabel: "Deductive (Lean)",
+    description: "Structured deductive argument with mathematical notation, logical steps, and a machine-verifiable Lean 4 proof.",
+    whenToUse: "Claims that can be stated as precise propositions needing formal verification.",
+  },
+  lean: {
+    label: "Lean4 Code",
+    chipLabel: "Lean4 Code",
+    description: "Raw Lean 4 theorem prover code.",
+    whenToUse: "Generated automatically as step 2 of the deductive pipeline.",
+  },
+  "causal-graph": {
+    label: "Causal Graph",
+    chipLabel: "Causal Graph",
+    description: "Directed graph of variables, causal relationships, confounders, and mechanisms.",
+    whenToUse: "Reasoning about cause-and-effect, interventions, or counterfactual questions.",
+  },
+  "statistical-model": {
+    label: "Statistical Model",
+    chipLabel: "Statistical Model",
+    description: "Variables with roles, testable hypotheses with null hypotheses, and suggested statistical tests.",
+    whenToUse: "Claims involving quantities, correlations, or empirical evidence testable with data.",
+  },
+  "property-tests": {
+    label: "Property Tests",
+    chipLabel: "Property Tests",
+    description: "Invariants, preconditions, postconditions, and data generators as executable test specs.",
+    whenToUse: "Rules that should always hold, especially for computational or algorithmic claims.",
+  },
+  "dialectical-map": {
+    label: "Dialectical Map",
+    chipLabel: "Dialectical Map",
+    description: "Map of distinct viewpoints, tensions between them, and a proposed synthesis.",
+    whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain.",
+  },
+  counterexamples: {
+    label: "Counterexamples",
+    chipLabel: "Counterexamples",
+    description: "Adversarial analysis identifying specific scenarios that could falsify the claim, with plausibility ratings.",
+    whenToUse: "Testing the robustness of a claim by finding edge cases, exceptions, or conditions under which it breaks down.",
+  },
 };
 
 /** Artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
@@ -128,6 +185,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "statistical-model",
   "property-tests",
   "dialectical-map",
+  "counterexamples",
 ];
 
 /** Maps artifact types to their API route paths */
@@ -136,6 +194,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
   "dialectical-map": "/api/formalization/dialectical-map",
+  counterexamples: "/api/formalization/counterexamples",
 };
 
 /** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
@@ -146,4 +205,5 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
   "dialectical-map": "dialecticalMap",
+  counterexamples: "counterexamples",
 };
