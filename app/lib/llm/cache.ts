@@ -10,6 +10,8 @@ type CachedResult = {
   usage: LlmCallUsage;
 };
 
+type CachedResultWithHash = CachedResult & { cacheHash: string };
+
 function computeHash(
   model: string,
   systemPrompt: string,
@@ -32,7 +34,7 @@ export function getCachedResult(
   systemPrompt: string,
   userContent: string,
   maxTokens: number
-): CachedResult | null {
+): CachedResultWithHash | null {
   const hash = computeHash(model, systemPrompt, userContent, maxTokens);
   const filePath = join(CACHE_DIR, `${hash}.json`);
 
@@ -49,6 +51,7 @@ export function getCachedResult(
         costUsd: 0,
         latencyMs: 0,
       },
+      cacheHash: hash,
     };
   } catch {
     // Corrupt cache file — treat as miss

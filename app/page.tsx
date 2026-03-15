@@ -3,7 +3,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
-import type { SessionScope } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
 import InputPanel from "@/app/components/panels/InputPanel";
 import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
@@ -111,14 +110,7 @@ export default function Home() {
     updateSession,
     selectSession,
     sessionsForScope,
-    activeSessionForScope,
   } = useFormalizationSessions();
-
-  const currentScope: SessionScope = isDecompMode
-    ? { type: "node", nodeId: selectedNode!.id, nodeLabel: selectedNode!.label }
-    : { type: "global" };
-  const currentScopeSessions = sessionsForScope(currentScope);
-  const currentScopeActiveSession = activeSessionForScope(currentScope);
 
   // When in decomposition mode, the semiformal/lean panels show selected node's data
   const activeSemiformal = isDecompMode ? selectedNode!.semiformalProof : semiformalText;
@@ -138,6 +130,16 @@ export default function Home() {
   const combinedPaperText = useMemo(() => {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
+
+  // Extract the PDF File reference for structured parsing (non-persisted; only available
+  // when the user uploaded a PDF in this session and it hasn't been cleared)
+  const pdfFile = useMemo(() => {
+    const pdfFiles = extractedFiles.filter(
+      (f) => f.file && f.name.toLowerCase().endsWith(".pdf"),
+    );
+    // Only use structured parsing when there's exactly one PDF source
+    return pdfFiles.length === 1 ? pdfFiles[0].file ?? null : null;
+  }, [extractedFiles]);
 
   // --- Source documents for decomposition (each input as a separate document) ---
   const sourceDocuments: SourceDocument[] = useMemo(() => {
@@ -187,6 +189,8 @@ export default function Home() {
 
   /** Global single-proof: generate semiformal only, then stop for review */
   const handleGenerateSemiformal = useCallback(async () => {
+    // Deselect any decomposition node so the global semiformalText drives the panel
+    selectNode(null);
     const session = createSession({ type: "global" });
     setLoadingPhase("semiformal");
     setSemiformalText("");
@@ -210,7 +214,7 @@ export default function Home() {
     } finally {
       setLoadingPhase("idle");
     }
-  }, [combinedPaperText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, createSession, updateSession]);
+  }, [combinedPaperText, selectNode, createSession, updateSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
 
   /** Global single-proof: Lean generation + verification retry loop */
   const handleGenerateLean = useCallback(async () => {
@@ -272,13 +276,11 @@ export default function Home() {
     if (!selectedNode) return;
 
     const session = createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
-    updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" });
     setLoadingPhase("semiformal");
     setActivePanelId("semiformal");
 
     try {
       const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
-
       const semiformalData = await fetchApi<{ proof: string }>(
         "/api/formalization/semiformal",
         { text: nodeText },
@@ -466,40 +468,45 @@ export default function Home() {
     handleLeanIterate("");
   }, [handleLeanIterate]);
 
-  /** Load a previous session's data into the current view */
+  /** Load a previous session's data into the current view (supports cross-scope navigation) */
   const handleSelectSession = useCallback((sessionId: string) => {
     selectSession(sessionId);
-    // Find the session data to load
-    const target = currentScopeSessions.find((s) => s.id === sessionId);
+    const allSessions = sessionsForScope({ type: "global" }).concat(
+      decomp.nodes.flatMap((n) => sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label }))
+    );
+    const target = allSessions.find((s) => s.id === sessionId);
     if (!target) return;
 
-    if (isDecompMode && selectedNode) {
-      // Map session verification status back to node status
+    if (target.scope.type === "node") {
+      // Navigate into the target node
+      selectNode(target.scope.nodeId);
       const nodeStatus = target.verificationStatus === "valid" ? "verified"
         : target.verificationStatus === "invalid" ? "failed"
         : target.verificationStatus === "verifying" ? "in-progress"
         : "unverified";
-      updateNode(selectedNode.id, {
+      updateNode(target.scope.nodeId, {
         semiformalProof: target.semiformalText,
         leanCode: target.leanCode,
         verificationStatus: nodeStatus,
         verificationErrors: target.verificationErrors,
       });
     } else {
+      // Global session — exit decomposition mode
+      selectNode(null);
       setSemiformalText(target.semiformalText);
       setLeanCode(target.leanCode);
       setVerificationStatus(target.verificationStatus);
       setVerificationErrors(target.verificationErrors);
       setSemiformalDirty(false);
     }
-  }, [selectSession, currentScopeSessions, isDecompMode, selectedNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+  }, [selectSession, sessionsForScope, decomp.nodes, selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
     if (sourceDocuments.length > 0) {
-      extractPropositions(sourceDocuments);
+      extractPropositions(sourceDocuments, pdfFile);
     }
-  }, [sourceDocuments, extractPropositions]);
+  }, [sourceDocuments, pdfFile, extractPropositions]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
@@ -596,17 +603,26 @@ export default function Home() {
     });
   }, [semiformalText, leanCode, decomp.nodes]);
 
-  // --- Session banner ---
-  const sessionBannerElement = currentScopeActiveSession ? (
+  // --- Panel content map ---
+  // Collect all sessions for the banner dropdown (global + all node scopes)
+  const allSessions = useMemo(() => {
+    const global = sessionsForScope({ type: "global" });
+    const nodeSessions = decomp.nodes.flatMap((n) =>
+      sessionsForScope({ type: "node", nodeId: n.id, nodeLabel: n.label })
+    );
+    return [...global, ...nodeSessions].sort((a, b) => b.runNumber - a.runNumber || b.updatedAt.localeCompare(a.updatedAt));
+  }, [sessionsForScope, decomp.nodes]);
+
+  const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
+  const sessionBannerElement = activeSession ? (
     <SessionBanner
-      currentSession={currentScopeActiveSession}
-      sessions={currentScopeSessions}
+      currentSession={activeSession}
+      sessions={allSessions}
       onSelectSession={handleSelectSession}
     />
   ) : null;
 
-  // --- Panel content map ---
-  const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => ({
+  return ({
     source: (
       <InputPanel
         sourceText={sourceText}
@@ -623,10 +639,10 @@ export default function Home() {
       <SemiformalPanel
         semiformalText={activeSemiformal}
         onSemiformalTextChange={handleSemiformalTextChange}
+        sessionBanner={sessionBannerElement}
         onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
         showGenerateLean={semiformalReadyForLean}
         leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
-        sessionBanner={sessionBannerElement}
       />
     ),
     lean: (
@@ -674,7 +690,7 @@ export default function Home() {
         endpointPriors={ENDPOINT_PRIORS}
       />
     ),
-  }), [
+  });}, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
@@ -684,7 +700,7 @@ export default function Home() {
     handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
     handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
-    sessionBannerElement,
+    activeSession, allSessions, handleSelectSession,
   ]);
 
   return (

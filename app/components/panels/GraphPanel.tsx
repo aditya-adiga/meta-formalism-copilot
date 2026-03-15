@@ -51,8 +51,12 @@ export default function GraphPanel({
   onCancelQueue,
 }: GraphPanelProps) {
   const hasNodes = propositions.length > 0;
-  const sourceCount = sourceDocuments.length;
   const [exporting, setExporting] = useState(false);
+  const sourceCount = sourceDocuments.length;
+
+  const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
+  const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
+  const progressPct = queueProgress.total > 0 ? (processed / queueProgress.total) * 100 : 0;
 
   const sourceColorMap: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
@@ -65,10 +69,6 @@ export default function GraphPanel({
   const buttonLabel = extractionStatus === "extracting"
     ? "Decomposing..."
     : `Decompose ${sourceCount} Source${sourceCount !== 1 ? "s" : ""}`;
-
-  const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
-  const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
-  const progressPct = queueProgress.total > 0 ? (processed / queueProgress.total) * 100 : 0;
 
   const handleExportGraph = useCallback(async () => {
     setExporting(true);
@@ -145,21 +145,6 @@ export default function GraphPanel({
         </div>
       </div>
 
-      {/* Source color legend — shown when multiple sources and nodes exist */}
-      {sourceCount > 1 && hasNodes && (
-        <div className="flex flex-wrap gap-3 border-b border-[#DDD9D5] bg-[#F5F1ED]/50 px-6 py-2">
-          {sourceDocuments.map((doc) => (
-            <div key={doc.sourceId} className="flex items-center gap-1.5">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: sourceColorMap[doc.sourceId] }}
-              />
-              <span className="text-[11px] text-[#6B6560]">{doc.sourceLabel}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Progress bar — shown when queue is active or just finished */}
       {(queueActive || queueProgress.status === "done") && queueProgress.total > 0 && (
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-2">
@@ -186,6 +171,21 @@ export default function GraphPanel({
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Source color legend — shown when multiple sources and nodes exist */}
+      {sourceCount > 1 && hasNodes && (
+        <div className="flex flex-wrap gap-3 border-b border-[#DDD9D5] bg-[#F5F1ED]/50 px-6 py-2">
+          {sourceDocuments.map((doc) => (
+            <div key={doc.sourceId} className="flex items-center gap-1.5">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: sourceColorMap[doc.sourceId] }}
+              />
+              <span className="text-[11px] text-[#6B6560]">{doc.sourceLabel}</span>
+            </div>
+          ))}
         </div>
       )}
 

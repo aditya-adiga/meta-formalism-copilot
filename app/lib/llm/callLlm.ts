@@ -70,8 +70,8 @@ export async function callLlm({
   // Check cache before making any LLM call
   const cached = getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
   if (cached) {
-    console.log(`[${endpoint}] cache hit (model: ${effectiveModel})`);
-    return cached;
+    console.log(`[${endpoint}] cache hit (model: ${effectiveModel}, hash: ${cached.cacheHash.slice(0, 8)})`);
+    return { text: cached.text, usage: cached.usage };
   }
 
   if (anthropicKey) {
@@ -114,7 +114,6 @@ export async function callLlm({
       },
       body: JSON.stringify({
         model: openRouterModel,
-        max_tokens: maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },

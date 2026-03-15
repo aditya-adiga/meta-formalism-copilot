@@ -73,6 +73,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
     case "txt":
     case "md":
     case "markdown":
+    case "tex":
       return extractTextFromTxt(file);
     case "docx":
       return extractTextFromDocx(file);

@@ -28,6 +28,8 @@ describe('OutputPanel', () => {
   const defaultProps = {
     semiformalText: '',
     onSemiformalTextChange: vi.fn(),
+    semiformalDirty: false,
+    onRegenerateLean: vi.fn(),
     leanCode: '',
     onLeanCodeChange: vi.fn(),
     loadingPhase: 'idle' as const,
@@ -35,8 +37,6 @@ describe('OutputPanel', () => {
     verificationErrors: '',
     onReVerify: vi.fn(),
     onLeanIterate: vi.fn(),
-    semiformalDirty: false,
-    onRegenerateLean: vi.fn(),
   }
 
   beforeEach(() => {
