@@ -111,6 +111,12 @@ export default function Home() {
     setCounterexamples: setPersistedCounterexamples,
   });
 
+  const counterexamples = useMemo(() => {
+    if (!persistedCounterexamples) return null;
+    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
+    catch { return null; }
+  }, [persistedCounterexamples]);
+
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
@@ -715,6 +721,13 @@ export default function Home() {
             onAiEdit={artifactEditing.counterexamples.handleAiEdit}
             editing={artifactEditing.counterexamples.editing}
             editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
+          />
+        );
+      case "counterexamples":
+        return (
+          <CounterexamplesPanel
+            counterexamples={counterexamples}
+            loading={counterexamplesLoading}
           />
         );
       case "analytics":
