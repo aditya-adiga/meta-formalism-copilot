@@ -283,6 +283,7 @@ export default function Home() {
   }, [semiformalText, leanCode, decomp.nodes]);
 
   // --- Panel content map ---
+  // Collect all sessions for the banner dropdown (global + all node scopes)
   const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
   const sessionBannerElement = activeSession ? (
     <SessionBanner
