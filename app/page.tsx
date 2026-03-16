@@ -23,6 +23,7 @@ import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
@@ -30,10 +31,28 @@ import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
+import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
+
+function phaseToEndpoint(phase: LoadingPhase): string | null {
+  switch (phase) {
+    case "semiformal":
+      return "formalization/semiformal";
+    case "lean":
+    case "retrying":
+    case "iterating":
+      return "formalization/lean";
+    case "verifying":
+    case "reverifying":
+      return "verification/lean";
+    case "idle":
+      return null;
+  }
+}
 
 export default function Home() {
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
+
 
   // --- Persisted state (survives page refresh) ---
   const {
@@ -119,8 +138,9 @@ export default function Home() {
       nodes: decomp.nodes,
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
+      sources: decomp.sources ?? [],
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
 
   // --- Session state ---
   // Restore callback: applies a session's data to global or per-node state
@@ -329,6 +349,17 @@ export default function Home() {
   // Determine if any RPC is in flight (for workspace session-switch guard)
   const isAnyRpcBusy = loadingPhase !== "idle" || isAnyGenerating || queueRunning;
 
+  // --- Wait time estimates ---
+  const inputCharCount = useMemo(() => {
+    return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
+  }, [sourceText, extractedFiles]);
+  const pipelineEndpoint = phaseToEndpoint(loadingPhase);
+  const waitEstimate = useWaitTimeEstimate(pipelineEndpoint, inputCharCount);
+  const causalGraphWaitEstimate = useWaitTimeEstimate(
+    causalGraphLoading ? "formalization/causal-graph" : null,
+    inputCharCount,
+  );
+
   // --- Handlers ---
 
   const handleSemiformalTextChange = useCallback((text: string) => {
@@ -530,6 +561,7 @@ export default function Home() {
             selectedArtifactTypes={selectedArtifactTypes}
             onArtifactTypesChange={setSelectedArtifactTypes}
             loadingState={artifactLoadingState}
+            waitEstimate={waitEstimate}
           />
         );
       case "semiformal":
@@ -541,6 +573,7 @@ export default function Home() {
             onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
             showGenerateLean={semiformalReadyForLean}
             leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+            waitEstimate={waitEstimate}
           />
         );
       case "lean":
@@ -557,6 +590,7 @@ export default function Home() {
             onReVerify={activePipeline.handleReVerify}
             onLeanIterate={activePipeline.handleLeanIterate}
             sessionBanner={sessionBannerElement}
+            waitEstimate={waitEstimate}
           />
         );
       case "decomposition":
@@ -595,6 +629,7 @@ export default function Home() {
           <CausalGraphPanel
             causalGraph={causalGraph}
             loading={causalGraphLoading}
+            waitEstimate={causalGraphWaitEstimate}
           />
         );
       case "statistical-model":
@@ -635,11 +670,12 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
     dialecticalMap, dialecticalMapLoading,
     analyticsEntries, analyticsSummary, clearAnalytics,
+    waitEstimate,
   ]);
 
   return (

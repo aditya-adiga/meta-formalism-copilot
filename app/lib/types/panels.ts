@@ -1,5 +1,6 @@
 export type PanelId =
   | "source"
+  | "context"
   | "decomposition" // renamed from "graph"
   | "node-detail"
   | "semiformal"

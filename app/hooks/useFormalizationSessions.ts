@@ -7,6 +7,8 @@ export type SessionRestoreHandler = (session: FormalizationSession) => void;
 
 type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors" | "artifacts">>;
 
+
+
 const STORAGE_KEY = "metaformalism-sessions";
 
 function loadFromStorage(): SessionsState {

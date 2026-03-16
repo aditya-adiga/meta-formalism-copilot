@@ -1,5 +1,6 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import FileUpload from "@/app/components/features/source-input/FileUpload";
 import TextInput from "@/app/components/features/source-input/TextInput";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
@@ -20,6 +21,7 @@ type InputPanelProps = {
   selectedArtifactTypes: ArtifactType[];
   onArtifactTypesChange: (types: ArtifactType[]) => void;
   loadingState?: ArtifactLoadingState;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 export default function InputPanel({
@@ -36,6 +38,7 @@ export default function InputPanel({
   selectedArtifactTypes,
   onArtifactTypesChange,
   loadingState,
+  // waitEstimate available via props for future use
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">

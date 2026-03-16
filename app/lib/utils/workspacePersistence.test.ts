@@ -70,7 +70,7 @@ describe("saveWorkspace", () => {
       sourceText: "source", extractedFiles: [], contextText: "ctx",
       semiformalText: "semi", leanCode: "lean", semiformalDirty: false,
       verificationStatus: "valid", verificationErrors: "",
-      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     });
     expect(result).toBe(true);
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
@@ -84,7 +84,7 @@ describe("saveWorkspace", () => {
       sourceText: "", extractedFiles: [], contextText: "",
       semiformalText: "", leanCode: "", semiformalDirty: false,
       verificationStatus: "verifying", verificationErrors: "",
-      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     });
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.verificationStatus).toBe("none");
@@ -104,7 +104,7 @@ describe("saveWorkspace", () => {
       sourceText: "", extractedFiles: [], contextText: "",
       semiformalText: "", leanCode: "", semiformalDirty: false,
       verificationStatus: "none", verificationErrors: "",
-      decomposition: { nodes: [node], selectedNodeId: null, paperText: "" },
+      decomposition: { nodes: [node], selectedNodeId: null, paperText: "", sources: [] },
     });
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.decomposition.nodes[0].verificationStatus).toBe("unverified");
@@ -119,7 +119,7 @@ describe("saveWorkspace", () => {
       sourceText: "", extractedFiles: [], contextText: "",
       semiformalText: "", leanCode: "", semiformalDirty: false,
       verificationStatus: "none", verificationErrors: "",
-      decomposition: { nodes: [], selectedNodeId: null, paperText: "" },
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     });
     expect(result).toBe(false);
     Storage.prototype.setItem = originalSetItem;

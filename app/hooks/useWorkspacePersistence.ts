@@ -44,6 +44,7 @@ export function useWorkspacePersistence() {
     nodes: [],
     selectedNodeId: null,
     paperText: "",
+    sources: [],
   });
 
   // Restored decomposition state — set once on mount, consumed by page.tsx to call resetState
@@ -215,7 +216,7 @@ export function useWorkspacePersistence() {
 
     setState(DEFAULT_STATE);
 
-    const emptyDecomp: PersistedDecomposition = { nodes: [], selectedNodeId: null, paperText: "" };
+    const emptyDecomp: PersistedDecomposition = { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
     decompRef.current = emptyDecomp;
 
     saveWorkspace({

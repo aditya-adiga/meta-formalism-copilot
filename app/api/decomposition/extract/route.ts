@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
       const propositions = JSON.parse(stripCodeFences(responseText));
       return NextResponse.json({ propositions });
     } catch {
+      // JSON parse failed — invalidate the cached bad response
       if (cacheKey) {
         try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
       }

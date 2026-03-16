@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
   loading?: boolean;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 type ViewMode = "graph" | "details";
@@ -92,7 +94,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
   );
 }
 
-export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPanelProps) {
+export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
   return (
@@ -101,7 +103,7 @@ export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPa
       loading={loading}
       hasData={causalGraph !== null}
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage="Generating causal graph..."
+      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
     >
       {causalGraph && (
         <div className="flex flex-col h-full">

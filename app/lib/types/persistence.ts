@@ -1,4 +1,4 @@
-import type { PropositionNode } from "./decomposition";
+import type { PropositionNode, SourceDocument } from "./decomposition";
 
 export const WORKSPACE_VERSION = 2;
 export const WORKSPACE_KEY = "workspace-v2";
@@ -8,6 +8,7 @@ export type PersistedDecomposition = {
   nodes: PropositionNode[];
   selectedNodeId: string | null;
   paperText: string;
+  sources: SourceDocument[];
 };
 
 export type PersistedWorkspace = {
