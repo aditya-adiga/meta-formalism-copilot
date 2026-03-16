@@ -1,10 +1,12 @@
 "use client";
 
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
   loading?: boolean;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 function WeightBadge({ weight }: { weight: number }) {
@@ -18,7 +20,7 @@ function WeightBadge({ weight }: { weight: number }) {
   );
 }
 
-export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPanelProps) {
+export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }: CausalGraphPanelProps) {
   if (!causalGraph && !loading) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -44,7 +46,7 @@ export default function CausalGraphPanel({ causalGraph, loading }: CausalGraphPa
 
       {loading && !causalGraph ? (
         <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating causal graph...
+          Generating causal graph...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
         </div>
       ) : causalGraph ? (
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">

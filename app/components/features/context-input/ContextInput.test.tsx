@@ -34,7 +34,7 @@ describe('ContextInput', () => {
 
   it('disables the Formalise button when loading', () => {
     render(<ContextInput {...defaultProps} loading={true} />)
-    expect(screen.getByText('Formalising...')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /formalising/i })).toBeDisabled()
   })
 
   it('calls onFormalise when the button is clicked', async () => {
@@ -114,14 +114,14 @@ describe('ContextInput', () => {
     render(<ContextInput {...defaultProps} value="text" />)
     await userEvent.click(screen.getByText('Elaborate'))
 
-    expect(screen.getByText('Refining...')).toBeInTheDocument()
+    expect(screen.getByText(/Refining\.\.\./)).toBeInTheDocument()
     // Refinement buttons should be hidden while refining
     expect(screen.queryByText('Elaborate')).not.toBeInTheDocument()
 
     // Resolve to clean up
     resolvePromise!(new Response(JSON.stringify({ text: 'done' }), { status: 200 }))
     await waitFor(() => {
-      expect(screen.queryByText('Refining...')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Refining\.\.\./)).not.toBeInTheDocument()
     })
   })
 })

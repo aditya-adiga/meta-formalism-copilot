@@ -18,6 +18,8 @@ export type ArtifactData = {
   verificationErrors: string;
 };
 
+
+
 export type FormalizationSession = {
   id: string;
   runNumber: number;

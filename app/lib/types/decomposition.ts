@@ -25,6 +25,8 @@ export type NodeArtifact = {
   verificationErrors: string;
 };
 
+
+
 export type PropositionNode = {
   id: string;
   label: string;

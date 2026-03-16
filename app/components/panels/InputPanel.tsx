@@ -1,6 +1,7 @@
 import ContextInput from "@/app/components/features/context-input/ContextInput";
 import FileUpload from "@/app/components/features/source-input/FileUpload";
 import TextInput from "@/app/components/features/source-input/TextInput";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type InputPanelProps = {
   sourceText: string;
@@ -11,6 +12,7 @@ type InputPanelProps = {
   onContextTextChange: (value: string) => void;
   onFormalise: () => void;
   loading: boolean;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 export default function InputPanel({
@@ -22,6 +24,7 @@ export default function InputPanel({
   onContextTextChange,
   onFormalise,
   loading,
+  waitEstimate,
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -72,6 +75,7 @@ export default function InputPanel({
           onChange={onContextTextChange}
           onFormalise={onFormalise}
           loading={loading}
+          waitEstimate={waitEstimate}
         />
       </div>
     </div>

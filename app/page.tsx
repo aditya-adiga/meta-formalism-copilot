@@ -17,15 +17,34 @@ import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
+import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
+
+function phaseToEndpoint(phase: LoadingPhase): string | null {
+  switch (phase) {
+    case "semiformal":
+      return "formalization/semiformal";
+    case "lean":
+    case "retrying":
+    case "iterating":
+      return "formalization/lean";
+    case "verifying":
+    case "reverifying":
+      return "verification/lean";
+    case "idle":
+      return null;
+  }
+}
 
 export default function Home() {
   // --- Panel navigation ---
   const [activePanelId, setActivePanelId] = useState<PanelId>("source");
+
 
   // --- Persisted state (survives page refresh) ---
   const {
@@ -39,6 +58,7 @@ export default function Home() {
     verificationErrors, setVerificationErrors,
     restoredDecompState, persistDecompState,
   } = useWorkspacePersistence();
+
 
   // --- Causal graph state ---
   const [causalGraph, setCausalGraph] = useState<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"] | null>(null);
@@ -299,6 +319,17 @@ export default function Home() {
     }
   }, [isDecompMode, selectedNode, combinedPaperText, contextText]);
 
+  // --- Wait time estimates ---
+  const inputCharCount = useMemo(() => {
+    return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
+  }, [sourceText, extractedFiles]);
+  const pipelineEndpoint = phaseToEndpoint(loadingPhase);
+  const waitEstimate = useWaitTimeEstimate(pipelineEndpoint, inputCharCount);
+  const causalGraphWaitEstimate = useWaitTimeEstimate(
+    causalGraphLoading ? "formalization/causal-graph" : null,
+    inputCharCount,
+  );
+
   // --- Panel definitions ---
   const panels = usePanelDefinitions({
     sourceText, extractedFiles, contextText,
@@ -343,6 +374,7 @@ export default function Home() {
         onContextTextChange={setContextText}
         onFormalise={handleGenerateSemiformal}
         loading={loadingPhase !== "idle"}
+        waitEstimate={waitEstimate}
       />
     ),
     semiformal: (
@@ -353,6 +385,7 @@ export default function Home() {
         onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
         showGenerateLean={semiformalReadyForLean}
         leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+        waitEstimate={waitEstimate}
       />
     ),
     lean: (
@@ -368,6 +401,7 @@ export default function Home() {
         onReVerify={activePipeline.handleReVerify}
         onLeanIterate={activePipeline.handleLeanIterate}
         sessionBanner={sessionBannerElement}
+        waitEstimate={waitEstimate}
       />
     ),
     decomposition: (
@@ -399,6 +433,7 @@ export default function Home() {
       <CausalGraphPanel
         causalGraph={causalGraph}
         loading={causalGraphLoading}
+        waitEstimate={causalGraphWaitEstimate}
       />
     ),
     analytics: (
@@ -417,7 +452,8 @@ export default function Home() {
     activePipeline,
     handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
+    waitEstimate,
   ]);
 
   return (
