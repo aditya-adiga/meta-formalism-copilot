@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handleArtifactRoute } from "@/app/lib/formalization/artifactRoute";
+import { dialecticalMapSchema } from "@/app/lib/llm/schemas";
 
 const SYSTEM_PROMPT = `You are a dialectical analyst. Given source text and optional context, map the dialectical structure: identify distinct perspectives, their core claims and supporting arguments, tensions between perspectives, and synthesize an equilibrium position.
 
@@ -83,5 +84,6 @@ export async function POST(request: NextRequest) {
     systemPrompt: SYSTEM_PROMPT,
     responseKey: "dialecticalMap",
     mockResponse,
+    responseFormat: dialecticalMapSchema,
   });
 }
