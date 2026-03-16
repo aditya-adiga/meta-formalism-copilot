@@ -90,46 +90,7 @@ The app continues to work without the verifier — the API route falls back to a
 
 ## How to Contribute
 
-We welcome contributions! Please follow these guidelines:
-
-### Pull Request Workflow
-
-1. **Create a branch** for your feature or fix
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. **Make your changes** following the existing code structure
-
-3. **Test your changes** locally with `npm run dev`
-
-4. **Commit your changes** with clear, descriptive messages
-   ```bash
-   git commit -m "Add feature: description of what you added"
-   ```
-
-5. **Push your branch** and create a Pull Request
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-6. **Do NOT commit directly to main** - all changes must go through Pull Requests
-
-### Code Guidelines
-
-- Follow the existing folder structure in `app/components/features/`
-- Use TypeScript for all new components
-- Use Tailwind CSS for styling (CSS variables in `globals.css`)
-- Add JSDoc comments for complex functions
-- Keep components modular and focused on a single responsibility
-- Test your changes across different screen sizes
-
-### Before Submitting
-
-- Ensure `npm run lint` passes without errors
-- Verify the UI works in both light backgrounds
-- Check that all imports use the correct paths
-- Remove any console.logs or debug code
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on branching, code style, and the PR process.
 
 ## Project Documentation
 
