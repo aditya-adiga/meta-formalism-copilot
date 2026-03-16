@@ -13,6 +13,7 @@ import {
   PropertyTestsIcon,
   DialecticalMapIcon,
   AnalyticsIcon,
+  CounterexamplesIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
 type PanelDefsInput = {
@@ -34,6 +35,8 @@ type PanelDefsInput = {
   propertyTestsLoading?: boolean;
   hasDialecticalMap?: boolean;
   dialecticalMapLoading?: boolean;
+  hasCounterexamples?: boolean;
+  counterexamplesLoading?: boolean;
 };
 
 export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
@@ -46,6 +49,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     hasStatisticalModel, statisticalModelLoading,
     hasPropertyTests, propertyTestsLoading,
     hasDialecticalMap, dialecticalMapLoading,
+    hasCounterexamples, counterexamplesLoading,
   } = opts;
 
   const hasDecomp = nodes.length > 0;
@@ -144,6 +148,14 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       statusSummary: dialecticalMapLoading ? "Generating..." : hasDialecticalMap ? "Map ready" : "No map yet",
       hidden: !hasDialecticalMap && !dialecticalMapLoading,
     },
+    {
+      id: "counterexamples" as PanelId,
+      label: "Counterexamples",
+      icon: <CounterexamplesIcon />,
+      group: "artifacts" as const,
+      statusSummary: counterexamplesLoading ? "Generating..." : hasCounterexamples ? "Counterexamples ready" : "No counterexamples yet",
+      hidden: !hasCounterexamples && !counterexamplesLoading,
+    },
     // --- Meta group ---
     {
       id: "analytics" as PanelId,
@@ -157,5 +169,6 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hasCausalGraph, causalGraphLoading,
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,
-      hasDialecticalMap, dialecticalMapLoading]);
+      hasDialecticalMap, dialecticalMapLoading,
+      hasCounterexamples, counterexamplesLoading]);
 }

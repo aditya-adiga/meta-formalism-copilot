@@ -119,6 +119,17 @@ export function DialecticalMapIcon({ className }: IconProps) {
   );
 }
 
+/** Lightning/warning icon for Counterexamples */
+export function CounterexamplesIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="10 2 18 17 2 17" />
+      <line x1="10" y1="8" x2="10" y2="12" />
+      <circle cx="10" cy="14.5" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {
   return (

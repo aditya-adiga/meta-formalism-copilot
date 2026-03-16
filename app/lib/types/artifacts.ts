@@ -111,6 +111,22 @@ export type DialecticalMapResponse = {
   };
 };
 
+/** Counterexamples response shape */
+export type CounterexamplesResponse = {
+  counterexamples: {
+    claim: string;
+    counterexamples: Array<{
+      id: string;
+      scenario: string;
+      targetAssumption: string;
+      explanation: string;
+      plausibility: "high" | "medium" | "low";
+    }>;
+    robustnessAssessment: string;
+    summary: string;
+  };
+};
+
 /** Display metadata for each artifact type */
 export const ARTIFACT_META: Record<ArtifactType, {
   label: string;
@@ -154,6 +170,12 @@ export const ARTIFACT_META: Record<ArtifactType, {
     description: "Map of distinct viewpoints, tensions between them, and a proposed synthesis.",
     whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain.",
   },
+  counterexamples: {
+    label: "Counterexamples",
+    chipLabel: "Counterexamples",
+    description: "Adversarial analysis identifying specific scenarios that could falsify the claim, with plausibility ratings.",
+    whenToUse: "Testing the robustness of a claim by finding edge cases, exceptions, or conditions under which it breaks down.",
+  },
 };
 
 /** Artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
@@ -163,6 +185,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "statistical-model",
   "property-tests",
   "dialectical-map",
+  "counterexamples",
 ];
 
 /** Maps artifact types to their API route paths */
@@ -171,6 +194,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
   "dialectical-map": "/api/formalization/dialectical-map",
+  counterexamples: "/api/formalization/counterexamples",
 };
 
 /** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
@@ -181,4 +205,5 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
   "dialectical-map": "dialecticalMap",
+  counterexamples: "counterexamples",
 };

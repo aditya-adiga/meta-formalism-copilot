@@ -15,6 +15,7 @@ import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
 import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
 import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
+import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -70,6 +71,7 @@ export default function Home() {
     statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
     propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
     dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
+    counterexamples: persistedCounterexamples, setCounterexamples: setPersistedCounterexamples,
   } = useWorkspacePersistence();
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
@@ -97,6 +99,12 @@ export default function Home() {
     catch { return null; }
   }, [persistedDialecticalMap]);
 
+  const counterexamples = useMemo(() => {
+    if (!persistedCounterexamples) return null;
+    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
+    catch { return null; }
+  }, [persistedCounterexamples]);
+
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
@@ -114,6 +122,7 @@ export default function Home() {
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
   const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
@@ -169,9 +178,10 @@ export default function Home() {
         case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
         case "property-tests": setPersistedPropertyTests(artifact.content); break;
         case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+        case "counterexamples": setPersistedCounterexamples(artifact.content); break;
       }
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap, setPersistedCounterexamples]);
 
   const {
     activeSession,
@@ -232,7 +242,10 @@ export default function Home() {
     if (results["dialectical-map"]) {
       setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+    if (results["counterexamples"]) {
+      setPersistedCounterexamples(JSON.stringify(results["counterexamples"]));
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap, setPersistedCounterexamples]);
 
   // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
   const {
@@ -513,12 +526,14 @@ export default function Home() {
     propertyTestsLoading,
     hasDialecticalMap: dialecticalMap !== null,
     dialecticalMapLoading,
+    hasCounterexamples: counterexamples !== null,
+    counterexamplesLoading,
   });
 
   // --- Export All handler ---
   const hasExportableContent = Boolean(
     semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
-    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+    || causalGraph || statisticalModel || propertyTests || dialecticalMap || counterexamples
   );
 
   const handleExportAll = useCallback(async () => {
@@ -532,8 +547,9 @@ export default function Home() {
       statisticalModel,
       propertyTests,
       dialecticalMap,
+      counterexamples,
     });
-  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
@@ -654,6 +670,13 @@ export default function Home() {
             loading={dialecticalMapLoading}
           />
         );
+      case "counterexamples":
+        return (
+          <CounterexamplesPanel
+            counterexamples={counterexamples}
+            loading={counterexamplesLoading}
+          />
+        );
       case "analytics":
         return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
       default:
@@ -675,6 +698,7 @@ export default function Home() {
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
     dialecticalMap, dialecticalMapLoading,
+    counterexamples, counterexamplesLoading,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
   ]);

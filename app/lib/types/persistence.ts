@@ -27,4 +27,5 @@ export type PersistedWorkspace = {
   statisticalModel: string | null;
   propertyTests: string | null;
   dialecticalMap: string | null;
+  counterexamples: string | null;
 };
