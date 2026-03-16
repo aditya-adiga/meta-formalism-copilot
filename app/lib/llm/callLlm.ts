@@ -112,6 +112,14 @@ export async function callLlm({
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
+      ...(responseFormat && {
+        output_config: {
+          format: {
+            type: "json_schema" as const,
+            schema: responseFormat.json_schema.schema,
+          },
+        },
+      }),
     });
     const latencyMs = Date.now() - start;
     const text = message.content[0].type === "text" ? message.content[0].text : "";
