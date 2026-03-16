@@ -70,7 +70,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function coerceDecomposition(raw: unknown): PersistedDecomposition {
   if (!isObject(raw)) {
-    return { nodes: [], selectedNodeId: null, paperText: "" };
+    return { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
   }
 
   const nodes = Array.isArray(raw.nodes)
@@ -81,10 +81,15 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
         statement: typeof n.statement === "string" ? n.statement : "",
         proofText: typeof n.proofText === "string" ? n.proofText : "",
         dependsOn: Array.isArray(n.dependsOn) ? (n.dependsOn as unknown[]).filter((d) => typeof d === "string") as string[] : [],
+        sourceId: typeof n.sourceId === "string" ? n.sourceId : "",
+        sourceLabel: typeof n.sourceLabel === "string" ? n.sourceLabel : "",
         semiformalProof: typeof n.semiformalProof === "string" ? n.semiformalProof : "",
         leanCode: typeof n.leanCode === "string" ? n.leanCode : "",
         verificationStatus: sanitizeNodeStatus(typeof n.verificationStatus === "string" ? n.verificationStatus : ""),
         verificationErrors: typeof n.verificationErrors === "string" ? n.verificationErrors : "",
+        context: typeof n.context === "string" ? n.context : "",
+        selectedArtifactTypes: Array.isArray(n.selectedArtifactTypes) ? n.selectedArtifactTypes as import("@/app/lib/types/session").ArtifactType[] : [],
+        artifacts: Array.isArray(n.artifacts) ? n.artifacts as import("@/app/lib/types/decomposition").NodeArtifact[] : [],
       } as PropositionNode))
     : [];
 
@@ -92,6 +97,11 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
     nodes,
     selectedNodeId: typeof raw.selectedNodeId === "string" ? raw.selectedNodeId : null,
     paperText: typeof raw.paperText === "string" ? raw.paperText : "",
+    sources: Array.isArray(raw.sources) ? (raw.sources as unknown[]).filter(isObject).map((s) => ({
+      sourceId: typeof s.sourceId === "string" ? s.sourceId : "",
+      sourceLabel: typeof s.sourceLabel === "string" ? s.sourceLabel : "",
+      text: typeof s.text === "string" ? s.text : "",
+    })) : [],
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import SendIcon from "@/app/components/ui/icons/SendIcon";
+import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
 type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
@@ -32,6 +33,10 @@ export default function LeanCodeDisplay({
   const [instruction, setInstruction] = useState("");
   const [explanation, setExplanation] = useState("");
   const [explaining, setExplaining] = useState(false);
+  const explainWaitEstimate = useWaitTimeEstimate(
+    explaining ? "explanation/lean-error" : null,
+    (code.length + verificationErrors.length),
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // When the parent pushes a new code value, reset local state during render
@@ -137,7 +142,9 @@ export default function LeanCodeDisplay({
                 disabled={explaining || !!explanation}
                 className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
               >
-                {explaining ? "Explaining…" : "Explain this error"}
+                {explaining
+                  ? `Explaining…${explainWaitEstimate ? ` ${explainWaitEstimate.remainingLabel}` : ""}`
+                  : "Explain this error"}
               </button>
               {explanation && (
                 <>
@@ -183,7 +190,7 @@ export default function LeanCodeDisplay({
                 value={iterating ? "" : instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={iterating ? "Iterating…" : "Suggest a fix or instruction…"}
+                placeholder={iterating ? "Iterating\u2026" : "Suggest a fix or instruction\u2026"}
                 disabled={iterating}
                 className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none disabled:cursor-not-allowed"
                 aria-label="Lean4 iteration instruction"

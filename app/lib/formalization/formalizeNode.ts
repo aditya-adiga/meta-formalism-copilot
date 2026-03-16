@@ -1,37 +1,11 @@
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
+import { generateSemiformal, generateLean, verifyLean } from "@/app/lib/formalization/api";
 
 const MAX_LEAN_ATTEMPTS = 3;
 
 /** Simple cancellation signal checked between async steps. */
 export type CancelSignal = { cancelled: boolean };
-
-async function generateLean(
-  informalProof: string,
-  previousAttempt?: string,
-  errors?: string,
-  instruction?: string,
-  contextLeanCode?: string,
-) {
-  const res = await fetch("/api/formalization/lean", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ informalProof, previousAttempt, errors, instruction, contextLeanCode }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Lean generation failed");
-  return data.leanCode as string;
-}
-
-async function verifyLean(leanCode: string) {
-  const res = await fetch("/api/verification/lean", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ leanCode }),
-  });
-  const data = await res.json();
-  return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
-}
 
 /**
  * Run the full formalization pipeline for a single node:
@@ -52,22 +26,11 @@ export async function formalizeNode(
     const nodeText = `${node.statement}\n\n${node.proofText}`;
 
     // Step 1: semiformal proof
-    const semiformalRes = await fetch("/api/formalization/semiformal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: nodeText }),
-    });
+    const proof = await generateSemiformal(nodeText);
     if (signal?.cancelled) {
       updateNode(node.id, { verificationStatus: "unverified", verificationErrors: "" });
       return "failed";
     }
-
-    const semiformalData = await semiformalRes.json();
-    if (!semiformalRes.ok) {
-      updateNode(node.id, { verificationStatus: "failed", verificationErrors: semiformalData.error ?? "Unknown error" });
-      return "failed";
-    }
-    const proof = semiformalData.proof as string;
     updateNode(node.id, { semiformalProof: proof });
 
     // Step 2: Lean generation with dependency context + retry loop

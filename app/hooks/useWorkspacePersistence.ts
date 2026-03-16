@@ -36,6 +36,7 @@ export function useWorkspacePersistence() {
     nodes: [],
     selectedNodeId: null,
     paperText: "",
+    sources: [],
   });
 
   // Restored decomposition state — set once on mount, consumed by page.tsx to call resetState

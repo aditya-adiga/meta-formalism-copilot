@@ -58,6 +58,21 @@ export function GraphIcon({ className }: IconProps) {
   );
 }
 
+/** Causal/arrow-split icon for Causal Graph */
+export function CausalGraphIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="4" cy="10" r="2" />
+      <circle cx="16" cy="5" r="2" />
+      <circle cx="16" cy="15" r="2" />
+      <path d="M6 9l8-3" />
+      <path d="M6 11l8 3" />
+    </svg>
+  );
+}
+
+
+
 /** Bar chart icon for Analytics */
 export function AnalyticsIcon({ className }: IconProps) {
   return (

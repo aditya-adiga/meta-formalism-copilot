@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 
 const OPENROUTER_MODEL = "anthropic/claude-opus-4.6";
 
@@ -18,18 +19,43 @@ function mockResponse(text: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const { text } = await request.json();
+  const body = await request.json();
+
+  // Support both the new ArtifactGenerationRequest shape and the legacy { text } shape
+  const sourceText: string = body.sourceText ?? body.text ?? "";
+  const context: string = body.context ?? "";
+
+  if (!sourceText) {
+    return NextResponse.json({ error: "sourceText is required" }, { status: 400 });
+  }
+
+  // Build user content: include context distinctly if provided
+  const parts: string[] = [];
+  if (context) {
+    parts.push(`[Context]\n${context}`);
+  }
+  if ((body as ArtifactGenerationRequest).nodeId && (body as ArtifactGenerationRequest).nodeLabel) {
+    parts.push(`[Node: ${(body as ArtifactGenerationRequest).nodeLabel}]`);
+  }
+  parts.push(sourceText);
+  if ((body as ArtifactGenerationRequest).previousAttempt) {
+    parts.push(`[Previous Attempt — refine this]\n${(body as ArtifactGenerationRequest).previousAttempt}`);
+  }
+  if ((body as ArtifactGenerationRequest).instruction) {
+    parts.push(`[Additional Instruction]\n${(body as ArtifactGenerationRequest).instruction}`);
+  }
+  const userContent = parts.join("\n\n");
 
   try {
     const { text: responseText, usage } = await callLlm({
       endpoint: "formalization/semiformal",
       systemPrompt: SYSTEM_PROMPT,
-      userContent: text,
+      userContent,
       maxTokens: 16384,
       openRouterModel: OPENROUTER_MODEL,
     });
 
-    const proof = usage.provider === "mock" ? mockResponse(text) : responseText;
+    const proof = usage.provider === "mock" ? mockResponse(sourceText) : responseText;
     return NextResponse.json({ proof });
   } catch (err) {
     if (err instanceof OpenRouterError) {

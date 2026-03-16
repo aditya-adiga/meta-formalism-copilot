@@ -65,7 +65,7 @@ describe("saveWorkspace", () => {
   it("writes JSON to localStorage and returns true", () => {
     const result = saveWorkspace(
       "source", [], "ctx", "semi", "lean", false, "valid", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
+      { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     );
     expect(result).toBe(true);
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
@@ -77,7 +77,7 @@ describe("saveWorkspace", () => {
   it("sanitizes 'verifying' status to 'none'", () => {
     saveWorkspace(
       "", [], "", "", "", false, "verifying", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
+      { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     );
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.verificationStatus).toBe("none");
@@ -91,10 +91,11 @@ describe("saveWorkspace", () => {
       semiformalProof: "", leanCode: "",
       verificationStatus: "in-progress" as const,
       verificationErrors: "",
+      context: "", selectedArtifactTypes: [], artifacts: [],
     };
     saveWorkspace(
       "", [], "", "", "", false, "none", "",
-      { nodes: [node], selectedNodeId: null, paperText: "" },
+      { nodes: [node], selectedNodeId: null, paperText: "", sources: [] },
     );
     const stored = JSON.parse(localStorage.getItem(WORKSPACE_KEY)!);
     expect(stored.decomposition.nodes[0].verificationStatus).toBe("unverified");
@@ -107,7 +108,7 @@ describe("saveWorkspace", () => {
     });
     const result = saveWorkspace(
       "", [], "", "", "", false, "none", "",
-      { nodes: [], selectedNodeId: null, paperText: "" },
+      { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
     );
     expect(result).toBe(false);
     Storage.prototype.setItem = originalSetItem;
