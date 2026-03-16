@@ -71,8 +71,6 @@ export function CausalGraphIcon({ className }: IconProps) {
   );
 }
 
-
-
 /** Bar chart icon for Analytics */
 export function AnalyticsIcon({ className }: IconProps) {
   return (
@@ -84,6 +82,42 @@ export function AnalyticsIcon({ className }: IconProps) {
   );
 }
 
+/** Bell curve / distribution icon for Statistical Model */
+export function StatisticalModelIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 16 C4 16, 5 14, 7 10 C8 7, 9 3, 10 3 C11 3, 12 7, 13 10 C15 14, 16 16, 18 16" />
+      <line x1="2" y1="16" x2="18" y2="16" />
+    </svg>
+  );
+}
+
+/** Checklist/property icon for Property Tests */
+export function PropertyTestsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 5 5 7 8 3" />
+      <line x1="10" y1="5" x2="17" y2="5" />
+      <polyline points="3 10 5 12 8 8" />
+      <line x1="10" y1="10" x2="17" y2="10" />
+      <polyline points="3 15 5 17 8 13" />
+      <line x1="10" y1="15" x2="17" y2="15" />
+    </svg>
+  );
+}
+
+/** Scales/balance icon for Dialectical Map */
+export function DialecticalMapIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="10" y1="2" x2="10" y2="18" />
+      <line x1="3" y1="6" x2="17" y2="6" />
+      <path d="M3 6 L5 12 H1 Z" />
+      <path d="M17 6 L19 12 H15 Z" />
+      <line x1="7" y1="18" x2="13" y2="18" />
+    </svg>
+  );
+}
 
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {

@@ -1,8 +1,7 @@
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
-import { generateSemiformal, generateLean, verifyLean } from "@/app/lib/formalization/api";
-
-const MAX_LEAN_ATTEMPTS = 3;
+import { generateSemiformal } from "@/app/lib/formalization/api";
+import { leanRetryLoop } from "@/app/lib/formalization/leanRetryLoop";
 
 /** Simple cancellation signal checked between async steps. */
 export type CancelSignal = { cancelled: boolean };
@@ -35,45 +34,24 @@ export async function formalizeNode(
 
     // Step 2: Lean generation with dependency context + retry loop
     const depContext = gatherDependencyContext(allNodes, node.id);
-    let currentCode = "";
-    let lastErrors = "";
 
-    for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
-      if (signal?.cancelled) {
-        updateNode(node.id, { verificationStatus: "unverified", verificationErrors: "" });
-        return "failed";
-      }
+    const result = await leanRetryLoop(proof, {
+      onLeanCode: (code) => updateNode(node.id, { leanCode: code }),
+      onErrors: (errors) => updateNode(node.id, { verificationErrors: errors }),
+      isCancelled: () => signal?.cancelled ?? false,
+      dependencyContext: depContext || undefined,
+    });
 
-      currentCode = await generateLean(
-        proof,
-        attempt > 1 ? currentCode : undefined,
-        attempt > 1 ? lastErrors : undefined,
-        undefined,
-        depContext || undefined,
-      );
-      updateNode(node.id, { leanCode: currentCode });
-
-      if (signal?.cancelled) {
-        updateNode(node.id, { verificationStatus: "unverified", verificationErrors: "" });
-        return "failed";
-      }
-
-      const fullCode = depContext ? `${depContext}\n\n${currentCode}` : currentCode;
-      const { valid, errors } = await verifyLean(fullCode);
-
-      if (valid) {
-        updateNode(node.id, { verificationStatus: "verified", verificationErrors: "" });
-        return "verified";
-      }
-
-      lastErrors = errors || "Verification failed";
-      updateNode(node.id, { verificationErrors: lastErrors });
-      if (attempt === MAX_LEAN_ATTEMPTS) {
-        updateNode(node.id, { verificationStatus: "failed" });
-      }
+    if (signal?.cancelled) {
+      updateNode(node.id, { verificationStatus: "unverified", verificationErrors: "" });
+      return "failed";
     }
 
-    return "failed";
+    updateNode(node.id, {
+      verificationStatus: result.valid ? "verified" : "failed",
+      verificationErrors: result.errors,
+    });
+    return result.valid ? "verified" : "failed";
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Request failed";
     updateNode(node.id, { verificationStatus: "failed", verificationErrors: msg });

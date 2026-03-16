@@ -2,9 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import SendIcon from "@/app/components/ui/icons/SendIcon";
+import type { VerificationStatus } from "@/app/lib/types/session";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 type LeanCodeDisplayProps = {
   code: string;
@@ -143,7 +142,7 @@ export default function LeanCodeDisplay({
                 className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-red-400"
               >
                 {explaining
-                  ? `Explaining…${explainWaitEstimate ? ` ${explainWaitEstimate.remainingLabel}` : ""}`
+                  ? `Explaining\u2026${explainWaitEstimate ? ` ${explainWaitEstimate.remainingLabel}` : ""}`
                   : "Explain this error"}
               </button>
               {explanation && (
@@ -180,34 +179,34 @@ export default function LeanCodeDisplay({
             />
           )}
         </div>
-
-        {/* Iterate bar — visible whenever there is code */}
-        {code && (
-          <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
-            <div className={`flex items-center gap-2 rounded-full bg-[var(--ink-black)] px-4 py-2.5 shadow-md ${iterating ? "opacity-60" : ""}`}>
-              <input
-                type="text"
-                value={iterating ? "" : instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={iterating ? "Iterating\u2026" : "Suggest a fix or instruction\u2026"}
-                disabled={iterating}
-                className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none disabled:cursor-not-allowed"
-                aria-label="Lean4 iteration instruction"
-              />
-              <button
-                type="button"
-                onClick={handleIterateSubmit}
-                disabled={iterating || !instruction.trim()}
-                className="flex shrink-0 items-center justify-center rounded-full p-1 text-white/90 transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-[var(--ink-black)] disabled:opacity-40"
-                aria-label="Submit iteration instruction"
-              >
-                <SendIcon />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Iterate bar — visible whenever there is code */}
+      {code && (
+        <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
+          <div className={`flex items-center gap-2 rounded-full bg-[var(--ink-black)] px-4 py-2.5 shadow-md ${iterating ? "opacity-60" : ""}`}>
+            <input
+              type="text"
+              value={iterating ? "" : instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={iterating ? "Iterating\u2026" : "Suggest a fix or instruction\u2026"}
+              disabled={iterating}
+              className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none disabled:cursor-not-allowed"
+              aria-label="Lean4 iteration instruction"
+            />
+            <button
+              type="button"
+              onClick={handleIterateSubmit}
+              disabled={iterating || !instruction.trim()}
+              className="flex shrink-0 items-center justify-center rounded-full p-1 text-white/90 transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-[var(--ink-black)] disabled:opacity-40"
+              aria-label="Submit iteration instruction"
+            >
+              <SendIcon />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

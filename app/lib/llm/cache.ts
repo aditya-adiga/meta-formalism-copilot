@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "fs";
+import { readFile, writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
 import type { LlmCallUsage } from "./callLlm";
 
@@ -12,7 +12,7 @@ type CachedResult = {
 
 type CachedResultWithHash = CachedResult & { cacheHash: string };
 
-function computeHash(
+export function computeHash(
   model: string,
   systemPrompt: string,
   userContent: string,
@@ -23,25 +23,24 @@ function computeHash(
     .digest("hex");
 }
 
-function ensureCacheDir() {
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
-  }
+let dirEnsured = false;
+async function ensureCacheDir() {
+  if (dirEnsured) return;
+  await mkdir(CACHE_DIR, { recursive: true });
+  dirEnsured = true;
 }
 
-export function getCachedResult(
+export async function getCachedResult(
   model: string,
   systemPrompt: string,
   userContent: string,
   maxTokens: number
-): CachedResultWithHash | null {
+): Promise<CachedResultWithHash | null> {
   const hash = computeHash(model, systemPrompt, userContent, maxTokens);
   const filePath = join(CACHE_DIR, `${hash}.json`);
 
-  if (!existsSync(filePath)) return null;
-
   try {
-    const data = JSON.parse(readFileSync(filePath, "utf-8")) as CachedResult;
+    const data = JSON.parse(await readFile(filePath, "utf-8")) as CachedResult;
     // Override usage to reflect cache hit
     return {
       text: data.text,
@@ -54,33 +53,31 @@ export function getCachedResult(
       cacheHash: hash,
     };
   } catch {
-    // Corrupt cache file — treat as miss
+    // Corrupt or missing cache file — treat as miss
     return null;
   }
 }
 
-export function setCachedResult(
-  model: string,
-  systemPrompt: string,
-  userContent: string,
-  maxTokens: number,
+export async function setCachedResult(
+  hash: string,
   result: CachedResult
-): void {
-  ensureCacheDir();
-  const hash = computeHash(model, systemPrompt, userContent, maxTokens);
+): Promise<void> {
+  await ensureCacheDir();
   const filePath = join(CACHE_DIR, `${hash}.json`);
-  writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8");
+  await writeFile(filePath, JSON.stringify(result, null, 2), "utf-8");
 }
 
-export function removeCachedResult(
+export async function removeCachedResult(
   model: string,
   systemPrompt: string,
   userContent: string,
   maxTokens: number,
-): void {
+): Promise<void> {
   const hash = computeHash(model, systemPrompt, userContent, maxTokens);
   const filePath = join(CACHE_DIR, `${hash}.json`);
-  if (existsSync(filePath)) {
-    unlinkSync(filePath);
+  try {
+    await unlink(filePath);
+  } catch {
+    // File doesn't exist — nothing to remove
   }
 }

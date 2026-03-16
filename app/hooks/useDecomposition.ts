@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 
 const INITIAL_STATE: DecompositionState = {
@@ -14,8 +14,10 @@ const INITIAL_STATE: DecompositionState = {
 export function useDecomposition() {
   const [state, setState] = useState<DecompositionState>(INITIAL_STATE);
 
-  const selectedNode: PropositionNode | null =
-    state.nodes.find((n) => n.id === state.selectedNodeId) ?? null;
+  const selectedNode = useMemo<PropositionNode | null>(
+    () => state.nodes.find((n) => n.id === state.selectedNodeId) ?? null,
+    [state.nodes, state.selectedNodeId],
+  );
 
   const extractPropositions = useCallback(async (documents: SourceDocument[], pdfFile?: File | null) => {
     const combinedText = documents.map((d) => d.text).join("\n\n");
@@ -85,6 +87,9 @@ export function useDecomposition() {
         leanCode: "",
         verificationStatus: "unverified" as const,
         verificationErrors: "",
+        context: "",
+        selectedArtifactTypes: [],
+        artifacts: [],
       }));
 
       setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));

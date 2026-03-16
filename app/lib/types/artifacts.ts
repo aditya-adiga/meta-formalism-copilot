@@ -111,10 +111,39 @@ export type DialecticalMapResponse = {
   };
 };
 
+/** Display metadata for each artifact type */
+export const ARTIFACT_META: Record<ArtifactType, { label: string; chipLabel: string }> = {
+  semiformal: { label: "Semiformal Proof", chipLabel: "Deductive (Lean)" },
+  lean: { label: "Lean4 Code", chipLabel: "Lean4 Code" },
+  "causal-graph": { label: "Causal Graph", chipLabel: "Causal Graph" },
+  "statistical-model": { label: "Statistical Model", chipLabel: "Statistical Model" },
+  "property-tests": { label: "Property Tests", chipLabel: "Property Tests" },
+  "dialectical-map": { label: "Dialectical Map", chipLabel: "Dialectical Map" },
+};
+
+/** Artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
+export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
+  "semiformal",
+  "causal-graph",
+  "statistical-model",
+  "property-tests",
+  "dialectical-map",
+];
+
 /** Maps artifact types to their API route paths */
 export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
   "dialectical-map": "/api/formalization/dialectical-map",
+};
+
+/** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
+export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
+  semiformal: "proof",
+  lean: "leanCode",
+  "causal-graph": "causalGraph",
+  "statistical-model": "statisticalModel",
+  "property-tests": "propertyTests",
+  "dialectical-map": "dialecticalMap",
 };

@@ -2,11 +2,10 @@
 
 import { useState, useCallback, useRef } from "react";
 import { generateSemiformal, generateLean, verifyLean } from "@/app/lib/formalization/api";
+import { leanRetryLoop } from "@/app/lib/formalization/leanRetryLoop";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 
-export type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-export type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
-
-const MAX_LEAN_ATTEMPTS = 3;
+export type { LoadingPhase, VerificationStatus };
 
 /**
  * Callbacks the pipeline uses to read/write state.
@@ -87,43 +86,31 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
 
     try {
       const depContext = a.getDependencyContext?.();
-      let currentCode = "";
-      let lastErrors = "";
 
-      for (let attempt = 1; attempt <= MAX_LEAN_ATTEMPTS; attempt++) {
-        if (attempt > 1) setLoadingPhase("retrying");
-        currentCode = await generateLean(
-          semiformal,
-          attempt > 1 ? currentCode : undefined,
-          attempt > 1 ? lastErrors : undefined,
-          undefined,
-          depContext || undefined,
-        );
-        a.setLeanCode(currentCode);
-        a.onSessionUpdate?.({ leanCode: currentCode });
+      const result = await leanRetryLoop(semiformal, {
+        onLeanCode: (code) => {
+          a.setLeanCode(code);
+          a.onSessionUpdate?.({ leanCode: code });
+        },
+        onErrors: (errors) => {
+          a.setVerificationErrors(errors);
+          a.onSessionUpdate?.({ verificationErrors: errors });
+        },
+        onAttemptStart: (attempt) => {
+          if (attempt > 1) setLoadingPhase("retrying");
+        },
+        onVerifyStart: (attempt) => {
+          setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
+          a.setVerificationStatus("verifying");
+          a.onSessionUpdate?.({ verificationStatus: "verifying" });
+        },
+        dependencyContext: depContext || undefined,
+      });
 
-        setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
-        a.setVerificationStatus("verifying");
-        a.onSessionUpdate?.({ verificationStatus: "verifying" });
-
-        const fullCode = depContext ? `${depContext}\n\n${currentCode}` : currentCode;
-        const { valid, errors } = await verifyLean(fullCode);
-
-        if (valid) {
-          a.setVerificationStatus("valid");
-          a.setVerificationErrors("");
-          a.onSessionUpdate?.({ verificationStatus: "valid", verificationErrors: "" });
-          return;
-        }
-
-        lastErrors = errors || "Verification failed";
-        a.setVerificationErrors(lastErrors);
-        a.onSessionUpdate?.({ verificationErrors: lastErrors });
-        if (attempt === MAX_LEAN_ATTEMPTS) {
-          a.setVerificationStatus("invalid");
-          a.onSessionUpdate?.({ verificationStatus: "invalid" });
-        }
-      }
+      const vStatus = result.valid ? "valid" as const : "invalid" as const;
+      a.setVerificationStatus(vStatus);
+      if (result.valid) a.setVerificationErrors("");
+      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: result.valid ? "" : result.errors });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       const currentLean = a.getLeanCode();
@@ -133,6 +120,18 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     } finally {
       setLoadingPhase("idle");
     }
+  }, []);
+
+  /** Prepend dependency context, verify, and apply result to state */
+  const verifyWithDeps = useCallback(async (a: PipelineAccessors, code: string) => {
+    const depContext = a.getDependencyContext?.();
+    const fullCode = depContext ? `${depContext}\n\n${code}` : code;
+    const { valid, errors } = await verifyLean(fullCode);
+    const vStatus = valid ? "valid" as const : "invalid" as const;
+    const vErrors = valid ? "" : errors || "Verification failed";
+    a.setVerificationStatus(vStatus);
+    a.setVerificationErrors(vErrors);
+    a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
   }, []);
 
   const handleReVerify = useCallback(async () => {
@@ -146,15 +145,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     a.onSessionUpdate?.({ verificationStatus: "verifying", verificationErrors: "" });
 
     try {
-      const depContext = a.getDependencyContext?.();
-      const fullCode = depContext ? `${depContext}\n\n${code}` : code;
-      const { valid, errors } = await verifyLean(fullCode);
-      const vStatus = valid ? "valid" as const : "invalid" as const;
-      const vErrors = valid ? "" : errors || "Verification failed";
-
-      a.setVerificationStatus(vStatus);
-      a.setVerificationErrors(vErrors);
-      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
+      await verifyWithDeps(a, code);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Verification request failed";
       a.setVerificationStatus("invalid");
@@ -163,7 +154,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     } finally {
       setLoadingPhase("idle");
     }
-  }, []);
+  }, [verifyWithDeps]);
 
   const handleLeanIterate = useCallback(async (instruction: string) => {
     const a = acc.current;
@@ -191,14 +182,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
       a.setLeanCode(newCode);
       a.onSessionUpdate?.({ leanCode: newCode });
 
-      const fullCode = depContext ? `${depContext}\n\n${newCode}` : newCode;
-      const { valid, errors } = await verifyLean(fullCode);
-      const vStatus = valid ? "valid" as const : "invalid" as const;
-      const vErrors = valid ? "" : errors || "Verification failed";
-
-      a.setVerificationStatus(vStatus);
-      a.setVerificationErrors(vErrors);
-      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
+      await verifyWithDeps(a, newCode);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Iteration failed";
       a.setVerificationStatus("invalid");
@@ -207,7 +191,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     } finally {
       setLoadingPhase("idle");
     }
-  }, []);
+  }, [verifyWithDeps]);
 
   const handleRegenerateLean = useCallback(() => {
     handleLeanIterate("");

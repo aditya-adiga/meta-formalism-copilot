@@ -2,13 +2,19 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
-import type { SourceDocument } from "@/app/lib/types/decomposition";
+import type { ArtifactType } from "@/app/lib/types/session";
+import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
+import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
+import WorkspaceSessionBar from "@/app/components/features/workspace-session/WorkspaceSessionBar";
 import InputPanel from "@/app/components/panels/InputPanel";
 import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
 import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
+import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
+import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
+import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -21,7 +27,9 @@ import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
-import { ENDPOINT_PRIORS } from "@/app/lib/llm/predict";
+import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
+import { useAnalytics } from "@/app/hooks/useAnalytics";
+import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
@@ -43,7 +51,7 @@ function phaseToEndpoint(phase: LoadingPhase): string | null {
 
 export default function Home() {
   // --- Panel navigation ---
-  const [activePanelId, setActivePanelId] = useState<PanelId>("source");
+  const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
 
 
   // --- Persisted state (survives page refresh) ---
@@ -57,12 +65,55 @@ export default function Home() {
     verificationStatus, setVerificationStatus,
     verificationErrors, setVerificationErrors,
     restoredDecompState, persistDecompState,
+    getSnapshot: getWorkspaceSnapshot, resetToSnapshot: resetWorkspaceToSnapshot, clearWorkspace,
+    causalGraph: persistedCausalGraph, setCausalGraph: setPersistedCausalGraph,
+    statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
+    propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
+    dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
   } = useWorkspacePersistence();
 
+  // --- Artifact data (persisted as JSON strings, parsed for display) ---
+  const causalGraph = useMemo(() => {
+    if (!persistedCausalGraph) return null;
+    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+    catch { return null; }
+  }, [persistedCausalGraph]);
 
-  // --- Causal graph state ---
-  const [causalGraph, setCausalGraph] = useState<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"] | null>(null);
-  const [causalGraphLoading, setCausalGraphLoading] = useState(false);
+  const statisticalModel = useMemo(() => {
+    if (!persistedStatisticalModel) return null;
+    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
+    catch { return null; }
+  }, [persistedStatisticalModel]);
+
+  const propertyTests = useMemo(() => {
+    if (!persistedPropertyTests) return null;
+    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
+    catch { return null; }
+  }, [persistedPropertyTests]);
+
+  const dialecticalMap = useMemo(() => {
+    if (!persistedDialecticalMap) return null;
+    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+    catch { return null; }
+  }, [persistedDialecticalMap]);
+
+  // --- Artifact type selection + parallel generation ---
+  const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
+  const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
+
+  // --- Analytics ---
+  const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
+
+  const setActivePanelId = useCallback((id: PanelId) => {
+    if (id === "analytics") refreshAnalytics();
+    setActivePanelIdRaw(id);
+  }, [refreshAnalytics]);
+
+  // Derive per-type loading booleans from artifactLoadingState
+  const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
+  const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
+  const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
+  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
@@ -96,14 +147,10 @@ export default function Home() {
   const handleRestoreSession = useCallback((session: FormalizationSession) => {
     if (session.scope.type === "node") {
       selectNode(session.scope.nodeId);
-      const nodeStatus = session.verificationStatus === "valid" ? "verified" as const
-        : session.verificationStatus === "invalid" ? "failed" as const
-        : session.verificationStatus === "verifying" ? "in-progress" as const
-        : "unverified" as const;
       updateNode(session.scope.nodeId, {
         semiformalProof: session.semiformalText,
         leanCode: session.leanCode,
-        verificationStatus: nodeStatus,
+        verificationStatus: toNodeVerificationStatus(session.verificationStatus),
         verificationErrors: session.verificationErrors,
       });
     } else {
@@ -114,18 +161,96 @@ export default function Home() {
       setVerificationErrors(session.verificationErrors);
       setSemiformalDirty(false);
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+
+    // Restore artifact data from session's artifacts[]
+    for (const artifact of session.artifacts) {
+      switch (artifact.type) {
+        case "causal-graph": setPersistedCausalGraph(artifact.content); break;
+        case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
+        case "property-tests": setPersistedPropertyTests(artifact.content); break;
+        case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+      }
+    }
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   const {
     activeSession,
     allSessionsSorted,
     createSession,
     syncToActiveSession,
+    updateSessionArtifact,
     selectSession,
     selectAndRestore,
     sessionsForScope,
+    getSnapshot: getSessionsSnapshot,
+    resetToSnapshot: resetSessionsToSnapshot,
+    clearAllSessions,
   } = useFormalizationSessions(handleRestoreSession);
 
+
+  /** Store artifact results in session and (optionally) node */
+  const storeArtifactResults = useCallback((
+    results: Partial<Record<ArtifactType, unknown>>,
+    nodeId?: string,
+  ) => {
+    for (const [type, value] of Object.entries(results)) {
+      if (value == null) continue;
+      const artifactType = type as ArtifactType;
+      const content = typeof value === "string" ? value : JSON.stringify(value);
+
+      // Store in active session
+      updateSessionArtifact(artifactType, content);
+
+      // Store in node artifacts if per-node generation
+      if (nodeId) {
+        const nodeArtifact: NodeArtifact = {
+          type: artifactType,
+          content,
+          verificationStatus: "unverified",
+          verificationErrors: "",
+        };
+        // Upsert: replace existing artifact of same type, or append
+        updateNode(nodeId, {
+          artifacts: [
+            ...(decomp.nodes.find((n) => n.id === nodeId)?.artifacts.filter((a) => a.type !== artifactType) ?? []),
+            nodeArtifact,
+          ],
+        });
+      }
+    }
+
+    // Also update persisted display state (JSON strings)
+    if (results["causal-graph"]) {
+      setPersistedCausalGraph(JSON.stringify(results["causal-graph"]));
+    }
+    if (results["statistical-model"]) {
+      setPersistedStatisticalModel(JSON.stringify(results["statistical-model"]));
+    }
+    if (results["property-tests"]) {
+      setPersistedPropertyTests(JSON.stringify(results["property-tests"]));
+    }
+    if (results["dialectical-map"]) {
+      setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+
+  // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
+  const {
+    workspaceSessions,
+    activeWorkspaceSession,
+    createNewSession: createNewWorkspaceSession,
+    switchToSession: switchWorkspaceSession,
+    renameSession: renameWorkspaceSession,
+    deleteSession: deleteWorkspaceSession,
+  } = useWorkspaceSessions({
+    getWorkspaceSnapshot: getWorkspaceSnapshot,
+    getSessionsSnapshot: getSessionsSnapshot,
+    resetWorkspaceToSnapshot: resetWorkspaceToSnapshot,
+    resetSessionsToSnapshot: resetSessionsToSnapshot,
+    clearWorkspace,
+    clearAllSessions,
+    resetDecomp,
+  });
 
   // --- Combined paper text for single-proof formalization ---
   const combinedPaperText = useMemo(() => {
@@ -169,7 +294,15 @@ export default function Home() {
     setVerificationErrors,
     onResetForSemiformal: () => { setSemiformalDirty(false); },
     onResetForLean: () => { setSemiformalDirty(false); },
-    onSessionUpdate: syncToActiveSession,
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
   });
 
   // Node pipeline: reads/writes selected node state
@@ -181,16 +314,20 @@ export default function Home() {
     getVerificationErrors: () => selectedNode?.verificationErrors ?? "",
     setVerificationStatus: (status) => {
       if (!selectedNode) return;
-      const nodeStatus = status === "valid" ? "verified" as const
-        : status === "invalid" ? "failed" as const
-        : status === "verifying" ? "in-progress" as const
-        : "unverified" as const;
-      updateNode(selectedNode.id, { verificationStatus: nodeStatus });
+      updateNode(selectedNode.id, { verificationStatus: toNodeVerificationStatus(status) });
     },
     setVerificationErrors: (errors) => { if (selectedNode) updateNode(selectedNode.id, { verificationErrors: errors }); },
     onResetForLean: () => { if (selectedNode) updateNode(selectedNode.id, { verificationStatus: "in-progress", verificationErrors: "" }); },
     getDependencyContext: () => selectedNode ? gatherDependencyContext(decomp.nodes, selectedNode.id) || undefined : undefined,
-    onSessionUpdate: syncToActiveSession,
+    onSessionUpdate: (updates) => {
+      syncToActiveSession(updates);
+      if (typeof updates.semiformalText === "string" && updates.semiformalText) {
+        updateSessionArtifact("semiformal", updates.semiformalText);
+      }
+      if (typeof updates.leanCode === "string" && updates.leanCode) {
+        updateSessionArtifact("lean", updates.leanCode);
+      }
+    },
   });
 
   // Active pipeline resolves based on decomposition mode
@@ -207,6 +344,20 @@ export default function Home() {
     isDecompMode,
     globalPipeline.loadingPhase,
     nodePipeline.loadingPhase,
+  );
+
+  // Determine if any RPC is in flight (for workspace session-switch guard)
+  const isAnyRpcBusy = loadingPhase !== "idle" || isAnyGenerating || queueRunning;
+
+  // --- Wait time estimates ---
+  const inputCharCount = useMemo(() => {
+    return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
+  }, [sourceText, extractedFiles]);
+  const pipelineEndpoint = phaseToEndpoint(loadingPhase);
+  const waitEstimate = useWaitTimeEstimate(pipelineEndpoint, inputCharCount);
+  const causalGraphWaitEstimate = useWaitTimeEstimate(
+    causalGraphLoading ? "formalization/causal-graph" : null,
+    inputCharCount,
   );
 
   // --- Handlers ---
@@ -230,34 +381,94 @@ export default function Home() {
     syncToActiveSession({ leanCode: code });
   }, [isDecompMode, selectedNode, updateNode, setLeanCode, syncToActiveSession]);
 
-  /** Global: generate semiformal, create session, navigate to panel */
-  const handleGenerateSemiformal = useCallback(async () => {
-    selectNode(null);
-    createSession({ type: "global" });
-    setActivePanelId("semiformal");
-    await globalPipeline.handleGenerateSemiformal(combinedPaperText);
-  }, [combinedPaperText, selectNode, createSession, globalPipeline]);
+  /** Shared generation logic: fire semiformal + other artifacts in parallel */
+  const executeGeneration = useCallback(async (
+    text: string,
+    context: string,
+    artifactTypes: ArtifactType[],
+    pipeline: typeof globalPipeline,
+    nodeId?: string,
+    nodeLabel?: string,
+  ) => {
+    const request = { sourceText: text, context, nodeId, nodeLabel };
+
+    // Navigate to the first selected artifact panel
+    const firstType = artifactTypes[0];
+    if (firstType === "semiformal") setActivePanelId("semiformal");
+    else if (firstType) setActivePanelId(firstType as PanelId);
+
+    const nonSemiformalTypes = artifactTypes.filter((t) => t !== "semiformal");
+    const hasSemiformal = artifactTypes.includes("semiformal");
+
+    const [, artifactResults] = await Promise.all([
+      hasSemiformal
+        ? pipeline.handleGenerateSemiformal(text)
+        : Promise.resolve(),
+      nonSemiformalTypes.length > 0
+        ? generateArtifacts(nonSemiformalTypes, request)
+        : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
+    ]);
+
+    if (artifactResults) {
+      storeArtifactResults(artifactResults, nodeId);
+    }
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
+
+  /** Unified: generate all selected artifact types in parallel */
+  const handleGenerate = useCallback(async () => {
+    const text = isDecompMode && selectedNode
+      ? `${selectedNode.statement}\n\n${selectedNode.proofText}`
+      : combinedPaperText;
+    if (!text.trim()) return;
+
+    if (!isDecompMode) {
+      selectNode(null);
+      createSession({ type: "global" });
+    } else if (selectedNode) {
+      createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
+    }
+
+    await executeGeneration(
+      text, contextText, selectedArtifactTypes,
+      isDecompMode ? nodePipeline : globalPipeline,
+      selectedNode?.id, selectedNode?.label,
+    );
+  }, [
+    isDecompMode, selectedNode, combinedPaperText, contextText,
+    selectedArtifactTypes, selectNode, createSession,
+    globalPipeline, nodePipeline, executeGeneration,
+  ]);
 
   /** Global: generate Lean from semiformal, navigate to panel */
   const handleGenerateLean = useCallback(async () => {
     setActivePanelId("lean");
     await globalPipeline.handleGenerateLean();
-  }, [globalPipeline]);
+  }, [globalPipeline, setActivePanelId]);
 
-  /** Per-node: generate semiformal, create session, navigate to panel */
-  const handleNodeGenerateSemiformal = useCallback(async () => {
+  /** Per-node: generate selected artifacts using node-level context + chip selection */
+  const handleNodeGenerate = useCallback(async () => {
     if (!selectedNode) return;
+    const text = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
+    if (!text.trim()) return;
+
+    const nodeContext = selectedNode.context || contextText;
+    const nodeTypes = selectedNode.selectedArtifactTypes.length > 0
+      ? selectedNode.selectedArtifactTypes
+      : selectedArtifactTypes;
+
     createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
-    setActivePanelId("semiformal");
-    const nodeText = `${selectedNode.statement}\n\n${selectedNode.proofText}`;
-    await nodePipeline.handleGenerateSemiformal(nodeText);
-  }, [selectedNode, createSession, nodePipeline]);
+
+    await executeGeneration(
+      text, nodeContext, nodeTypes, nodePipeline,
+      selectedNode.id, selectedNode.label,
+    );
+  }, [selectedNode, contextText, selectedArtifactTypes, createSession, nodePipeline, executeGeneration]);
 
   /** Per-node: generate Lean + verify, navigate to panel */
   const handleNodeGenerateLean = useCallback(async () => {
     setActivePanelId("lean");
     await nodePipeline.handleGenerateLean();
-  }, [nodePipeline]);
+  }, [nodePipeline, setActivePanelId]);
 
   // Graph panel handlers
   const handleDecompose = useCallback(() => {
@@ -277,7 +488,7 @@ export default function Home() {
         selectSession(nodeSessions[0].id);
       }
     }
-  }, [selectNode, decomp.nodes, sessionsForScope, selectSession]);
+  }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId]);
 
   // Resolve dependencies for NodeDetailPanel
   const selectedNodeDeps = useMemo(() => {
@@ -287,49 +498,6 @@ export default function Home() {
       .filter((n): n is NonNullable<typeof n> => n != null);
   }, [selectedNode, decomp.nodes]);
 
-  // --- Causal graph generation ---
-  const handleGenerateCausalGraph = useCallback(async () => {
-    const text = isDecompMode && selectedNode
-      ? `${selectedNode.statement}\n\n${selectedNode.proofText}`
-      : combinedPaperText;
-    if (!text.trim()) return;
-    setCausalGraphLoading(true);
-    setActivePanelId("causal-graph");
-    try {
-      const response = await fetch("/api/formalization/causal-graph", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceText: text,
-          context: contextText,
-          nodeId: selectedNode?.id,
-          nodeLabel: selectedNode?.label,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok && data.causalGraph) {
-        setCausalGraph(data.causalGraph);
-      } else {
-        console.error("[causal-graph]", data.error);
-      }
-    } catch (err) {
-      console.error("[causal-graph]", err);
-    } finally {
-      setCausalGraphLoading(false);
-    }
-  }, [isDecompMode, selectedNode, combinedPaperText, contextText]);
-
-  // --- Wait time estimates ---
-  const inputCharCount = useMemo(() => {
-    return [sourceText, ...extractedFiles.map((f) => f.text)].join("").length;
-  }, [sourceText, extractedFiles]);
-  const pipelineEndpoint = phaseToEndpoint(loadingPhase);
-  const waitEstimate = useWaitTimeEstimate(pipelineEndpoint, inputCharCount);
-  const causalGraphWaitEstimate = useWaitTimeEstimate(
-    causalGraphLoading ? "formalization/causal-graph" : null,
-    inputCharCount,
-  );
-
   // --- Panel definitions ---
   const panels = usePanelDefinitions({
     sourceText, extractedFiles, contextText,
@@ -338,10 +506,19 @@ export default function Home() {
     nodes: decomp.nodes, selectedNode,
     hasCausalGraph: causalGraph !== null,
     causalGraphLoading,
+    hasStatisticalModel: statisticalModel !== null,
+    statisticalModelLoading,
+    hasPropertyTests: propertyTests !== null,
+    propertyTestsLoading,
+    hasDialecticalMap: dialecticalMap !== null,
+    dialecticalMapLoading,
   });
 
   // --- Export All handler ---
-  const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
+  const hasExportableContent = Boolean(
+    semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
+    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+  );
 
   const handleExportAll = useCallback(async () => {
     // Dynamic import so jszip is only loaded when user clicks Export All
@@ -350,119 +527,173 @@ export default function Home() {
       semiformalText,
       leanCode,
       nodes: decomp.nodes,
+      causalGraph,
+      statisticalModel,
+      propertyTests,
+      dialecticalMap,
     });
-  }, [semiformalText, leanCode, decomp.nodes]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
 
-  // --- Panel content map ---
-  const panelContent: Partial<Record<PanelId, React.ReactNode>> = useMemo(() => {
-  const sessionBannerElement = activeSession ? (
-    <SessionBanner
-      currentSession={activeSession}
-      sessions={allSessionsSorted}
-      onSelectSession={selectAndRestore}
-    />
-  ) : null;
+  // --- Panel render function (only creates JSX for the active panel) ---
+  const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
+    const sessionBannerElement = activeSession ? (
+      <SessionBanner
+        currentSession={activeSession}
+        sessions={allSessionsSorted}
+        onSelectSession={selectAndRestore}
+      />
+    ) : null;
 
-  return ({
-    source: (
-      <InputPanel
-        sourceText={sourceText}
-        onSourceTextChange={setSourceText}
-        extractedFiles={extractedFiles}
-        onFilesChanged={setExtractedFiles}
-        contextText={contextText}
-        onContextTextChange={setContextText}
-        onFormalise={handleGenerateSemiformal}
-        loading={loadingPhase !== "idle"}
-        waitEstimate={waitEstimate}
-      />
-    ),
-    semiformal: (
-      <SemiformalPanel
-        semiformalText={activeSemiformal}
-        onSemiformalTextChange={handleSemiformalTextChange}
-        sessionBanner={sessionBannerElement}
-        onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
-        showGenerateLean={semiformalReadyForLean}
-        leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
-        waitEstimate={waitEstimate}
-      />
-    ),
-    lean: (
-      <LeanPanel
-        leanCode={activeLeanCode}
-        onLeanCodeChange={handleLeanCodeChange}
-        loadingPhase={loadingPhase}
-        verificationStatus={activeVerificationStatus}
-        verificationErrors={activeVerificationErrors}
-        semiformalDirty={!isDecompMode && semiformalDirty}
-        semiformalReady={semiformalReadyForLean}
-        onRegenerateLean={activePipeline.handleRegenerateLean}
-        onReVerify={activePipeline.handleReVerify}
-        onLeanIterate={activePipeline.handleLeanIterate}
-        sessionBanner={sessionBannerElement}
-        waitEstimate={waitEstimate}
-      />
-    ),
-    decomposition: (
-      <GraphPanel
-        propositions={decomp.nodes}
-        selectedNodeId={decomp.selectedNodeId}
-        onSelectNode={handleSelectNode}
-        hasContent={sourceDocuments.length > 0}
-        sourceDocuments={sourceDocuments}
-        extractionStatus={decomp.extractionStatus}
-        onDecompose={handleDecompose}
-        queueProgress={queueProgress}
-        onFormalizeAll={startQueue}
-        onPauseQueue={pauseQueue}
-        onResumeQueue={resumeQueue}
-        onCancelQueue={cancelQueue}
-      />
-    ),
-    "node-detail": selectedNode ? (
-      <NodeDetailPanel
-        node={selectedNode}
-        dependencies={selectedNodeDeps}
-        onFormalise={handleNodeGenerateSemiformal}
-        onGenerateLean={handleNodeGenerateLean}
-        loading={loadingPhase !== "idle" || queueRunning}
-      />
-    ) : undefined,
-    "causal-graph": (
-      <CausalGraphPanel
-        causalGraph={causalGraph}
-        loading={causalGraphLoading}
-        waitEstimate={causalGraphWaitEstimate}
-      />
-    ),
-    analytics: (
-      <AnalyticsPanel
-        endpointPriors={ENDPOINT_PRIORS}
-      />
-    ),
-  });}, [
+    switch (panelId) {
+      case "source":
+        return (
+          <InputPanel
+            sourceText={sourceText}
+            onSourceTextChange={setSourceText}
+            onFilesChanged={setExtractedFiles}
+            existingFiles={extractedFiles}
+            contextText={contextText}
+            onContextTextChange={setContextText}
+            onFormalise={handleGenerate}
+            loading={loadingPhase !== "idle" || isAnyGenerating}
+            onDecompose={handleDecompose}
+            decomposing={decomp.extractionStatus === "extracting"}
+            selectedArtifactTypes={selectedArtifactTypes}
+            onArtifactTypesChange={setSelectedArtifactTypes}
+            loadingState={artifactLoadingState}
+            waitEstimate={waitEstimate}
+          />
+        );
+      case "semiformal":
+        return (
+          <SemiformalPanel
+            semiformalText={activeSemiformal}
+            onSemiformalTextChange={handleSemiformalTextChange}
+            sessionBanner={sessionBannerElement}
+            onGenerateLean={isDecompMode ? handleNodeGenerateLean : handleGenerateLean}
+            showGenerateLean={semiformalReadyForLean}
+            leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
+            waitEstimate={waitEstimate}
+          />
+        );
+      case "lean":
+        return (
+          <LeanPanel
+            leanCode={activeLeanCode}
+            onLeanCodeChange={handleLeanCodeChange}
+            loadingPhase={loadingPhase}
+            verificationStatus={activeVerificationStatus}
+            verificationErrors={activeVerificationErrors}
+            semiformalDirty={!isDecompMode && semiformalDirty}
+            semiformalReady={semiformalReadyForLean}
+            onRegenerateLean={activePipeline.handleRegenerateLean}
+            onReVerify={activePipeline.handleReVerify}
+            onLeanIterate={activePipeline.handleLeanIterate}
+            sessionBanner={sessionBannerElement}
+            waitEstimate={waitEstimate}
+          />
+        );
+      case "decomposition":
+        return (
+          <GraphPanel
+            propositions={decomp.nodes}
+            selectedNodeId={decomp.selectedNodeId}
+            onSelectNode={handleSelectNode}
+            hasContent={sourceDocuments.length > 0}
+            sourceDocuments={sourceDocuments}
+            extractionStatus={decomp.extractionStatus}
+            onDecompose={handleDecompose}
+            queueProgress={queueProgress}
+            onFormalizeAll={startQueue}
+            onPauseQueue={pauseQueue}
+            onResumeQueue={resumeQueue}
+            onCancelQueue={cancelQueue}
+          />
+        );
+      case "node-detail":
+        return selectedNode ? (
+          <NodeDetailPanel
+            node={selectedNode}
+            dependencies={selectedNodeDeps}
+            onFormalise={handleNodeGenerate}
+            onGenerateLean={handleNodeGenerateLean}
+            loading={loadingPhase !== "idle" || queueRunning}
+            globalContextText={contextText}
+            onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
+            onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
+            loadingState={artifactLoadingState}
+          />
+        ) : undefined;
+      case "causal-graph":
+        return (
+          <CausalGraphPanel
+            causalGraph={causalGraph}
+            loading={causalGraphLoading}
+            waitEstimate={causalGraphWaitEstimate}
+          />
+        );
+      case "statistical-model":
+        return (
+          <StatisticalModelPanel
+            statisticalModel={statisticalModel}
+            loading={statisticalModelLoading}
+          />
+        );
+      case "property-tests":
+        return (
+          <PropertyTestsPanel
+            propertyTests={propertyTests}
+            loading={propertyTestsLoading}
+          />
+        );
+      case "dialectical-map":
+        return (
+          <DialecticalMapPanel
+            dialecticalMap={dialecticalMap}
+            loading={dialecticalMapLoading}
+          />
+        );
+      case "analytics":
+        return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
+      default:
+        return undefined;
+    }
+  }, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
     selectedNode, selectedNodeDeps, sourceDocuments,
     queueProgress, startQueue, pauseQueue, resumeQueue, cancelQueue,
     setSourceText, setExtractedFiles, setContextText,
-    handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
-    activePipeline,
-    handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
+    handleGenerate, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
+    activePipeline, isAnyGenerating,
+    handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
+    selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate,
+    statisticalModel, statisticalModelLoading,
+    propertyTests, propertyTestsLoading,
+    dialecticalMap, dialecticalMapLoading,
+    analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
   ]);
 
   return (
-    <main>
+    <main className="flex h-screen flex-col">
+      <WorkspaceSessionBar
+        sessions={workspaceSessions}
+        activeSession={activeWorkspaceSession}
+        onNewSession={createNewWorkspaceSession}
+        onSwitchSession={switchWorkspaceSession}
+        onRenameSession={renameWorkspaceSession}
+        onDeleteSession={deleteWorkspaceSession}
+        isBusy={isAnyRpcBusy}
+      />
       <PanelShell
         panels={panels}
         activePanelId={activePanelId}
         onSelectPanel={setActivePanelId}
-        panelContent={panelContent}
+        renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
       />

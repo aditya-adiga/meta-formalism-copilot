@@ -1,8 +1,34 @@
 import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { VerificationStatus } from "@/app/lib/types/session";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import { WORKSPACE_VERSION, WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+const LEGACY_WORKSPACE_KEY = "workspace-v1";
+
+/** Migrate legacy workspace-v1 data to workspace-v2 key, then remove the old key. */
+export function migrateV1Workspace(): void {
+  try {
+    const raw = localStorage.getItem(LEGACY_WORKSPACE_KEY);
+    if (!raw) return;
+
+    // Only migrate if there's no v2 data yet
+    if (localStorage.getItem(WORKSPACE_KEY)) {
+      localStorage.removeItem(LEGACY_WORKSPACE_KEY);
+      return;
+    }
+
+    const parsed: unknown = JSON.parse(raw);
+    if (isObject(parsed)) {
+      // Stamp with current version so loadWorkspace accepts it
+      (parsed as Record<string, unknown>).version = WORKSPACE_VERSION;
+      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(parsed));
+    }
+    localStorage.removeItem(LEGACY_WORKSPACE_KEY);
+  } catch {
+    // Best-effort; don't block app startup
+    try { localStorage.removeItem(LEGACY_WORKSPACE_KEY); } catch { /* ignore */ }
+  }
+}
 
 /** Strip transient "verifying" status back to "none" */
 export function sanitizeVerificationStatus(status: string): "none" | "valid" | "invalid" {
@@ -29,31 +55,46 @@ function sanitizeNode(node: PropositionNode): PropositionNode {
  * Save workspace state to localStorage.
  * Returns true on success, false on failure (e.g. QuotaExceededError).
  */
-export function saveWorkspace(
-  sourceText: string,
-  extractedFiles: { name: string; text: string }[],
-  contextText: string,
-  semiformalText: string,
-  leanCode: string,
-  semiformalDirty: boolean,
-  verificationStatus: VerificationStatus,
-  verificationErrors: string,
-  decomposition: PersistedDecomposition,
-): boolean {
+export type ArtifactPersistenceData = {
+  causalGraph: string | null;
+  statisticalModel: string | null;
+  propertyTests: string | null;
+  dialecticalMap: string | null;
+};
+
+export type SaveWorkspaceInput = {
+  sourceText: string;
+  extractedFiles: { name: string; text: string }[];
+  contextText: string;
+  semiformalText: string;
+  leanCode: string;
+  semiformalDirty: boolean;
+  verificationStatus: VerificationStatus;
+  verificationErrors: string;
+  decomposition: PersistedDecomposition;
+  artifacts?: ArtifactPersistenceData;
+};
+
+export function saveWorkspace(input: SaveWorkspaceInput): boolean {
+  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null };
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
-    sourceText,
-    extractedFiles,
-    contextText,
-    semiformalText,
-    leanCode,
-    semiformalDirty,
-    verificationStatus: sanitizeVerificationStatus(verificationStatus),
-    verificationErrors,
+    sourceText: input.sourceText,
+    extractedFiles: input.extractedFiles,
+    contextText: input.contextText,
+    semiformalText: input.semiformalText,
+    leanCode: input.leanCode,
+    semiformalDirty: input.semiformalDirty,
+    verificationStatus: sanitizeVerificationStatus(input.verificationStatus),
+    verificationErrors: input.verificationErrors,
     decomposition: {
-      ...decomposition,
-      nodes: decomposition.nodes.map(sanitizeNode),
+      ...input.decomposition,
+      nodes: input.decomposition.nodes.map(sanitizeNode),
     },
+    causalGraph: artifacts.causalGraph,
+    statisticalModel: artifacts.statisticalModel,
+    propertyTests: artifacts.propertyTests,
+    dialecticalMap: artifacts.dialecticalMap,
   };
 
   try {
@@ -111,6 +152,7 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
  */
 export function loadWorkspace(): PersistedWorkspace | null {
   try {
+    migrateV1Workspace();
     const raw = localStorage.getItem(WORKSPACE_KEY);
     if (!raw) return null;
 
@@ -140,6 +182,10 @@ export function loadWorkspace(): PersistedWorkspace | null {
       ),
       verificationErrors: typeof parsed.verificationErrors === "string" ? parsed.verificationErrors : "",
       decomposition,
+      causalGraph: typeof parsed.causalGraph === "string" ? parsed.causalGraph : null,
+      statisticalModel: typeof parsed.statisticalModel === "string" ? parsed.statisticalModel : null,
+      propertyTests: typeof parsed.propertyTests === "string" ? parsed.propertyTests : null,
+      dialecticalMap: typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null,
     };
   } catch {
     return null;

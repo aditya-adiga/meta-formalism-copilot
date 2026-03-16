@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import type { FormalizationSession, SessionScope, SessionsState } from "@/app/lib/types/session";
+import type { FormalizationSession, SessionScope, SessionsState, ArtifactData, ArtifactType } from "@/app/lib/types/session";
 
 export type SessionRestoreHandler = (session: FormalizationSession) => void;
 
-type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>;
+type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors" | "artifacts">>;
 
 
 
@@ -28,24 +28,45 @@ function scopeMatches(a: SessionScope, b: SessionScope): boolean {
   return a.type === "node" && b.type === "node" && a.nodeId === b.nodeId;
 }
 
+const DEBOUNCE_MS = 500;
+
 export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
   const [state, setState] = useState<SessionsState>(loadFromStorage);
   const mounted = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef(state);
 
   // Ref so selectAndRestore always sees the latest callback without recreating
   const onRestoreRef = useRef(onRestore);
   useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
 
+  // Keep stateRef in sync for unmount flush
+  useEffect(() => { stateRef.current = state; }, [state]);
 
-
-  // Persist to localStorage on every change after initial mount
+  // Debounced persist to localStorage after initial mount
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, DEBOUNCE_MS);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [state]);
+
+  // Flush on unmount to avoid data loss
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+      }
+    };
+  }, []);
 
   const createSession = useCallback((scope: SessionScope): FormalizationSession => {
     const newSession: FormalizationSession = {
@@ -123,7 +144,37 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     });
   }, []);
 
-
+  /**
+   * Upsert an artifact entry in the active session's artifacts[].
+   * If an artifact of the same type exists, it's replaced; otherwise appended.
+   */
+  const updateSessionArtifact = useCallback((type: ArtifactType, content: string) => {
+    setState((prev) => {
+      if (!prev.activeSessionId) return prev;
+      const now = new Date().toISOString();
+      const newArtifact: ArtifactData = {
+        type,
+        content,
+        generatedAt: now,
+        verificationStatus: "none",
+        verificationErrors: "",
+      };
+      return {
+        ...prev,
+        sessions: prev.sessions.map((s) => {
+          if (s.id !== prev.activeSessionId) return s;
+          const existing = s.artifacts.findIndex((a) => a.type === type);
+          const artifacts = [...s.artifacts];
+          if (existing >= 0) {
+            artifacts[existing] = newArtifact;
+          } else {
+            artifacts.push(newArtifact);
+          }
+          return { ...s, artifacts, updatedAt: now };
+        }),
+      };
+    });
+  }, []);
 
   const clearActiveSession = useCallback(() => {
     setState((prev) => ({ ...prev, activeSessionId: null }));
@@ -149,6 +200,26 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     [state.sessions],
   );
 
+  /** Return a snapshot of the current sessions state (for workspace session saves) */
+  const getSnapshot = useCallback((): SessionsState => {
+    return { sessions: stateRef.current.sessions, activeSessionId: stateRef.current.activeSessionId };
+  }, []);
+
+  /** Replace all formalization sessions from a snapshot (used when switching workspace sessions) */
+  const resetToSnapshot = useCallback((data: SessionsState) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setState(data);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }, []);
+
+  /** Clear all formalization sessions */
+  const clearAllSessions = useCallback(() => {
+    const empty: SessionsState = { sessions: [], activeSessionId: null };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setState(empty);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+  }, []);
+
   return {
     sessions: state.sessions,
     allSessionsSorted,
@@ -158,8 +229,12 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     selectSession,
     selectAndRestore,
     syncToActiveSession,
+    updateSessionArtifact,
     clearActiveSession,
     sessionsForScope,
     activeSessionForScope,
+    getSnapshot,
+    resetToSnapshot,
+    clearAllSessions,
   };
 }

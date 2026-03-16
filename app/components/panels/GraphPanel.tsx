@@ -88,7 +88,7 @@ export default function GraphPanel({
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Proof Graph
+          Decomposition
         </h2>
         <div className="flex items-center gap-2">
           {hasNodes && (

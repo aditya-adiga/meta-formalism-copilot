@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { PersistedDecomposition } from "@/app/lib/types/persistence";
-import { loadWorkspace, saveWorkspace } from "@/app/lib/utils/workspacePersistence";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
+import type { VerificationStatus } from "@/app/lib/types/session";
+import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData, type SaveWorkspaceInput } from "@/app/lib/utils/workspacePersistence";
 
 type WorkspaceState = {
   sourceText: string;
@@ -15,6 +14,11 @@ type WorkspaceState = {
   semiformalDirty: boolean;
   verificationStatus: VerificationStatus;
   verificationErrors: string;
+  // Artifact data (JSON-stringified)
+  causalGraph: string | null;
+  statisticalModel: string | null;
+  propertyTests: string | null;
+  dialecticalMap: string | null;
 };
 
 const DEFAULT_STATE: WorkspaceState = {
@@ -26,6 +30,10 @@ const DEFAULT_STATE: WorkspaceState = {
   semiformalDirty: false,
   verificationStatus: "none",
   verificationErrors: "",
+  causalGraph: null,
+  statisticalModel: null,
+  propertyTests: null,
+  dialecticalMap: null,
 };
 
 export function useWorkspacePersistence() {
@@ -59,6 +67,10 @@ export function useWorkspacePersistence() {
       semiformalDirty: data.semiformalDirty,
       verificationStatus: data.verificationStatus,
       verificationErrors: data.verificationErrors,
+      causalGraph: data.causalGraph,
+      statisticalModel: data.statisticalModel,
+      propertyTests: data.propertyTests,
+      dialecticalMap: data.dialecticalMap,
     });
 
     decompRef.current = data.decomposition;
@@ -67,47 +79,53 @@ export function useWorkspacePersistence() {
 
   // --- Debounced save on change ---
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep a ref to current state so scheduleSave always reads fresh data
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
-  useEffect(() => {
+  const artifactData: ArtifactPersistenceData = useMemo(() => ({
+    causalGraph: state.causalGraph,
+    statisticalModel: state.statisticalModel,
+    propertyTests: state.propertyTests,
+    dialecticalMap: state.dialecticalMap,
+  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap]);
+
+  const artifactRef = useRef(artifactData);
+  useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
+
+  // Stable save scheduler — reads from refs, never changes identity
+  const scheduleSave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      saveWorkspace(
-        state.sourceText,
-        state.extractedFiles,
-        state.contextText,
-        state.semiformalText,
-        state.leanCode,
-        state.semiformalDirty,
-        state.verificationStatus,
-        state.verificationErrors,
-        decompRef.current,
-      );
+      const s = stateRef.current;
+      const input: SaveWorkspaceInput = {
+        sourceText: s.sourceText,
+        extractedFiles: s.extractedFiles,
+        contextText: s.contextText,
+        semiformalText: s.semiformalText,
+        leanCode: s.leanCode,
+        semiformalDirty: s.semiformalDirty,
+        verificationStatus: s.verificationStatus,
+        verificationErrors: s.verificationErrors,
+        decomposition: decompRef.current,
+        artifacts: artifactRef.current,
+      };
+      saveWorkspace(input);
     }, 500);
+  }, []);
 
+  useEffect(() => {
+    scheduleSave();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [state]);
+  }, [state, artifactData, scheduleSave]);
 
   /** Call this whenever decomposition state changes so persistence stays in sync */
   const persistDecompState = useCallback((decompState: PersistedDecomposition) => {
     decompRef.current = decompState;
-    // Trigger a debounced save
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      saveWorkspace(
-        state.sourceText,
-        state.extractedFiles,
-        state.contextText,
-        state.semiformalText,
-        state.leanCode,
-        state.semiformalDirty,
-        state.verificationStatus,
-        state.verificationErrors,
-        decompRef.current,
-      );
-    }, 500);
-  }, [state]);
+    scheduleSave();
+  }, [scheduleSave]);
 
   // --- Individual setters that match the useState API page.tsx expects ---
   const setSourceText = useCallback((v: string) => setState((s) => ({ ...s, sourceText: v })), []);
@@ -121,6 +139,93 @@ export function useWorkspacePersistence() {
     setState((s) => ({ ...s, semiformalDirty: typeof v === "function" ? v(s.semiformalDirty) : v })), []);
   const setVerificationStatus = useCallback((v: VerificationStatus) => setState((s) => ({ ...s, verificationStatus: v })), []);
   const setVerificationErrors = useCallback((v: string) => setState((s) => ({ ...s, verificationErrors: v })), []);
+  const setCausalGraph = useCallback((v: string | null) => setState((s) => ({ ...s, causalGraph: v })), []);
+  const setStatisticalModel = useCallback((v: string | null) => setState((s) => ({ ...s, statisticalModel: v })), []);
+  const setPropertyTests = useCallback((v: string | null) => setState((s) => ({ ...s, propertyTests: v })), []);
+  const setDialecticalMap = useCallback((v: string | null) => setState((s) => ({ ...s, dialecticalMap: v })), []);
+
+  /** Build a PersistedWorkspace snapshot of the current state (synchronous) */
+  const getSnapshot = useCallback((): PersistedWorkspace => {
+    const s = stateRef.current;
+    const a = artifactRef.current;
+    return {
+      version: 2,
+      sourceText: s.sourceText,
+      extractedFiles: s.extractedFiles.map(({ name, text }) => ({ name, text })),
+      contextText: s.contextText,
+      semiformalText: s.semiformalText,
+      leanCode: s.leanCode,
+      semiformalDirty: s.semiformalDirty,
+      verificationStatus: s.verificationStatus === "verifying" ? "none" : s.verificationStatus,
+      verificationErrors: s.verificationErrors,
+      decomposition: { ...decompRef.current },
+      causalGraph: a.causalGraph,
+      statisticalModel: a.statisticalModel,
+      propertyTests: a.propertyTests,
+      dialecticalMap: a.dialecticalMap,
+    };
+  }, []);
+
+  /** Replace all workspace state from a snapshot (used when switching workspace sessions) */
+  const resetToSnapshot = useCallback((data: PersistedWorkspace): PersistedDecomposition => {
+    // Cancel any pending debounced save
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    setState({
+      sourceText: data.sourceText,
+      extractedFiles: data.extractedFiles,
+      contextText: data.contextText,
+      semiformalText: data.semiformalText,
+      leanCode: data.leanCode,
+      semiformalDirty: data.semiformalDirty,
+      verificationStatus: data.verificationStatus,
+      verificationErrors: data.verificationErrors,
+      causalGraph: data.causalGraph,
+      statisticalModel: data.statisticalModel,
+      propertyTests: data.propertyTests,
+      dialecticalMap: data.dialecticalMap,
+    });
+
+    decompRef.current = data.decomposition;
+
+    // Write to localStorage immediately (no debounce for session switches)
+    saveWorkspace({
+      sourceText: data.sourceText,
+      extractedFiles: data.extractedFiles,
+      contextText: data.contextText,
+      semiformalText: data.semiformalText,
+      leanCode: data.leanCode,
+      semiformalDirty: data.semiformalDirty,
+      verificationStatus: data.verificationStatus,
+      verificationErrors: data.verificationErrors,
+      decomposition: data.decomposition,
+      artifacts: {
+        causalGraph: data.causalGraph,
+        statisticalModel: data.statisticalModel,
+        propertyTests: data.propertyTests,
+        dialecticalMap: data.dialecticalMap,
+      },
+    });
+
+    return data.decomposition;
+  }, []);
+
+  /** Clear all workspace state back to defaults */
+  const clearWorkspace = useCallback((): PersistedDecomposition => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    setState(DEFAULT_STATE);
+
+    const emptyDecomp: PersistedDecomposition = { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
+    decompRef.current = emptyDecomp;
+
+    saveWorkspace({
+      ...DEFAULT_STATE,
+      decomposition: emptyDecomp,
+    });
+
+    return emptyDecomp;
+  }, []);
 
   // Stable return object that destructures the same as before
   return useMemo(() => ({
@@ -140,7 +245,18 @@ export function useWorkspacePersistence() {
     setVerificationStatus,
     verificationErrors: state.verificationErrors,
     setVerificationErrors,
+    causalGraph: state.causalGraph,
+    setCausalGraph,
+    statisticalModel: state.statisticalModel,
+    setStatisticalModel,
+    propertyTests: state.propertyTests,
+    setPropertyTests,
+    dialecticalMap: state.dialecticalMap,
+    setDialecticalMap,
     restoredDecompState,
     persistDecompState,
-  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+    getSnapshot,
+    resetToSnapshot,
+    clearWorkspace,
+  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap, getSnapshot, resetToSnapshot, clearWorkspace]);
 }

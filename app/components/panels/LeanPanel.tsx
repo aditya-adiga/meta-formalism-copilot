@@ -3,10 +3,9 @@
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import { downloadLeanCode } from "@/app/lib/utils/export";
+import VerificationBadge from "@/app/components/ui/VerificationBadge";
+import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
-
-type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 type LeanPanelProps = {
   leanCode: string;
@@ -22,17 +21,6 @@ type LeanPanelProps = {
   sessionBanner?: React.ReactNode;
   waitEstimate?: WaitTimeEstimate | null;
 };
-
-function VerificationBadge({ status }: { status: VerificationStatus }) {
-  if (status === "none") return null;
-  if (status === "verifying") {
-    return <span className="ml-2 text-xs font-normal text-[#6B6560]">Verifying...</span>;
-  }
-  if (status === "valid") {
-    return <span className="ml-2 text-xs font-normal text-green-700">Verified</span>;
-  }
-  return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
-}
 
 export default function LeanPanel({
   leanCode,

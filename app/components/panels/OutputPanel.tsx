@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import EditableOutput from "@/app/components/features/output-editing/EditableOutput";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import LeanCodeDisplay from "@/app/components/features/lean-display/LeanCodeDisplay";
+import VerificationBadge from "@/app/components/ui/VerificationBadge";
+import type { VerificationStatus } from "@/app/lib/types/session";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
-
-type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
 
 type OutputPanelProps = {
   semiformalText: string;
@@ -23,17 +23,6 @@ type OutputPanelProps = {
   onLeanIterate: (instruction: string) => void;
   waitEstimate?: WaitTimeEstimate | null;
 };
-
-function VerificationBadge({ status }: { status: VerificationStatus }) {
-  if (status === "none") return null;
-  if (status === "verifying") {
-    return <span className="ml-2 text-xs font-normal text-[#6B6560]">Verifying...</span>;
-  }
-  if (status === "valid") {
-    return <span className="ml-2 text-xs font-normal text-green-700">Verified</span>;
-  }
-  return <span className="ml-2 text-xs font-normal text-red-700">Verification Failed</span>;
-}
 
 export default function OutputPanel({ semiformalText, onSemiformalTextChange, semiformalDirty, onRegenerateLean, leanCode, onLeanCodeChange, loadingPhase, verificationStatus, verificationErrors, onReVerify, onLeanIterate, waitEstimate }: OutputPanelProps) {
   const [editing, setEditing] = useState(false);
@@ -158,7 +147,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
                   onClick={() => onLeanIterate("")}
                   className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
                 >
-                  Verification failed — Fix with AI ↺
+                  Verification failed — Fix with AI
                 </button>
               )}
               {semiformalDirty && loadingPhase === "idle" && (
@@ -166,7 +155,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
                   onClick={onRegenerateLean}
                   className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
                 >
-                  Semiformal changed — Regenerate ↺
+                  Semiformal changed — Regenerate
                 </button>
               )}
             </div>

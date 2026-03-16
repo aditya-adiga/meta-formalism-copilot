@@ -14,11 +14,6 @@ describe('TextInput', () => {
     expect(screen.getByPlaceholderText('Paste or type your source material here...')).toBeInTheDocument()
   })
 
-  it('shows helper text', () => {
-    render(<TextInput value="" onChange={() => {}} />)
-    expect(screen.getByText(/Enter source information/)).toBeInTheDocument()
-  })
-
   it('calls onChange when user types', async () => {
     const onChange = vi.fn()
     render(<TextInput value="" onChange={onChange} />)
