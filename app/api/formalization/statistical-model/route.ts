@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handleArtifactRoute } from "@/app/lib/formalization/artifactRoute";
+import { statisticalModelSchema } from "@/app/lib/llm/schemas";
 
 const SYSTEM_PROMPT = `You are a statistical reasoning analyst. Given source text and optional context, extract the statistical structure: identify variables with their roles, formulate testable hypotheses with null hypotheses and suggested tests, list statistical assumptions, and note sample requirements.
 
@@ -59,5 +60,6 @@ export async function POST(request: NextRequest) {
     systemPrompt: SYSTEM_PROMPT,
     responseKey: "statisticalModel",
     mockResponse,
+    responseFormat: statisticalModelSchema,
   });
 }
