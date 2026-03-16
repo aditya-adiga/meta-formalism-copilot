@@ -73,6 +73,7 @@ export default function GraphPanel({
   const handleExportGraph = useCallback(async () => {
     setExporting(true);
     try {
+      // Dynamic import to avoid loading html-to-image until needed
       const { getGraphViewportElement, downloadGraphAsPng } = await import("@/app/lib/utils/exportGraph");
       const viewport = getGraphViewportElement();
       if (viewport) await downloadGraphAsPng(viewport);
@@ -97,6 +98,7 @@ export default function GraphPanel({
               disabled={exporting}
             />
           )}
+          {/* Formalize All / queue controls */}
           {hasNodes && !queueActive && queueProgress.status !== "done" && (
             <button
               onClick={onFormalizeAll}
