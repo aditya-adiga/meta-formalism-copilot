@@ -369,7 +369,7 @@ export default function Home() {
         sessionBanner={sessionBannerElement}
       />
     ),
-    graph: (
+    decomposition: (
       <GraphPanel
         propositions={decomp.nodes}
         selectedNodeId={decomp.selectedNodeId}
