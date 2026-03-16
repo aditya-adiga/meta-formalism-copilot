@@ -67,8 +67,9 @@ export default function Home() {
       nodes: decomp.nodes,
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
+      sources: decomp.sources ?? [],
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
 
   // --- Session state ---
   // Restore callback: applies a session's data to global or per-node state

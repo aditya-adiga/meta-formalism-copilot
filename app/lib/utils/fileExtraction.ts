@@ -9,7 +9,7 @@ import mammoth from "mammoth";
 export function sanitizeText(raw: string): string {
   return (
     raw
-      // Normalize ligatures and diacritics (e.g. ﬁ → fi, ﬂ → fl)
+      // Normalize ligatures and diacritics (e.g. fi → fi, fl → fl)
       .normalize("NFKC")
       // Strip control characters except newline and tab
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
