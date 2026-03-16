@@ -99,8 +99,9 @@ export default function Home() {
       nodes: decomp.nodes,
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
+      sources: decomp.sources ?? [],
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
 
   // --- Session state ---
   const {
@@ -190,7 +191,7 @@ export default function Home() {
   const handleGenerateSemiformal = useCallback(async () => {
     // Deselect any decomposition node so the global semiformalText drives the panel
     selectNode(null);
-    createSession({ type: "global" });
+    const session = createSession({ type: "global" });
     setLoadingPhase("semiformal");
     setSemiformalText("");
     setLeanCode("");
@@ -204,14 +205,16 @@ export default function Home() {
         "/api/formalization/semiformal",
         { text: combinedPaperText },
       );
-      setSemiformalText(semiformalData.proof);
+      const proof = semiformalData.proof;
+      setSemiformalText(proof);
+      updateSession(session.id, { semiformalText: proof });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       setSemiformalText(`Error: ${msg}`);
     } finally {
       setLoadingPhase("idle");
     }
-  }, [combinedPaperText, selectNode, createSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
+  }, [combinedPaperText, selectNode, createSession, updateSession, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors]);
 
   /** Global single-proof: Lean generation + verification retry loop */
   const handleGenerateLean = useCallback(async () => {
@@ -272,7 +275,7 @@ export default function Home() {
   const handleNodeGenerateSemiformal = useCallback(async () => {
     if (!selectedNode) return;
 
-    createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
+    const session = createSession({ type: "node", nodeId: selectedNode.id, nodeLabel: selectedNode.label });
     setLoadingPhase("semiformal");
     setActivePanelId("semiformal");
 
@@ -282,15 +285,16 @@ export default function Home() {
         "/api/formalization/semiformal",
         { text: nodeText },
       );
-      updateNode(selectedNode.id, { semiformalProof: semiformalData.proof, verificationStatus: "unverified" });
-      if (activeSession) updateSession(activeSession.id, { semiformalText: semiformalData.proof });
+      const proof = semiformalData.proof;
+      updateNode(selectedNode.id, { semiformalProof: proof, verificationStatus: "unverified" });
+      updateSession(session.id, { semiformalText: proof });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
     } finally {
       setLoadingPhase("idle");
     }
-  }, [selectedNode, updateNode, createSession, activeSession, updateSession]);
+  }, [selectedNode, updateNode, createSession, updateSession]);
 
   /** Per-node: Lean generation + verification retry loop */
   const handleNodeGenerateLean = useCallback(async () => {
@@ -315,30 +319,36 @@ export default function Home() {
           depContext || undefined,
         );
         updateNode(selectedNode.id, { leanCode: currentCode });
+        if (activeSession) updateSession(activeSession.id, { leanCode: currentCode });
 
         setLoadingPhase(attempt > 1 ? "reverifying" : "verifying");
+        if (activeSession) updateSession(activeSession.id, { verificationStatus: "verifying" });
 
         const fullCode = depContext ? `${depContext}\n\n${currentCode}` : currentCode;
         const { valid, errors } = await verifyLean(fullCode);
 
         if (valid) {
           updateNode(selectedNode.id, { verificationStatus: "verified", verificationErrors: "" });
+          if (activeSession) updateSession(activeSession.id, { verificationStatus: "valid", verificationErrors: "" });
           return;
         }
 
         lastErrors = errors || "Verification failed";
         updateNode(selectedNode.id, { verificationErrors: lastErrors });
+        if (activeSession) updateSession(activeSession.id, { verificationErrors: lastErrors });
         if (attempt === MAX_LEAN_ATTEMPTS) {
           updateNode(selectedNode.id, { verificationStatus: "failed" });
+          if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid" });
         }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       updateNode(selectedNode.id, { verificationStatus: "failed", verificationErrors: msg });
+      if (activeSession) updateSession(activeSession.id, { verificationStatus: "invalid", verificationErrors: msg });
     } finally {
       setLoadingPhase("idle");
     }
-  }, [selectedNode, decomp.nodes, updateNode]);
+  }, [selectedNode, decomp.nodes, updateNode, activeSession, updateSession]);
 
   const handleReVerify = useCallback(async () => {
     const code = isDecompMode && selectedNode ? selectedNode.leanCode : leanCode;
