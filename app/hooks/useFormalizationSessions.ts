@@ -8,6 +8,7 @@ export type SessionRestoreHandler = (session: FormalizationSession) => void;
 type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors">>;
 
 
+
 const STORAGE_KEY = "metaformalism-sessions";
 
 function loadFromStorage(): SessionsState {
@@ -34,6 +35,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
   // Ref so selectAndRestore always sees the latest callback without recreating
   const onRestoreRef = useRef(onRestore);
   useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
+
 
 
   // Persist to localStorage on every change after initial mount
@@ -120,6 +122,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
       };
     });
   }, []);
+
 
 
   const clearActiveSession = useCallback(() => {

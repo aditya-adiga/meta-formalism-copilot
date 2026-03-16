@@ -103,12 +103,12 @@ export function useDecomposition() {
 
   /** Restore persisted decomposition state (called once on mount) */
   const resetState = useCallback(
-    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string }) => {
+    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources?: SourceDocument[] }) => {
       setState({
         nodes: restored.nodes,
         selectedNodeId: restored.selectedNodeId,
         paperText: restored.paperText,
-        sources: [],
+        sources: restored.sources ?? [],
         extractionStatus: restored.nodes.length > 0 ? "done" : "idle",
       });
     },

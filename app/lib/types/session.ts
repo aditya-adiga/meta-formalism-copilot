@@ -19,6 +19,7 @@ export type ArtifactData = {
 };
 
 
+
 export type FormalizationSession = {
   id: string;
   runNumber: number;

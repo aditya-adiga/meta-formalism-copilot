@@ -26,6 +26,7 @@ export type NodeArtifact = {
 };
 
 
+
 export type PropositionNode = {
   id: string;
   label: string;

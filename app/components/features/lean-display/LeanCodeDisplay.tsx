@@ -190,7 +190,7 @@ export default function LeanCodeDisplay({
                 value={iterating ? "" : instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={iterating ? "Iterating…" : "Suggest a fix or instruction…"}
+                placeholder={iterating ? "Iterating\u2026" : "Suggest a fix or instruction\u2026"}
                 disabled={iterating}
                 className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none disabled:cursor-not-allowed"
                 aria-label="Lean4 iteration instruction"
