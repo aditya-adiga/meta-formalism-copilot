@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
-import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import type { PropositionNode, SourceDocument, NodeGroup } from "@/app/lib/types/decomposition";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
@@ -23,8 +23,9 @@ const SOURCE_COLORS = [
 
 type GraphPanelProps = {
   propositions: PropositionNode[];
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
   onSelectNode: (id: string) => void;
+  onToggleNode: (id: string) => void;
   hasContent: boolean;
   sourceDocuments: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";
@@ -34,12 +35,17 @@ type GraphPanelProps = {
   onPauseQueue: () => void;
   onResumeQueue: () => void;
   onCancelQueue: () => void;
+  groups: NodeGroup[];
+  activeGroupId: string | null;
+  onRecallGroup: (groupId: string) => void;
+  onSaveGroup: () => void;
 };
 
 export default function GraphPanel({
   propositions,
-  selectedNodeId,
+  selectedNodeIds,
   onSelectNode,
+  onToggleNode,
   hasContent,
   sourceDocuments,
   extractionStatus,
@@ -49,10 +55,15 @@ export default function GraphPanel({
   onPauseQueue,
   onResumeQueue,
   onCancelQueue,
+  groups,
+  activeGroupId,
+  onRecallGroup,
+  onSaveGroup,
 }: GraphPanelProps) {
   const hasNodes = propositions.length > 0;
   const [exporting, setExporting] = useState(false);
   const sourceCount = sourceDocuments.length;
+  const isMultiSelect = selectedNodeIds.length > 1;
 
   const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
   const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
@@ -90,6 +101,14 @@ export default function GraphPanel({
           Proof Graph
         </h2>
         <div className="flex items-center gap-2">
+          {isMultiSelect && !activeGroupId && (
+            <button
+              onClick={onSaveGroup}
+              className="rounded-full bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md"
+            >
+              Save Group ({selectedNodeIds.length})
+            </button>
+          )}
           {hasNodes && (
             <DownloadButton
               label={exporting ? "Exporting..." : "Export .png"}
@@ -187,36 +206,66 @@ export default function GraphPanel({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        {!hasContent && (
-          <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590]">
-            Upload a paper in the Source panel first
+      <div className="flex min-h-0 flex-1">
+        {/* Saved groups sidebar */}
+        {groups.length > 0 && hasNodes && (
+          <div className="flex w-44 shrink-0 flex-col gap-1 overflow-auto border-r border-[#DDD9D5] bg-[#F5F1ED]/50 p-2">
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-[#9A9590]">
+              Saved Groups
+            </span>
+            {groups.map((group) => (
+              <button
+                key={group.id}
+                onClick={() => onRecallGroup(group.id)}
+                className={`flex flex-col items-start rounded-md px-2.5 py-1.5 text-left transition-colors ${
+                  activeGroupId === group.id
+                    ? "bg-indigo-100 border border-indigo-300"
+                    : "bg-white border border-[#DDD9D5] hover:bg-[#F5F1ED]"
+                }`}
+              >
+                <span className="text-xs font-medium text-[var(--ink-black)] truncate w-full">
+                  {group.name}
+                </span>
+                <span className="text-[10px] text-[#9A9590]">
+                  {group.nodeIds.length} node{group.nodeIds.length !== 1 ? "s" : ""}
+                </span>
+              </button>
+            ))}
           </div>
         )}
 
-        {hasContent && !hasNodes && extractionStatus !== "extracting" && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-[#9A9590]">
-            <p>Click &quot;{buttonLabel}&quot; to extract propositions</p>
-            {extractionStatus === "error" && (
-              <p className="text-red-600">Extraction failed. Try again.</p>
-            )}
-          </div>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {!hasContent && (
+            <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590]">
+              Upload a paper in the Source panel first
+            </div>
+          )}
 
-        {extractionStatus === "extracting" && !hasNodes && (
-          <div className="flex flex-1 items-center justify-center text-sm text-[#6B6560]">
-            Extracting propositions...
-          </div>
-        )}
+          {hasContent && !hasNodes && extractionStatus !== "extracting" && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-[#9A9590]">
+              <p>Click &quot;{buttonLabel}&quot; to extract propositions</p>
+              {extractionStatus === "error" && (
+                <p className="text-red-600">Extraction failed. Try again.</p>
+              )}
+            </div>
+          )}
 
-        {hasNodes && (
-          <ProofGraph
-            propositions={propositions}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode}
-            sourceColorMap={sourceColorMap}
-          />
-        )}
+          {extractionStatus === "extracting" && !hasNodes && (
+            <div className="flex flex-1 items-center justify-center text-sm text-[#6B6560]">
+              Extracting propositions...
+            </div>
+          )}
+
+          {hasNodes && (
+            <ProofGraph
+              propositions={propositions}
+              selectedNodeIds={selectedNodeIds}
+              onSelectNode={onSelectNode}
+              onToggleNode={onToggleNode}
+              sourceColorMap={sourceColorMap}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

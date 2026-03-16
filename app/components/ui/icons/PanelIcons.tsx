@@ -69,6 +69,19 @@ export function AnalyticsIcon({ className }: IconProps) {
   );
 }
 
+/** Multi-node group icon for Group Detail */
+export function GroupDetailIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="7" height="6" rx="1" />
+      <rect x="11" y="3" width="7" height="6" rx="1" />
+      <rect x="6" y="11" width="7" height="6" rx="1" />
+      <line x1="5.5" y1="9" x2="8" y2="11" />
+      <line x1="14.5" y1="9" x2="12" y2="11" />
+    </svg>
+  );
+}
+
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {
   return (

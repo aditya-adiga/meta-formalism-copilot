@@ -4,6 +4,7 @@ export type PanelId =
   | "lean"
   | "graph"
   | "node-detail"
+  | "group-detail"
   | "analytics";
 
 export type PanelDef = {

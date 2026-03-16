@@ -33,9 +33,23 @@ export type PropositionNode = {
   verificationErrors: string;
 };
 
+export type NodeGroup = {
+  id: string;
+  name: string;
+  nodeIds: string[];
+  semiformalProof: string;
+  leanCode: string;
+  verificationStatus: NodeVerificationStatus;
+  verificationErrors: string;
+  context: string;
+};
+
 export type DecompositionState = {
   nodes: PropositionNode[];
   selectedNodeId: string | null;
+  selectedNodeIds: string[];
+  activeGroupId: string | null;
+  groups: NodeGroup[];
   paperText: string;
   sources: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";

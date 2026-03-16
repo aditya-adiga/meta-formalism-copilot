@@ -1,4 +1,4 @@
-import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { PropositionNode, NodeGroup, NodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import { WORKSPACE_VERSION, WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
@@ -53,6 +53,7 @@ export function saveWorkspace(
     decomposition: {
       ...decomposition,
       nodes: decomposition.nodes.map(sanitizeNode),
+      groups: decomposition.groups ?? [],
     },
   };
 
@@ -88,10 +89,24 @@ function coerceDecomposition(raw: unknown): PersistedDecomposition {
       } as PropositionNode))
     : [];
 
+  const groups: NodeGroup[] = Array.isArray(raw.groups)
+    ? (raw.groups as unknown[]).filter(isObject).map((g) => ({
+        id: typeof g.id === "string" ? g.id : "",
+        name: typeof g.name === "string" ? g.name : "",
+        nodeIds: Array.isArray(g.nodeIds) ? (g.nodeIds as unknown[]).filter((d) => typeof d === "string") as string[] : [],
+        semiformalProof: typeof g.semiformalProof === "string" ? g.semiformalProof : "",
+        leanCode: typeof g.leanCode === "string" ? g.leanCode : "",
+        verificationStatus: sanitizeNodeStatus(typeof g.verificationStatus === "string" ? g.verificationStatus : ""),
+        verificationErrors: typeof g.verificationErrors === "string" ? g.verificationErrors : "",
+        context: typeof g.context === "string" ? g.context : "",
+      } as NodeGroup))
+    : [];
+
   return {
     nodes,
     selectedNodeId: typeof raw.selectedNodeId === "string" ? raw.selectedNodeId : null,
     paperText: typeof raw.paperText === "string" ? raw.paperText : "",
+    groups,
   };
 }
 

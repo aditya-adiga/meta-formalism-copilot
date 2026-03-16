@@ -11,13 +11,16 @@ const nodeTypes = { proofNode: ProofGraphNode };
 
 type ProofGraphProps = {
   propositions: PropositionNode[];
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
   onSelectNode: (id: string) => void;
+  onToggleNode: (id: string) => void;
   sourceColorMap: Record<string, string>;
 };
 
-export default function ProofGraph({ propositions, selectedNodeId, onSelectNode, sourceColorMap }: ProofGraphProps) {
+export default function ProofGraph({ propositions, selectedNodeIds, onSelectNode, onToggleNode, sourceColorMap }: ProofGraphProps) {
   const { nodes, edges } = useGraphLayout(propositions);
+
+  const selectedSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
   // Inject sourceColor into each node's data
   const coloredNodes = useMemo(() => {
@@ -31,10 +34,14 @@ export default function ProofGraph({ propositions, selectedNodeId, onSelectNode,
   }, [nodes, sourceColorMap]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      onSelectNode(node.id);
+    (event, node) => {
+      if (event.shiftKey || event.ctrlKey || event.metaKey) {
+        onToggleNode(node.id);
+      } else {
+        onSelectNode(node.id);
+      }
     },
-    [onSelectNode],
+    [onSelectNode, onToggleNode],
   );
 
   return (
@@ -42,7 +49,7 @@ export default function ProofGraph({ propositions, selectedNodeId, onSelectNode,
       <ReactFlow
         nodes={coloredNodes.map((n) => ({
           ...n,
-          selected: n.id === selectedNodeId,
+          selected: selectedSet.has(n.id),
         }))}
         edges={edges}
         nodeTypes={nodeTypes}

@@ -9,6 +9,7 @@ import SemiformalPanel from "@/app/components/panels/SemiformalPanel";
 import LeanPanel from "@/app/components/panels/LeanPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
+import GroupDetailPanel from "@/app/components/panels/GroupDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
@@ -23,6 +24,7 @@ import {
   LeanIcon,
   GraphIcon,
   NodeDetailIcon,
+  GroupDetailIcon,
   AnalyticsIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
@@ -75,10 +77,18 @@ export default function Home() {
 
   // --- Ephemeral state (not persisted) ---
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
+  const [groupContext, setGroupContext] = useState("");
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
+  const {
+    state: decomp, selectedNode, selectedNodes, activeGroup,
+    extractPropositions, selectNode, toggleNodeSelection,
+    updateNode,
+    createGroup, updateGroup, deleteGroup, setActiveGroup,
+    resetState: resetDecomp,
+  } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
+  const isMultiSelect = decomp.selectedNodeIds.length > 1;
 
   // --- Auto-formalize queue ---
   const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode);
@@ -93,14 +103,15 @@ export default function Home() {
     }
   }, [restoredDecompState, resetDecomp]);
 
-  // Keep persistence layer in sync with decomposition changes
+  // Keep persistence layer in sync with decomposition changes (including groups)
   useEffect(() => {
     persistDecompState({
       nodes: decomp.nodes,
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
+      groups: decomp.groups,
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.groups, persistDecompState]);
 
   // --- Session state ---
   const {
@@ -498,6 +509,7 @@ export default function Home() {
     }
   }, [sourceDocuments, pdfFile, extractPropositions]);
 
+  /** Single-click a node in the graph */
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
     setActivePanelId("node-detail");
@@ -510,6 +522,103 @@ export default function Home() {
       }
     }
   }, [selectNode, decomp.nodes, sessionsForScope, selectSession]);
+
+  /** Shift/Ctrl+click a node in the graph: toggle multi-selection */
+  const handleToggleNodeSelection = useCallback((id: string) => {
+    toggleNodeSelection(id);
+    // Navigate to group-detail when we have >1 node selected
+    // We check the current state + the toggle to predict the new count
+    const currentIds = decomp.selectedNodeIds;
+    const willBeSelected = !currentIds.includes(id);
+    const newCount = willBeSelected ? currentIds.length + 1 : currentIds.length - 1;
+    if (newCount > 1) {
+      setActivePanelId("group-detail");
+    } else if (newCount === 1) {
+      setActivePanelId("node-detail");
+    }
+  }, [toggleNodeSelection, decomp.selectedNodeIds]);
+
+  /** Recall a saved group from the sidebar */
+  const handleRecallGroup = useCallback((groupId: string) => {
+    setActiveGroup(groupId);
+    const group = decomp.groups.find((g) => g.id === groupId);
+    if (group) {
+      setGroupContext(group.context);
+    }
+    setActivePanelId("group-detail");
+  }, [setActiveGroup, decomp.groups]);
+
+  /** Save current multi-selection as a new group */
+  const handleSaveGroup = useCallback((name: string) => {
+    createGroup(name, decomp.selectedNodeIds);
+  }, [createGroup, decomp.selectedNodeIds]);
+
+  /** Save group from the graph panel header (uses default name) */
+  const handleSaveGroupFromGraph = useCallback(() => {
+    const name = `Group (${decomp.selectedNodeIds.length} nodes)`;
+    createGroup(name, decomp.selectedNodeIds);
+    setActivePanelId("group-detail");
+  }, [createGroup, decomp.selectedNodeIds]);
+
+  /** Update the active group */
+  const handleUpdateGroup = useCallback((updates: { name?: string; nodeIds?: string[] }) => {
+    if (!decomp.activeGroupId) return;
+    updateGroup(decomp.activeGroupId, updates);
+  }, [decomp.activeGroupId, updateGroup]);
+
+  /** Delete the active group */
+  const handleDeleteGroup = useCallback(() => {
+    if (!decomp.activeGroupId) return;
+    deleteGroup(decomp.activeGroupId);
+    setActivePanelId("graph");
+  }, [decomp.activeGroupId, deleteGroup]);
+
+  /** Formalize as group: sends combined text from all selected nodes */
+  const handleFormalizeGroup = useCallback(async () => {
+    if (selectedNodes.length === 0) return;
+
+    // Build combined source text from all selected nodes
+    const combinedText = selectedNodes
+      .map((n) => `## ${n.label} (${n.kind})\n${n.statement}\n${n.proofText ? `\nProof: ${n.proofText}` : ""}`)
+      .join("\n\n---\n\n");
+
+    setLoadingPhase("semiformal");
+    setActivePanelId("semiformal");
+
+    try {
+      const semiformalData = await fetchApi<{ proof: string }>(
+        "/api/formalization/semiformal",
+        { text: combinedText, context: groupContext || undefined },
+      );
+
+      // Store result in the active group if saved
+      if (decomp.activeGroupId) {
+        updateGroup(decomp.activeGroupId, {
+          semiformalProof: semiformalData.proof,
+          context: groupContext,
+        });
+      }
+
+      // Also set global semiformal so the panel shows it
+      setSemiformalText(semiformalData.proof);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setSemiformalText(`Error: ${msg}`);
+      if (decomp.activeGroupId) {
+        updateGroup(decomp.activeGroupId, { verificationErrors: msg });
+      }
+    } finally {
+      setLoadingPhase("idle");
+    }
+  }, [selectedNodes, groupContext, decomp.activeGroupId, updateGroup, setSemiformalText]);
+
+  /** Update group context (syncs to active group if saved) */
+  const handleGroupContextChange = useCallback((text: string) => {
+    setGroupContext(text);
+    if (decomp.activeGroupId) {
+      updateGroup(decomp.activeGroupId, { context: text });
+    }
+  }, [decomp.activeGroupId, updateGroup]);
 
   // Resolve dependencies for NodeDetailPanel
   const selectedNodeDeps = useMemo(() => {
@@ -549,6 +658,17 @@ export default function Home() {
       hidden: !selectedNode,
     },
     {
+      id: "group-detail" as PanelId,
+      label: "Group Detail",
+      icon: <GroupDetailIcon />,
+      statusSummary: activeGroup
+        ? activeGroup.name
+        : isMultiSelect
+          ? `${decomp.selectedNodeIds.length} nodes selected`
+          : "",
+      hidden: !isMultiSelect && !activeGroup,
+    },
+    {
       id: "semiformal" as PanelId,
       label: "Semiformal Proof",
       icon: <SemiformalIcon />,
@@ -578,7 +698,7 @@ export default function Home() {
       icon: <AnalyticsIcon />,
       statusSummary: "Cost estimates",
     },
-  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, decomp.nodes, selectedNode]);
+  ], [sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode, loadingPhase, activeVerificationStatus, semiformalReadyForLean, hasDecomp, decomp.nodes, decomp.selectedNodeIds, selectedNode, activeGroup, isMultiSelect]);
 
   // --- Export All handler ---
   const hasExportableContent = Boolean(semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0);
@@ -653,8 +773,9 @@ export default function Home() {
     graph: (
       <GraphPanel
         propositions={decomp.nodes}
-        selectedNodeId={decomp.selectedNodeId}
+        selectedNodeIds={decomp.selectedNodeIds}
         onSelectNode={handleSelectNode}
+        onToggleNode={handleToggleNodeSelection}
         hasContent={sourceDocuments.length > 0}
         sourceDocuments={sourceDocuments}
         extractionStatus={decomp.extractionStatus}
@@ -664,6 +785,10 @@ export default function Home() {
         onPauseQueue={pauseQueue}
         onResumeQueue={resumeQueue}
         onCancelQueue={cancelQueue}
+        groups={decomp.groups}
+        activeGroupId={decomp.activeGroupId}
+        onRecallGroup={handleRecallGroup}
+        onSaveGroup={handleSaveGroupFromGraph}
       />
     ),
     "node-detail": selectedNode ? (
@@ -673,6 +798,19 @@ export default function Home() {
         onFormalise={handleNodeGenerateSemiformal}
         onGenerateLean={handleNodeGenerateLean}
         loading={loadingPhase !== "idle" || queueRunning}
+      />
+    ) : undefined,
+    "group-detail": (isMultiSelect || activeGroup) ? (
+      <GroupDetailPanel
+        selectedNodes={selectedNodes}
+        activeGroup={activeGroup}
+        onSaveGroup={handleSaveGroup}
+        onUpdateGroup={handleUpdateGroup}
+        onDeleteGroup={handleDeleteGroup}
+        onFormalizeGroup={handleFormalizeGroup}
+        loading={loadingPhase !== "idle"}
+        onGroupContextChange={handleGroupContextChange}
+        groupContext={groupContext}
       />
     ) : undefined,
     analytics: (
@@ -685,11 +823,14 @@ export default function Home() {
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
     semiformalDirty, semiformalReadyForLean, isDecompMode, decomp, queueRunning,
     selectedNode, selectedNodeDeps, sourceDocuments,
+    selectedNodes, activeGroup, isMultiSelect, groupContext,
     queueProgress, startQueue, pauseQueue, resumeQueue, cancelQueue,
     setSourceText, setExtractedFiles, setContextText,
     handleGenerateSemiformal, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     handleRegenerateLean, handleReVerify, handleLeanIterate,
-    handleSelectNode, handleDecompose, handleNodeGenerateSemiformal, handleNodeGenerateLean,
+    handleSelectNode, handleToggleNodeSelection, handleDecompose,
+    handleNodeGenerateSemiformal, handleNodeGenerateLean,
+    handleRecallGroup, handleSaveGroupFromGraph, handleSaveGroup, handleUpdateGroup, handleDeleteGroup, handleFormalizeGroup, handleGroupContextChange,
     activeSession, allSessions, handleSelectSession,
   ]);
 
