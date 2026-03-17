@@ -19,9 +19,6 @@ export type NodeKind =
   | "methodology"
   | "conclusion";
 
-/** @deprecated Use NodeKind instead */
-export type PropositionKind = NodeKind;
-
 export type NodeVerificationStatus =
   | "unverified"
   | "in-progress"
