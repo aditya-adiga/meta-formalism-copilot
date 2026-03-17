@@ -7,15 +7,11 @@ type InlineEditPopupProps = {
   onApply: (instruction: string) => void;
   onClose: () => void;
   selectedText: string;
-  position?: { top: number; left: number };
 };
 
 export default function InlineEditPopup({
   onApply,
   onClose,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  selectedText,
-  position,
 }: InlineEditPopupProps) {
   const [instruction, setInstruction] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,14 +41,9 @@ export default function InlineEditPopup({
     }
   };
 
-  const style: React.CSSProperties = position
-    ? { position: "absolute", top: position.top, left: position.left, zIndex: 50 }
-    : {};
-
   return (
     <div
       className="transition-opacity duration-200"
-      style={style}
       role="dialog"
       aria-label="Edit selection with AI"
     >

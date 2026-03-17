@@ -7,8 +7,6 @@ export type SessionRestoreHandler = (session: FormalizationSession) => void;
 
 type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors" | "artifacts">>;
 
-
-
 const STORAGE_KEY = "metaformalism-sessions";
 
 function loadFromStorage(): SessionsState {
@@ -176,10 +174,6 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     });
   }, []);
 
-  const clearActiveSession = useCallback(() => {
-    setState((prev) => ({ ...prev, activeSessionId: null }));
-  }, []);
-
   const sessionsForScope = useCallback((scope: SessionScope): FormalizationSession[] => {
     return state.sessions
       .filter((s) => scopeMatches(s.scope, scope))
@@ -188,11 +182,6 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
 
   const activeSession: FormalizationSession | null =
     state.sessions.find((s) => s.id === state.activeSessionId) ?? null;
-
-  const activeSessionForScope = useCallback((scope: SessionScope): FormalizationSession | null => {
-    if (!activeSession) return null;
-    return scopeMatches(activeSession.scope, scope) ? activeSession : null;
-  }, [activeSession]);
 
   // All sessions sorted by run number (descending), for use in session banners
   const allSessionsSorted = useMemo(() =>
@@ -230,9 +219,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     selectAndRestore,
     syncToActiveSession,
     updateSessionArtifact,
-    clearActiveSession,
     sessionsForScope,
-    activeSessionForScope,
     getSnapshot,
     resetToSnapshot,
     clearAllSessions,
