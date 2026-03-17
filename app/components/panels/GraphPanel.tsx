@@ -123,7 +123,7 @@ export default function GraphPanel({
               disabled={extractionStatus === "extracting"}
               className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
-              {queueProgress.status === "done" ? "Re-formalize All" : "Formalize All"}
+              Formalize All
             </button>
           )}
           {queueActive && (
