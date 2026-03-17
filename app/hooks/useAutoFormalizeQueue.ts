@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import { topologicalSort } from "@/app/lib/utils/topologicalSort";
@@ -37,6 +37,12 @@ export function useAutoFormalizeQueue(
   const pauseRef = useRef(false);
   const cancelSignalRef = useRef<CancelSignal>({ cancelled: false });
   const runningRef = useRef(false);
+  // Sync contextText to a ref so the async start() loop always reads the latest
+  // value without needing contextText in its dependency array (which would
+  // recreate start on every keystroke). Mid-run context changes apply to the
+  // next node, not the one currently being formalized.
+  const contextTextRef = useRef(contextText);
+  useEffect(() => { contextTextRef.current = contextText; }, [contextText]);
 
   const start = useCallback(async (artifactTypes?: ArtifactType[]) => {
     if (runningRef.current) return;
@@ -119,7 +125,7 @@ export function useAutoFormalizeQueue(
 
       setProgress((p) => ({ ...p, currentNodeId: nodeId }));
 
-      const result = await formalizeNode(node, nodes, updateNode, cancelSignalRef.current, artifactTypes, contextText);
+      const result = await formalizeNode(node, nodes, updateNode, cancelSignalRef.current, artifactTypes, contextTextRef.current);
 
       if (cancelSignalRef.current.cancelled) break;
 
@@ -139,7 +145,7 @@ export function useAutoFormalizeQueue(
       status: "done",
       currentNodeId: null,
     }));
-  }, [nodes, updateNode, contextText]);
+  }, [nodes, updateNode]);
 
   const pause = useCallback(() => {
     pauseRef.current = true;
