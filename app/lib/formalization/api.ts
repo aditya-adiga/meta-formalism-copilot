@@ -3,7 +3,7 @@
 /** Fetch a JSON API route, throwing on non-OK responses. */
 export async function fetchApi<T>(
   url: string,
-  body: Record<string, unknown>,
+  body: object,
 ): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
