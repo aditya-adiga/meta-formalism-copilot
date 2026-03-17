@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
@@ -52,6 +52,12 @@ export default function GraphPanel({
 }: GraphPanelProps) {
   const hasNodes = propositions.length > 0;
   const [exporting, setExporting] = useState(false);
+  const [progressDismissed, setProgressDismissed] = useState(false);
+
+  // Reset dismissed state when queue starts again
+  useEffect(() => {
+    if (queueProgress.status === "running") setProgressDismissed(false);
+  }, [queueProgress.status]);
   const sourceCount = sourceDocuments.length;
 
   const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
@@ -99,13 +105,13 @@ export default function GraphPanel({
             />
           )}
           {/* Formalize All / queue controls */}
-          {hasNodes && !queueActive && queueProgress.status !== "done" && (
+          {hasNodes && !queueActive && (
             <button
               onClick={onFormalizeAll}
               disabled={extractionStatus === "extracting"}
               className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
-              Formalize All
+              {queueProgress.status === "done" ? "Re-formalize All" : "Formalize All"}
             </button>
           )}
           {queueActive && (
@@ -146,7 +152,7 @@ export default function GraphPanel({
       </div>
 
       {/* Progress bar — shown when queue is active or just finished */}
-      {(queueActive || queueProgress.status === "done") && queueProgress.total > 0 && (
+      {(queueActive || (queueProgress.status === "done" && !progressDismissed)) && queueProgress.total > 0 && (
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-2">
           <div className="flex items-center justify-between text-xs text-[#6B6560]">
             <span>
@@ -156,10 +162,21 @@ export default function GraphPanel({
               {" / "}
               {queueProgress.total} total
             </span>
-            <span>
+            <span className="flex items-center gap-2">
               {queueProgress.status === "paused" && "Paused"}
               {queueProgress.status === "running" && "Running..."}
               {queueProgress.status === "done" && "Done"}
+              {queueProgress.status === "done" && (
+                <button
+                  onClick={() => setProgressDismissed(true)}
+                  className="rounded p-0.5 text-[#9A9590] hover:text-[var(--ink-black)] transition-colors"
+                  title="Dismiss"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M3 3l6 6M9 3l-6 6" />
+                  </svg>
+                </button>
+              )}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#DDD9D5]">
