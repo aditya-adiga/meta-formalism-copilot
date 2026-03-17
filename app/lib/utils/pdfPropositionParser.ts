@@ -506,9 +506,7 @@ export async function parsePdfPropositions(
     allAnnotations.push(...page.annotations);
   }
 
-  // Identify headers — also used as the TeX-compiled detection heuristic.
-  // Accept ≥2 bold-confirmed headers, or fall back to ≥3 pattern-matched headers
-  // when font metadata is opaque (some PDFs report all fonts as generic names).
+  // Check if the PDF appears to be TeX-compiled with structured propositions
   const headers = identifyPropositionHeaders(allLines);
   const boldHeaders = headers.filter((h) => h.boldConfirmed);
   if (boldHeaders.length < 2 && headers.length < 3) {
