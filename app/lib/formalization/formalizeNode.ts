@@ -1,7 +1,8 @@
 import type { PropositionNode, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
+import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
-import { generateSemiformal } from "@/app/lib/formalization/api";
+import { generateSemiformal, fetchApi } from "@/app/lib/formalization/api";
 import { leanRetryLoop } from "@/app/lib/formalization/leanRetryLoop";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
 
@@ -62,7 +63,7 @@ export async function formalizeNode(
 
     // Run non-deductive artifact generation in parallel
     if (nonDeductiveTypes.length > 0) {
-      const request = { sourceText: nodeText, context, nodeId: node.id, nodeLabel: node.label };
+      const request: ArtifactGenerationRequest = { sourceText: nodeText, context, nodeId: node.id, nodeLabel: node.label };
       const artifactResults = await generateNonDeductiveArtifacts(nonDeductiveTypes, request, signal);
 
       if (signal?.cancelled) {
@@ -91,7 +92,7 @@ export async function formalizeNode(
     // (non-deductive artifacts don't have a verification step yet)
     const finalStatus = hasSemiformal ? deductiveResult : "verified";
     updateNode(node.id, {
-      verificationStatus: finalStatus === "verified" ? "verified" : "failed",
+      verificationStatus: finalStatus,
       verificationErrors: "",
     });
     return finalStatus;
@@ -105,7 +106,7 @@ export async function formalizeNode(
 /** Generate non-deductive artifacts by calling their API routes */
 async function generateNonDeductiveArtifacts(
   types: ArtifactType[],
-  request: { sourceText: string; context: string; nodeId?: string; nodeLabel?: string },
+  request: ArtifactGenerationRequest,
   signal?: CancelSignal,
 ): Promise<Array<{ type: ArtifactType; content: unknown }>> {
   const promises = types.map(async (type): Promise<{ type: ArtifactType; content: unknown } | null> => {
@@ -114,16 +115,7 @@ async function generateNonDeductiveArtifacts(
     if (!route) return null;
 
     try {
-      const res = await fetch(route, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(`[formalizeNode:${type}]`, data.error);
-        return null;
-      }
+      const data = await fetchApi<Record<string, unknown>>(route, request);
       const key = ARTIFACT_RESPONSE_KEY[type];
       return { type, content: data[key] ?? null };
     } catch (err) {
