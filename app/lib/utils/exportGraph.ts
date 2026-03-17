@@ -3,7 +3,7 @@
  * html-to-image is only needed when exporting the React Flow graph.
  */
 
-import { toPng, toSvg } from "html-to-image";
+import { toPng } from "html-to-image";
 import { triggerDownload } from "./export";
 
 /** Query the React Flow viewport element from the DOM */
@@ -19,18 +19,6 @@ export async function downloadGraphAsPng(
 ) {
   const dataUrl = await toPng(viewportElement, {
     pixelRatio: 2,
-    backgroundColor: EXPORT_BG,
-  });
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  triggerDownload(blob, filename);
-}
-
-export async function downloadGraphAsSvg(
-  viewportElement: HTMLElement,
-  filename = "proof-graph.svg",
-) {
-  const dataUrl = await toSvg(viewportElement, {
     backgroundColor: EXPORT_BG,
   });
   const res = await fetch(dataUrl);
