@@ -4,10 +4,8 @@ import type { ReactNode } from "react";
 import WholeTextEditBar from "@/app/components/features/output-editing/ai-bars/WholeTextEditBar";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 
-/** Shared editing props accepted by all structured artifact panels. */
+/** Shared editing props for whole-document AI rewrites (shell-level). */
 export type ArtifactEditingProps = {
-  /** Called when a section edit produces new JSON content */
-  onContentChange?: (json: string) => void;
   /** Called with instruction for whole-document AI rewrites */
   onAiEdit?: (instruction: string) => void;
   /** Whether a whole-document AI edit is currently in flight */
