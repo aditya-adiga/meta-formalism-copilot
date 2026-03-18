@@ -32,7 +32,7 @@ function RoleBadge({ role }: { role: string }) {
 
 export default function StatisticalModelPanel({
   statisticalModel, streamingPreview, loading,
-  onContentChange, onAiEdit, editing, editWaitEstimate,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
 }: StatisticalModelPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(statisticalModel, onContentChange);
 
@@ -48,6 +48,8 @@ export default function StatisticalModelPanel({
       hasData={hasDisplayData}
       emptyMessage="No statistical model yet. Generate one from the source panel or node detail."
       loadingMessage="Generating statistical model..."
+      editableContent={editableContent}
+      onContentChange={onContentChange}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}

@@ -118,7 +118,7 @@ function DetailsView({
 
 export default function CausalGraphPanel({
   causalGraph, streamingPreview, loading, waitEstimate,
-  onContentChange, onAiEdit, editing, editWaitEstimate,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
 }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
@@ -134,6 +134,8 @@ export default function CausalGraphPanel({
       hasData={hasDisplayData}
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
       loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      editableContent={editableContent}
+      onContentChange={onContentChange}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
