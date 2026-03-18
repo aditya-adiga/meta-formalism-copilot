@@ -5,6 +5,7 @@ import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
+import EditableSection from "@/app/components/features/output-editing/EditableSection";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
@@ -25,13 +26,33 @@ function WeightBadge({ weight }: { weight: number }) {
   );
 }
 
-function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causalGraph"] }) {
+function DetailsView({
+  causalGraph,
+  onContentChange,
+}: {
+  causalGraph: CausalGraphResponse["causalGraph"];
+  onContentChange?: (json: string) => void;
+}) {
+  const updateField = (key: string, value: unknown) => {
+    if (!onContentChange) return;
+    onContentChange(JSON.stringify({ ...causalGraph, [key]: value }));
+  };
+
+  const updateArrayItem = (key: string, index: number, value: unknown) => {
+    if (!onContentChange) return;
+    const arr = [...((causalGraph as unknown as Record<string, unknown[]>)[key])];
+    arr[index] = value;
+    onContentChange(JSON.stringify({ ...causalGraph, [key]: arr }));
+  };
+
   return (
     <>
       {/* Summary */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-        <p className="text-sm text-[var(--ink-black)] leading-relaxed">{causalGraph.summary}</p>
+        <EditableSection value={causalGraph.summary} onChange={(v) => updateField("summary", v)}>
+          <p className="text-sm text-[var(--ink-black)] leading-relaxed">{causalGraph.summary}</p>
+        </EditableSection>
       </section>
 
       {/* Variables */}
@@ -40,14 +61,16 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
           Variables ({causalGraph.variables.length})
         </h3>
         <div className="space-y-2">
-          {causalGraph.variables.map((v) => (
-            <div key={v.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-[#9A9590]">{v.id}</span>
-                <span className="text-sm font-medium text-[var(--ink-black)]">{v.label}</span>
+          {causalGraph.variables.map((v, i) => (
+            <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
+              <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-[#9A9590]">{v.id}</span>
+                  <span className="text-sm font-medium text-[var(--ink-black)]">{v.label}</span>
+                </div>
+                <p className="mt-1 text-xs text-[#6B6560]">{v.description}</p>
               </div>
-              <p className="mt-1 text-xs text-[#6B6560]">{v.description}</p>
-            </div>
+            </EditableSection>
           ))}
         </div>
       </section>
@@ -59,15 +82,17 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
         </h3>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
-            <div key={`${e.from}-${e.to}-${i}`} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs">{e.from}</span>
-                <span className="text-[#9A9590]">&rarr;</span>
-                <span className="font-mono text-xs">{e.to}</span>
-                <WeightBadge weight={e.weight} />
+            <EditableSection key={`${e.from}-${e.to}-${i}`} value={e} onChange={(newE) => updateArrayItem("edges", i, newE)}>
+              <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs">{e.from}</span>
+                  <span className="text-[#9A9590]">&rarr;</span>
+                  <span className="font-mono text-xs">{e.to}</span>
+                  <WeightBadge weight={e.weight} />
+                </div>
+                <p className="mt-1 text-xs text-[#6B6560]">{e.mechanism}</p>
               </div>
-              <p className="mt-1 text-xs text-[#6B6560]">{e.mechanism}</p>
-            </div>
+            </EditableSection>
           ))}
         </div>
       </section>
@@ -79,13 +104,15 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
             Confounders ({causalGraph.confounders.length})
           </h3>
           <div className="space-y-2">
-            {causalGraph.confounders.map((c) => (
-              <div key={c.id} className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
-                <span className="text-sm font-medium text-amber-900">{c.label}</span>
-                <p className="mt-1 text-xs text-amber-700">
-                  Affects: {c.affectedEdges.join(", ")}
-                </p>
-              </div>
+            {causalGraph.confounders.map((c, i) => (
+              <EditableSection key={c.id} value={c} onChange={(newC) => updateArrayItem("confounders", i, newC)}>
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
+                  <span className="text-sm font-medium text-amber-900">{c.label}</span>
+                  <p className="mt-1 text-xs text-amber-700">
+                    Affects: {c.affectedEdges.join(", ")}
+                  </p>
+                </div>
+              </EditableSection>
             ))}
           </div>
         </section>
@@ -96,7 +123,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
 
 export default function CausalGraphPanel({
   causalGraph, loading, waitEstimate,
-  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+  onContentChange, onAiEdit, editing, editWaitEstimate,
 }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
@@ -107,8 +134,6 @@ export default function CausalGraphPanel({
       hasData={causalGraph !== null}
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
       loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
-      editableContent={editableContent}
-      onContentChange={onContentChange}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
@@ -144,7 +169,7 @@ export default function CausalGraphPanel({
               <CausalGraphView causalGraph={causalGraph} />
             </div>
           ) : (
-            <DetailsView causalGraph={causalGraph} />
+            <DetailsView causalGraph={causalGraph} onContentChange={onContentChange} />
           )}
         </div>
       )}

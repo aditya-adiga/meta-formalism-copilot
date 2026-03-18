@@ -2,6 +2,7 @@
 
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import EditableSection from "@/app/components/features/output-editing/EditableSection";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -16,8 +17,20 @@ type CounterexamplesPanelProps = {
 
 export default function CounterexamplesPanel({
   counterexamples, loading,
-  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+  onContentChange, onAiEdit, editing, editWaitEstimate,
 }: CounterexamplesPanelProps) {
+  const updateField = (key: string, value: unknown) => {
+    if (!counterexamples || !onContentChange) return;
+    onContentChange(JSON.stringify({ ...counterexamples, [key]: value }));
+  };
+
+  const updateArrayItem = (key: string, index: number, value: unknown) => {
+    if (!counterexamples || !onContentChange) return;
+    const arr = [...((counterexamples as unknown as Record<string, unknown[]>)[key])];
+    arr[index] = value;
+    onContentChange(JSON.stringify({ ...counterexamples, [key]: arr }));
+  };
+
   return (
     <ArtifactPanelShell
       title="Counterexamples"
@@ -25,8 +38,6 @@ export default function CounterexamplesPanel({
       hasData={counterexamples !== null}
       emptyMessage="No counterexamples yet. Generate them from the source panel or node detail."
       loadingMessage="Generating counterexamples..."
-      editableContent={editableContent}
-      onContentChange={onContentChange}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
@@ -36,13 +47,17 @@ export default function CounterexamplesPanel({
           {/* Summary */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.summary}</p>
+            <EditableSection value={counterexamples.summary} onChange={(v) => updateField("summary", v)}>
+              <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.summary}</p>
+            </EditableSection>
           </section>
 
           {/* Claim under test */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Under Test</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed italic">{counterexamples.claim}</p>
+            <EditableSection value={counterexamples.claim} onChange={(v) => updateField("claim", v)}>
+              <p className="text-sm text-[var(--ink-black)] leading-relaxed italic">{counterexamples.claim}</p>
+            </EditableSection>
           </section>
 
           {/* Counterexamples */}
@@ -51,22 +66,24 @@ export default function CounterexamplesPanel({
               Counterexamples ({counterexamples.counterexamples.length})
             </h3>
             <div className="space-y-3">
-              {counterexamples.counterexamples.map((cx) => (
-                <div key={cx.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-[#9A9590]">{cx.id}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
-                      {cx.plausibility}
-                    </span>
+              {counterexamples.counterexamples.map((cx, i) => (
+                <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("counterexamples", i, newCx)}>
+                  <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-[#9A9590]">{cx.id}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
+                        {cx.plausibility}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
+                    <div className="text-xs text-[#6B6560]">
+                      <span className="font-semibold">Targets:</span> {cx.targetAssumption}
+                    </div>
+                    <div className="text-xs text-[#6B6560]">
+                      <span className="font-semibold">Why it works:</span> {cx.explanation}
+                    </div>
                   </div>
-                  <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
-                  <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Targets:</span> {cx.targetAssumption}
-                  </div>
-                  <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Why it works:</span> {cx.explanation}
-                  </div>
-                </div>
+                </EditableSection>
               ))}
             </div>
           </section>
@@ -74,7 +91,9 @@ export default function CounterexamplesPanel({
           {/* Robustness Assessment */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Robustness Assessment</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
+            <EditableSection value={counterexamples.robustnessAssessment} onChange={(v) => updateField("robustnessAssessment", v)}>
+              <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
+            </EditableSection>
           </section>
         </>
       )}
