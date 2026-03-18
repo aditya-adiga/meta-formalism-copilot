@@ -31,6 +31,7 @@ import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
+import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
@@ -104,6 +105,20 @@ export default function Home() {
     try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
     catch { return null; }
   }, [persistedCounterexamples]);
+
+  // --- Artifact editing ---
+  const artifactEditing = useAllArtifactEditing({
+    causalGraph: persistedCausalGraph,
+    setCausalGraph: setPersistedCausalGraph,
+    statisticalModel: persistedStatisticalModel,
+    setStatisticalModel: setPersistedStatisticalModel,
+    propertyTests: persistedPropertyTests,
+    setPropertyTests: setPersistedPropertyTests,
+    dialecticalMap: persistedDialecticalMap,
+    setDialecticalMap: setPersistedDialecticalMap,
+    counterexamples: persistedCounterexamples,
+    setCounterexamples: setPersistedCounterexamples,
+  });
 
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
@@ -646,6 +661,11 @@ export default function Home() {
             causalGraph={causalGraph}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
+
+            onContentChange={setPersistedCausalGraph}
+            onAiEdit={artifactEditing.causalGraph.handleAiEdit}
+            editing={artifactEditing.causalGraph.editing}
+            editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
           />
         );
       case "statistical-model":
@@ -653,6 +673,11 @@ export default function Home() {
           <StatisticalModelPanel
             statisticalModel={statisticalModel}
             loading={statisticalModelLoading}
+
+            onContentChange={setPersistedStatisticalModel}
+            onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
+            editing={artifactEditing.statisticalModel.editing}
+            editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
           />
         );
       case "property-tests":
@@ -660,6 +685,11 @@ export default function Home() {
           <PropertyTestsPanel
             propertyTests={propertyTests}
             loading={propertyTestsLoading}
+
+            onContentChange={setPersistedPropertyTests}
+            onAiEdit={artifactEditing.propertyTests.handleAiEdit}
+            editing={artifactEditing.propertyTests.editing}
+            editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
           />
         );
       case "dialectical-map":
@@ -667,6 +697,11 @@ export default function Home() {
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
             loading={dialecticalMapLoading}
+
+            onContentChange={setPersistedDialecticalMap}
+            onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
+            editing={artifactEditing.dialecticalMap.editing}
+            editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
           />
         );
       case "counterexamples":
@@ -674,6 +709,11 @@ export default function Home() {
           <CounterexamplesPanel
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
+
+            onContentChange={setPersistedCounterexamples}
+            onAiEdit={artifactEditing.counterexamples.handleAiEdit}
+            editing={artifactEditing.counterexamples.editing}
+            editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
           />
         );
       case "analytics":
@@ -694,10 +734,16 @@ export default function Home() {
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate,
+    setPersistedCausalGraph,
     statisticalModel, statisticalModelLoading,
+    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
+    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
+    setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
+    setPersistedCounterexamples,
+    artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
   ]);
