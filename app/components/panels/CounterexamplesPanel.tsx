@@ -1,7 +1,7 @@
 "use client";
 
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -12,9 +12,12 @@ const PLAUSIBILITY_STYLES: Record<string, string> = {
 type CounterexamplesPanelProps = {
   counterexamples: CounterexamplesResponse["counterexamples"] | null;
   loading?: boolean;
-};
+} & ArtifactEditingProps;
 
-export default function CounterexamplesPanel({ counterexamples, loading }: CounterexamplesPanelProps) {
+export default function CounterexamplesPanel({
+  counterexamples, loading,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+}: CounterexamplesPanelProps) {
   return (
     <ArtifactPanelShell
       title="Counterexamples"
@@ -22,6 +25,11 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
       hasData={counterexamples !== null}
       emptyMessage="No counterexamples yet. Generate them from the source panel or node detail."
       loadingMessage="Generating counterexamples..."
+      editableContent={editableContent}
+      onContentChange={onContentChange}
+      onAiEdit={onAiEdit}
+      editing={editing}
+      editWaitEstimate={editWaitEstimate}
     >
       {counterexamples && (
         <>

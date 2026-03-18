@@ -1,14 +1,17 @@
 "use client";
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 
 type DialecticalMapPanelProps = {
   dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
   loading?: boolean;
-};
+} & ArtifactEditingProps;
 
-export default function DialecticalMapPanel({ dialecticalMap, loading }: DialecticalMapPanelProps) {
+export default function DialecticalMapPanel({
+  dialecticalMap, loading,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+}: DialecticalMapPanelProps) {
   return (
     <ArtifactPanelShell
       title="Dialectical Map"
@@ -16,6 +19,11 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
       hasData={dialecticalMap !== null}
       emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
       loadingMessage="Generating dialectical map..."
+      editableContent={editableContent}
+      onContentChange={onContentChange}
+      onAiEdit={onAiEdit}
+      editing={editing}
+      editWaitEstimate={editWaitEstimate}
     >
       {dialecticalMap && (
         <>

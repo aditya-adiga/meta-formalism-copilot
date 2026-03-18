@@ -1,14 +1,17 @@
 "use client";
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 
 type PropertyTestsPanelProps = {
   propertyTests: PropertyTestsResponse["propertyTests"] | null;
   loading?: boolean;
-};
+} & ArtifactEditingProps;
 
-export default function PropertyTestsPanel({ propertyTests, loading }: PropertyTestsPanelProps) {
+export default function PropertyTestsPanel({
+  propertyTests, loading,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+}: PropertyTestsPanelProps) {
   return (
     <ArtifactPanelShell
       title="Property Tests"
@@ -16,6 +19,11 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
       hasData={propertyTests !== null}
       emptyMessage="No property tests yet. Generate them from the source panel or node detail."
       loadingMessage="Generating property tests..."
+      editableContent={editableContent}
+      onContentChange={onContentChange}
+      onAiEdit={onAiEdit}
+      editing={editing}
+      editWaitEstimate={editWaitEstimate}
     >
       {propertyTests && (
         <>

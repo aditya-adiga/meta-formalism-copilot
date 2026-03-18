@@ -1,12 +1,12 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
   loading?: boolean;
-};
+} & ArtifactEditingProps;
 
 const ROLE_COLORS: Record<string, string> = {
   independent: "text-blue-700 bg-blue-50 border-blue-200",
@@ -24,7 +24,10 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-export default function StatisticalModelPanel({ statisticalModel, loading }: StatisticalModelPanelProps) {
+export default function StatisticalModelPanel({
+  statisticalModel, loading,
+  editableContent, onContentChange, onAiEdit, editing, editWaitEstimate,
+}: StatisticalModelPanelProps) {
   return (
     <ArtifactPanelShell
       title="Statistical Model"
@@ -32,6 +35,11 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
       hasData={statisticalModel !== null}
       emptyMessage="No statistical model yet. Generate one from the source panel or node detail."
       loadingMessage="Generating statistical model..."
+      editableContent={editableContent}
+      onContentChange={onContentChange}
+      onAiEdit={onAiEdit}
+      editing={editing}
+      editWaitEstimate={editWaitEstimate}
     >
       {statisticalModel && (
         <>
