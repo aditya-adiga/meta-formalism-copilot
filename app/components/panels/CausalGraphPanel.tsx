@@ -111,7 +111,7 @@ export default function CausalGraphPanel({ causalGraph, streamingPreview, loadin
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
       loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
     >
-      {displayGraph && hasDisplayData && (
+      {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
           {/* View toggle */}
           <div className="flex gap-1 mb-3">
