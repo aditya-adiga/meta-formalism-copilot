@@ -3,6 +3,7 @@
 import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
 
 type NodeDetailPanelProps = {
@@ -17,6 +18,7 @@ type NodeDetailPanelProps = {
   onNodeContextChange: (text: string) => void;
   onNodeArtifactTypesChange: (types: ArtifactType[]) => void;
   loadingState?: ArtifactLoadingState;
+  waitEstimate?: WaitTimeEstimate | null;
 };
 
 const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: string }> = {
@@ -29,6 +31,7 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
 export default function NodeDetailPanel({
   node, dependencies, onFormalise, onGenerateLean, loading,
   globalContextText, onNodeContextChange, onNodeArtifactTypesChange, loadingState = {},
+  waitEstimate,
 }: NodeDetailPanelProps) {
   const status = STATUS_LABELS[node.verificationStatus];
 
@@ -162,9 +165,21 @@ export default function NodeDetailPanel({
               type="button"
               onClick={onGenerateLean}
               disabled={loading}
-              className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+              className="relative w-full overflow-hidden rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
             >
-              {loading ? "Generating..." : "Generate Lean4 Code"}
+              {loading && waitEstimate && (
+                <span
+                  className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-1000 ease-linear"
+                  style={{ width: `${Math.round(waitEstimate.progress * 100)}%` }}
+                />
+              )}
+              <span className="relative">
+                {loading
+                  ? waitEstimate
+                    ? `Generating... ${waitEstimate.remainingLabel}`
+                    : "Generating..."
+                  : "Generate Lean4 Code"}
+              </span>
             </button>
           </div>
         )}
@@ -179,6 +194,7 @@ export default function NodeDetailPanel({
           loading={loading}
           loadingState={loadingState}
           contextPlaceholder={globalContextText || "e.g., Explore this in the context of decision theory within game-theoretic settings..."}
+          waitEstimate={waitEstimate}
         />
       </div>
     </div>
