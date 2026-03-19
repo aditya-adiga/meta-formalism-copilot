@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { streamLlm, sseEvent } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
@@ -62,7 +69,8 @@ theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
 }
 
 export async function POST(request: NextRequest) {
-  const { informalProof, previousAttempt, errors, instruction, contextLeanCode } = await request.json();
+  const body = await request.json();
+  const { informalProof, previousAttempt, errors, instruction, contextLeanCode, stream: wantStream } = body;
 
   const isRetry = Boolean(previousAttempt && errors);
   const hasContext = Boolean(contextLeanCode);
@@ -80,6 +88,61 @@ export async function POST(request: NextRequest) {
     : informalProof;
   if (instruction) {
     userContent += `\n\nAdditional instruction: ${instruction}`;
+  }
+
+  // Streaming path: stream raw tokens, then post-process the final text
+  if (wantStream) {
+    const rawStream = streamLlm({
+      endpoint: "formalization/lean",
+      systemPrompt,
+      userContent,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+
+    // Transform the `done` event to apply stripCodeFences and import stripping
+    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        // Parse SSE events in this chunk
+        const events = text.split("\n\n").filter(Boolean);
+        for (const eventBlock of events) {
+          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
+          if (!eventMatch) {
+            controller.enqueue(chunk);
+            continue;
+          }
+          const [, eventType, dataStr] = eventMatch;
+          if (eventType === "done") {
+            try {
+              const data = JSON.parse(dataStr);
+              // Mock provider: use mock response
+              if (data.usage?.provider === "mock") {
+                data.text = mockResponse(informalProof, isRetry);
+              } else {
+                data.text = stripCodeFences(data.text);
+              }
+              // Strip imports when context provides them
+              if (hasContext) {
+                data.text = data.text
+                  .split("\n")
+                  .filter((line: string) => !/^import\s+/.test(line.trim()))
+                  .join("\n")
+                  .replace(/^\n+/, "");
+              }
+              controller.enqueue(sseEvent("done", data));
+            } catch {
+              controller.enqueue(chunk);
+            }
+          } else {
+            // Pass through token and error events unchanged
+            controller.enqueue(new TextEncoder().encode(eventBlock + "\n\n"));
+          }
+        }
+      },
+    }));
+
+    return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
   }
 
   try {
