@@ -7,7 +7,7 @@ import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts
 import { generateSemiformalStreaming, fetchStreamingApi } from "@/app/lib/formalization/api";
 import { throttle } from "@/app/lib/utils/throttle";
 import { parse as parsePartialJson } from "partial-json";
-import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
+import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -53,11 +53,15 @@ export function useArtifactGeneration() {
         if (!route) return [type, null];
 
         // Stream JSON artifacts with partial-JSON parsing for progressive rendering
+        const responseKey = ARTIFACT_RESPONSE_KEY[type];
         const onPartial = throttle((accumulated: string) => {
           try {
-            const partial = parsePartialJson(accumulated);
+            const partial = parsePartialJson(stripLeadingCodeFence(accumulated));
             if (partial && typeof partial === "object") {
-              setStreamingJsonPreview((prev) => ({ ...prev, [type]: partial }));
+              // Extract inner value by response key (e.g. {"causalGraph": {...}} → {...})
+              // so the preview matches what panels expect.
+              const inner = (partial as Record<string, unknown>)[responseKey] ?? partial;
+              setStreamingJsonPreview((prev) => ({ ...prev, [type]: inner }));
             }
           } catch {
             // partial-json parse failed — keep previous preview
