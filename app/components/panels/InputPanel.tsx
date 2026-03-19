@@ -22,6 +22,7 @@ type InputPanelProps = {
   onArtifactTypesChange: (types: ArtifactType[]) => void;
   loadingState?: ArtifactLoadingState;
   waitEstimate?: WaitTimeEstimate | null;
+  decomposeWaitEstimate?: WaitTimeEstimate | null;
 };
 
 export default function InputPanel({
@@ -38,7 +39,8 @@ export default function InputPanel({
   selectedArtifactTypes,
   onArtifactTypesChange,
   loadingState,
-  // waitEstimate available via props for future use
+  waitEstimate,
+  decomposeWaitEstimate,
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -60,9 +62,21 @@ export default function InputPanel({
                 type="button"
                 onClick={onDecompose}
                 disabled={decomposing || loading}
-                className="w-full rounded-full border border-[var(--ink-black)] bg-transparent px-6 py-2.5 text-sm font-medium text-[var(--ink-black)] shadow-sm transition-all duration-200 hover:bg-[var(--ink-black)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+                className="relative w-full overflow-hidden rounded-full border border-[var(--ink-black)] bg-transparent px-6 py-2.5 text-sm font-medium text-[var(--ink-black)] shadow-sm transition-all duration-200 hover:bg-[var(--ink-black)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
               >
-                {decomposing ? "Decomposing..." : "Decompose into nodes"}
+                {decomposing && decomposeWaitEstimate && (
+                  <span
+                    className="absolute inset-y-0 left-0 bg-[var(--ink-black)]/10 transition-[width] duration-1000 ease-linear"
+                    style={{ width: `${Math.round(decomposeWaitEstimate.progress * 100)}%` }}
+                  />
+                )}
+                <span className="relative">
+                  {decomposing
+                    ? decomposeWaitEstimate
+                      ? `Decomposing... ${decomposeWaitEstimate.remainingLabel}`
+                      : "Decomposing..."
+                    : "Decompose into nodes"}
+                </span>
               </button>
             </div>
           )}
@@ -84,6 +98,7 @@ export default function InputPanel({
           onGenerate={onFormalise}
           loading={loading}
           loadingState={loadingState}
+          waitEstimate={waitEstimate}
         />
       </div>
     </div>

@@ -367,6 +367,18 @@ export default function Home() {
     causalGraphLoading ? "formalization/causal-graph" : null,
     inputCharCount,
   );
+  const decomposeWaitEstimate = useWaitTimeEstimate(
+    decomp.extractionStatus === "extracting" ? "decomposition/extract" : null,
+    inputCharCount,
+  );
+  // Per-node wait estimate for queue processing (uses the currently-processing node's statement length)
+  const queueCurrentNode = queueProgress.currentNodeId
+    ? decomp.nodes.find((n) => n.id === queueProgress.currentNodeId)
+    : null;
+  const queueNodeWaitEstimate = useWaitTimeEstimate(
+    queueProgress.status === "running" && queueCurrentNode ? "formalization/semiformal" : null,
+    queueCurrentNode?.statement.length ?? 0,
+  );
 
   // --- Handlers ---
 
@@ -573,6 +585,7 @@ export default function Home() {
             onArtifactTypesChange={setSelectedArtifactTypes}
             loadingState={artifactLoadingState}
             waitEstimate={waitEstimate}
+            decomposeWaitEstimate={decomposeWaitEstimate}
           />
         );
       case "semiformal":
@@ -620,6 +633,8 @@ export default function Home() {
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
+            decomposeWaitEstimate={decomposeWaitEstimate}
+            queueNodeWaitEstimate={queueNodeWaitEstimate}
           />
         );
       case "node-detail":
@@ -634,6 +649,7 @@ export default function Home() {
             onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
             onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
             loadingState={artifactLoadingState}
+            waitEstimate={waitEstimate}
           />
         ) : undefined;
       case "causal-graph":
@@ -726,7 +742,7 @@ export default function Home() {
     setPersistedCounterexamples,
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
-    waitEstimate,
+    waitEstimate, decomposeWaitEstimate, queueNodeWaitEstimate,
   ]);
 
   return (

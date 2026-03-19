@@ -6,6 +6,7 @@ import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposit
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
+import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
 // Dynamic import to avoid SSR issues with ReactFlow
@@ -37,6 +38,8 @@ type GraphPanelProps = {
   onPauseQueue: () => void;
   onResumeQueue: () => void;
   onCancelQueue: () => void;
+  decomposeWaitEstimate?: WaitTimeEstimate | null;
+  queueNodeWaitEstimate?: WaitTimeEstimate | null;
 };
 
 export default function GraphPanel({
@@ -53,6 +56,8 @@ export default function GraphPanel({
   onPauseQueue,
   onResumeQueue,
   onCancelQueue,
+  decomposeWaitEstimate,
+  queueNodeWaitEstimate,
 }: GraphPanelProps) {
   const hasNodes = propositions.length > 0;
   const [exporting, setExporting] = useState(false);
@@ -79,7 +84,9 @@ export default function GraphPanel({
   }, [sourceDocuments]);
 
   const buttonLabel = extractionStatus === "extracting"
-    ? "Decomposing..."
+    ? decomposeWaitEstimate
+      ? `Decomposing... ${decomposeWaitEstimate.remainingLabel}`
+      : "Decomposing..."
     : `Decompose ${sourceCount} Source${sourceCount !== 1 ? "s" : ""}`;
 
   const handleExportGraph = useCallback(async () => {
@@ -155,9 +162,15 @@ export default function GraphPanel({
             <button
               onClick={onDecompose}
               disabled={extractionStatus === "extracting" || queueActive}
-              className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+              className="relative overflow-hidden rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
-              {buttonLabel}
+              {extractionStatus === "extracting" && decomposeWaitEstimate && (
+                <span
+                  className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-1000 ease-linear"
+                  style={{ width: `${Math.round(decomposeWaitEstimate.progress * 100)}%` }}
+                />
+              )}
+              <span className="relative">{buttonLabel}</span>
             </button>
           )}
         </div>
@@ -176,7 +189,7 @@ export default function GraphPanel({
             </span>
             <span className="flex items-center gap-2">
               {queueProgress.status === "paused" && "Paused"}
-              {queueProgress.status === "running" && "Running..."}
+              {queueProgress.status === "running" && (queueNodeWaitEstimate ? `Running... ${queueNodeWaitEstimate.remainingLabel}` : "Running...")}
               {queueProgress.status === "done" && "Done"}
               {queueProgress.status === "done" && (
                 <button
@@ -267,7 +280,7 @@ export default function GraphPanel({
 
         {extractionStatus === "extracting" && !hasNodes && (
           <div className="flex flex-1 items-center justify-center text-sm text-[#6B6560]">
-            Extracting propositions...
+            Extracting propositions...{decomposeWaitEstimate ? ` ${decomposeWaitEstimate.remainingLabel}` : ""}
           </div>
         )}
 
