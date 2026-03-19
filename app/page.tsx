@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -77,25 +78,25 @@ export default function Home() {
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
   const causalGraph = useMemo(() => {
     if (!persistedCausalGraph) return null;
-    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+    try { return JSON.parse(persistedCausalGraph) as CausalGraphResponse["causalGraph"]; }
     catch { return null; }
   }, [persistedCausalGraph]);
 
   const statisticalModel = useMemo(() => {
     if (!persistedStatisticalModel) return null;
-    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
+    try { return JSON.parse(persistedStatisticalModel) as StatisticalModelResponse["statisticalModel"]; }
     catch { return null; }
   }, [persistedStatisticalModel]);
 
   const propertyTests = useMemo(() => {
     if (!persistedPropertyTests) return null;
-    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
+    try { return JSON.parse(persistedPropertyTests) as PropertyTestsResponse["propertyTests"]; }
     catch { return null; }
   }, [persistedPropertyTests]);
 
   const dialecticalMap = useMemo(() => {
     if (!persistedDialecticalMap) return null;
-    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+    try { return JSON.parse(persistedDialecticalMap) as DialecticalMapResponse["dialecticalMap"]; }
     catch { return null; }
   }, [persistedDialecticalMap]);
 
@@ -645,7 +646,7 @@ export default function Home() {
         return (
           <CausalGraphPanel
             causalGraph={causalGraph}
-            streamingPreview={streamingJsonPreview["causal-graph"] as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"] | undefined}
+            streamingPreview={streamingJsonPreview["causal-graph"] as CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
           />

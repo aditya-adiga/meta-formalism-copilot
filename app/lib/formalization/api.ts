@@ -100,20 +100,6 @@ export async function fetchStreamingApi(
   return finalResult;
 }
 
-/**
- * Streaming variant for JSON artifact types. Streams tokens and calls
- * onPartial with the accumulated raw text (for partial-JSON parsing on the caller side).
- * Returns the final complete text from the done event.
- */
-export async function fetchJsonArtifactStreaming(
-  url: string,
-  body: Record<string, unknown>,
-  onPartial: (accumulated: string) => void,
-): Promise<string> {
-  const result = await fetchStreamingApi(url, body, { onToken: onPartial });
-  return result.text;
-}
-
 export async function verifyLean(leanCode: string) {
   const res = await fetch("/api/verification/lean", {
     method: "POST",

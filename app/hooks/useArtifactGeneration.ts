@@ -4,9 +4,10 @@ import { useState, useCallback, useMemo } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
-import { generateSemiformalStreaming, fetchJsonArtifactStreaming } from "@/app/lib/formalization/api";
+import { generateSemiformalStreaming, fetchStreamingApi } from "@/app/lib/formalization/api";
 import { throttle } from "@/app/lib/utils/throttle";
 import { parse as parsePartialJson } from "partial-json";
+import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -53,7 +54,6 @@ export function useArtifactGeneration() {
 
         // Stream JSON artifacts with partial-JSON parsing for progressive rendering
         const onPartial = throttle((accumulated: string) => {
-          setStreamingPreview((prev) => ({ ...prev, [type]: accumulated }));
           try {
             const partial = parsePartialJson(accumulated);
             if (partial && typeof partial === "object") {
@@ -64,11 +64,10 @@ export function useArtifactGeneration() {
           }
         }, 50);
 
-        const finalText = await fetchJsonArtifactStreaming(route, request, onPartial);
+        const { text: finalText } = await fetchStreamingApi(route, request, { onToken: onPartial });
 
         // Parse the final complete JSON
         try {
-          const { stripCodeFences } = await import("@/app/lib/utils/stripCodeFences");
           const parsed = JSON.parse(stripCodeFences(finalText));
           const responseKey = ARTIFACT_RESPONSE_KEY[type];
           return [type, parsed[responseKey] ?? parsed];
