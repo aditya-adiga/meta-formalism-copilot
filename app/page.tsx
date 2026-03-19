@@ -107,7 +107,7 @@ export default function Home() {
 
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
-  const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
+  const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
 
   // --- Analytics ---
   const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
@@ -645,6 +645,7 @@ export default function Home() {
         return (
           <CausalGraphPanel
             causalGraph={causalGraph}
+            streamingPreview={streamingJsonPreview["causal-graph"] as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
           />
@@ -694,7 +695,7 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
     dialecticalMap, dialecticalMapLoading,

@@ -8,6 +8,8 @@ import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphV
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
+  /** Partial graph data from streaming (partial-JSON parsed) */
+  streamingPreview?: CausalGraphResponse["causalGraph"] | null;
   loading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
 };
@@ -94,18 +96,22 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
   );
 }
 
-export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }: CausalGraphPanelProps) {
+export default function CausalGraphPanel({ causalGraph, streamingPreview, loading, waitEstimate }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
+
+  // Show streaming preview during generation, final data when done
+  const displayGraph = causalGraph ?? streamingPreview ?? null;
+  const hasDisplayData = displayGraph !== null && (displayGraph.variables?.length ?? 0) > 0;
 
   return (
     <ArtifactPanelShell
       title="Causal Graph"
-      loading={loading}
-      hasData={causalGraph !== null}
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
       loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
     >
-      {causalGraph && (
+      {displayGraph && hasDisplayData && (
         <div className="flex flex-col h-full">
           {/* View toggle */}
           <div className="flex gap-1 mb-3">
@@ -133,10 +139,10 @@ export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }:
 
           {viewMode === "graph" ? (
             <div className="flex-1 min-h-[400px]">
-              <CausalGraphView causalGraph={causalGraph} />
+              <CausalGraphView causalGraph={displayGraph} />
             </div>
           ) : (
-            <DetailsView causalGraph={causalGraph} />
+            <DetailsView causalGraph={displayGraph} />
           )}
         </div>
       )}
