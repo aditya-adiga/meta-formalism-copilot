@@ -87,13 +87,11 @@ export async function fetchStreamingApi(
           finalResult = { text: parsed.text, usage: parsed.usage };
         } catch { /* skip malformed */ }
       } else if (eventType === "error") {
+        let errorMsg = "Stream error";
         try {
-          const parsed = JSON.parse(dataStr);
-          throw new Error(parsed.error ?? "Stream error");
-        } catch (e) {
-          if (e instanceof Error && e.message !== "Stream error") throw e;
-          throw new Error("Stream error");
-        }
+          errorMsg = JSON.parse(dataStr).error ?? errorMsg;
+        } catch { /* use default */ }
+        throw new Error(errorMsg);
       }
     }
   }
@@ -129,11 +127,11 @@ export async function generateLean(
 /** Streaming variant of generateLean — calls onToken with accumulated text as tokens arrive. */
 export async function generateLeanStreaming(
   informalProof: string,
+  previousAttempt: string | undefined,
+  errors: string | undefined,
+  instruction: string | undefined,
+  contextLeanCode: string | undefined,
   onToken: (accumulated: string) => void,
-  previousAttempt?: string,
-  errors?: string,
-  instruction?: string,
-  contextLeanCode?: string,
 ): Promise<string> {
   const result = await fetchStreamingApi(
     "/api/formalization/lean",

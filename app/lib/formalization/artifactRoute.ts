@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import type { ResponseFormat } from "@/app/lib/llm/callLlm";
-import { streamLlm } from "@/app/lib/llm/streamLlm";
+import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
-
-const SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache",
-  Connection: "keep-alive",
-} as const;
 
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];
@@ -137,6 +131,14 @@ export async function handleArtifactRoute(
   }
 }
 
+/** Wrap a single SSE event in a Response. */
+function sseResponse(event: Uint8Array, status = 200): NextResponse {
+  const stream = new ReadableStream({
+    start(controller) { controller.enqueue(event); controller.close(); },
+  });
+  return new Response(stream, { headers: SSE_HEADERS, status }) as unknown as NextResponse;
+}
+
 /** Run a batch LLM call and wrap the result as a single SSE `done` event.
  *  Used for JSON artifact types where streaming raw tokens isn't useful. */
 async function handleBatchAsSSE(
@@ -144,7 +146,6 @@ async function handleBatchAsSSE(
   body: ArtifactGenerationRequest,
   userMessage: string,
 ): Promise<NextResponse> {
-  const { sseEvent } = await import("@/app/lib/llm/streamLlm");
   try {
     const { text: responseText, usage } = await callLlm({
       endpoint: config.endpoint,
@@ -154,32 +155,13 @@ async function handleBatchAsSSE(
       openRouterModel: OPENROUTER_MODEL,
     });
 
-    if (usage.provider === "mock") {
-      const mockText = JSON.stringify(config.mockResponse(body.sourceText));
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(sseEvent("done", { text: mockText, usage }));
-          controller.close();
-        },
-      });
-      return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
-    }
+    const text = usage.provider === "mock"
+      ? JSON.stringify(config.mockResponse(body.sourceText))
+      : responseText;
 
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(sseEvent("done", { text: responseText, usage }));
-        controller.close();
-      },
-    });
-    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+    return sseResponse(sseEvent("done", { text, usage }));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(sseEvent("error", { error: message, details: "" }));
-        controller.close();
-      },
-    });
-    return new Response(stream, { headers: SSE_HEADERS, status: 502 }) as unknown as NextResponse;
+    return sseResponse(sseEvent("error", { error: message, details: "" }), 502);
   }
 }

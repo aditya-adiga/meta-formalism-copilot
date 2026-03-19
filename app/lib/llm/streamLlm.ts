@@ -1,21 +1,19 @@
 import { randomUUID } from "crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { computeCost } from "./costs";
 import { appendAnalyticsEntry } from "@/app/lib/analytics/persist";
 import { computeHash, getCachedResult, setCachedResult } from "./cache";
+import {
+  OPENROUTER_API_URL,
+  DEFAULT_ANTHROPIC_MODEL,
+  getAnthropicClient,
+} from "./callLlm";
 import type { LlmCallUsage } from "./callLlm";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
-
-// Lazy-initialized Anthropic client — reused across calls
-let _anthropicClient: Anthropic | null = null;
-function getAnthropicClient(apiKey: string): Anthropic {
-  if (!_anthropicClient) {
-    _anthropicClient = new Anthropic({ apiKey });
-  }
-  return _anthropicClient;
-}
+export const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
 
 const encoder = new TextEncoder();
 
