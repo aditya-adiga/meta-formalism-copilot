@@ -4,7 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
-import { generateSemiformal, fetchApi } from "@/app/lib/formalization/api";
+import { generateSemiformalStreaming } from "@/app/lib/formalization/api";
+import { throttle } from "@/app/lib/utils/throttle";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -18,6 +19,7 @@ export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "genera
  */
 export function useArtifactGeneration() {
   const [loadingState, setLoadingState] = useState<ArtifactLoadingState>({});
+  const [streamingPreview, setStreamingPreview] = useState<Partial<Record<ArtifactType, string>>>({});
 
   const generateArtifacts = useCallback(async (
     selectedTypes: ArtifactType[],
@@ -31,11 +33,15 @@ export function useArtifactGeneration() {
     const initialState: ArtifactLoadingState = {};
     for (const t of types) initialState[t] = "generating";
     setLoadingState(initialState);
+    setStreamingPreview({});
 
     const promises = types.map(async (type): Promise<[ArtifactType, unknown | null]> => {
       try {
         if (type === "semiformal") {
-          const proof = await generateSemiformal(request.sourceText, request.context);
+          const onToken = throttle((accumulated: string) => {
+            setStreamingPreview((prev) => ({ ...prev, semiformal: accumulated }));
+          }, 50);
+          const proof = await generateSemiformalStreaming(request.sourceText, request.context, onToken);
           return [type, proof];
         }
 
@@ -65,6 +71,7 @@ export function useArtifactGeneration() {
     }
 
     setLoadingState(finalState);
+    setStreamingPreview({});
     return results;
   }, []);
 
@@ -73,5 +80,5 @@ export function useArtifactGeneration() {
     [loadingState],
   );
 
-  return { loadingState, generateArtifacts, isAnyGenerating };
+  return { loadingState, streamingPreview, generateArtifacts, isAnyGenerating };
 }

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import type { ResponseFormat } from "@/app/lib/llm/callLlm";
+import { streamLlm } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
 
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];
@@ -61,7 +68,26 @@ export async function handleArtifactRoute(
     return NextResponse.json({ error: "sourceText is required" }, { status: 400 });
   }
 
+  const wantStream = Boolean(rawBody.stream);
   const userMessage = buildUserMessage(body);
+
+  // Streaming path: text artifacts get real token streaming; JSON artifacts
+  // use batch call wrapped in a single SSE `done` event (raw JSON tokens
+  // aren't useful UI feedback).
+  if (wantStream) {
+    if (config.parseResponse === "text") {
+      const stream = streamLlm({
+        endpoint: config.endpoint,
+        systemPrompt: config.systemPrompt,
+        userContent: userMessage,
+        maxTokens: config.maxTokens ?? 8192,
+        openRouterModel: OPENROUTER_MODEL,
+      });
+      return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+    }
+    // JSON artifacts: batch call, wrap result in SSE
+    return handleBatchAsSSE(config, body, userMessage);
+  }
 
   try {
     const { text: responseText, usage, cacheKey } = await callLlm({
@@ -108,5 +134,52 @@ export async function handleArtifactRoute(
       { error: `LLM call failed: ${message}` },
       { status: 502 },
     );
+  }
+}
+
+/** Run a batch LLM call and wrap the result as a single SSE `done` event.
+ *  Used for JSON artifact types where streaming raw tokens isn't useful. */
+async function handleBatchAsSSE(
+  config: ArtifactRouteConfig,
+  body: ArtifactGenerationRequest,
+  userMessage: string,
+): Promise<NextResponse> {
+  const { sseEvent } = await import("@/app/lib/llm/streamLlm");
+  try {
+    const { text: responseText, usage } = await callLlm({
+      endpoint: config.endpoint,
+      systemPrompt: config.systemPrompt,
+      userContent: userMessage,
+      maxTokens: config.maxTokens ?? 8192,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+
+    if (usage.provider === "mock") {
+      const mockText = JSON.stringify(config.mockResponse(body.sourceText));
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(sseEvent("done", { text: mockText, usage }));
+          controller.close();
+        },
+      });
+      return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+    }
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(sseEvent("done", { text: responseText, usage }));
+        controller.close();
+      },
+    });
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(sseEvent("error", { error: message, details: "" }));
+        controller.close();
+      },
+    });
+    return new Response(stream, { headers: SSE_HEADERS, status: 502 }) as unknown as NextResponse;
   }
 }
