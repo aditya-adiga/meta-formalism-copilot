@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
@@ -58,7 +59,21 @@ export async function handleArtifactRoute(
     return NextResponse.json({ error: "sourceText is required" }, { status: 400 });
   }
 
+  const wantStream = Boolean(rawBody.stream);
   const userMessage = buildUserMessage(body);
+
+  // Streaming path: all artifact types use real token streaming.
+  // JSON artifacts stream raw tokens for partial-JSON parsing on the client.
+  if (wantStream) {
+    const stream = streamLlm({
+      endpoint: config.endpoint,
+      systemPrompt: config.systemPrompt,
+      userContent: userMessage,
+      maxTokens: config.maxTokens ?? 8192,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+  }
 
   try {
     const { text: responseText, usage, cacheKey } = await callLlm({
@@ -106,3 +121,4 @@ export async function handleArtifactRoute(
     );
   }
 }
+
