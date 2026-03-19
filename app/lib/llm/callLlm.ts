@@ -4,12 +4,12 @@ import { computeCost } from "./costs";
 import { appendAnalyticsEntry } from "@/app/lib/analytics/persist";
 import { computeHash, getCachedResult, setCachedResult } from "./cache";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
+export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 // Lazy-initialized Anthropic client — reused across calls
 let _anthropicClient: Anthropic | null = null;
-function getAnthropicClient(apiKey: string): Anthropic {
+export function getAnthropicClient(apiKey: string): Anthropic {
   if (!_anthropicClient) {
     _anthropicClient = new Anthropic({ apiKey });
   }
