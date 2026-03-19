@@ -188,7 +188,6 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
 
       const newCode = await generateLeanStreaming(
         semiformal,
-        onToken,
         currentLean || undefined,
         currentErrors || undefined,
         instruction || undefined,
