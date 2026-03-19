@@ -14,6 +14,10 @@ const NODE_HEIGHT = 70;
  * preserve their positions so that streaming updates and future user interactions
  * (drag, delete) don't cause full re-layout.
  *
+ * When edges first appear (transitioning from edge-less to edged graph), all positions
+ * are reset and a full re-layout runs. This prevents the "horizontal row" problem where
+ * nodes positioned without edge info get locked into a flat layout.
+ *
  * The positions ref is read during render (inside useMemo) intentionally — it acts as
  * an accumulator that must persist across streaming updates without triggering extra renders.
  * This is a standard pattern for derived-state-with-cache that React's lint rules are
@@ -23,10 +27,17 @@ export function useCausalGraphLayout(
   causalGraph: CausalGraphResponse["causalGraph"] | null,
 ) {
   const positionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Track whether previous render had edges, to detect the edge-arrival transition
+  const hadEdgesRef = useRef(false);
 
   /* eslint-disable react-hooks/refs */
   return useMemo(() => {
-    if (!causalGraph) return { nodes: [], edges: [] };
+    if (!causalGraph) {
+      // Reset tracking when graph is cleared (new generation starting)
+      positionsRef.current = new Map();
+      hadEdgesRef.current = false;
+      return { nodes: [], edges: [] };
+    }
 
     const variables = causalGraph.variables ?? [];
     const graphEdges = causalGraph.edges ?? [];
@@ -36,6 +47,17 @@ export function useCausalGraphLayout(
 
     const confounderIds = new Set(confounders.map((c) => c.id));
     const knownPositions = positionsRef.current;
+
+    const hasEdgesNow = graphEdges.length > 0;
+    const edgesJustArrived = hasEdgesNow && !hadEdgesRef.current;
+    hadEdgesRef.current = hasEdgesNow;
+
+    // When edges first appear, clear all positions so Dagre can re-layout
+    // with edge information. This prevents nodes from being stuck in the
+    // flat row they were placed in when no edge info was available.
+    if (edgesJustArrived) {
+      knownPositions.clear();
+    }
 
     // Find which nodes are new (no position yet)
     const newNodeIds = variables.filter((v) => !knownPositions.has(v.id)).map((v) => v.id);

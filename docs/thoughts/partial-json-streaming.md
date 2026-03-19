@@ -1,6 +1,6 @@
 # Partial JSON Streaming for Graph Views
 
-Status: exploration complete, ready for implementation
+Status: implementation complete
 
 ## Problem
 
@@ -75,13 +75,13 @@ aligns with how ReactFlow wants to work.
 
 ## Implementation order
 
-1. `npm install partial-json`
-2. Server: enable token streaming for JSON artifacts (remove `handleBatchAsSSE` path)
-3. Client: extend `fetchStreamingApi` or add helper for partial JSON callbacks
-4. `useArtifactGeneration`: wire up streaming for JSON types with throttled partial updates
-5. Refactor `useCausalGraphLayout` from pure `useMemo` to incremental state
-6. `CausalGraphView`: render partial graph data during streaming
-7. Repeat partial rendering for other JSON panels
+1. ~~`npm install partial-json`~~ done
+2. ~~Server: enable token streaming for JSON artifacts (remove `handleBatchAsSSE` path)~~ done
+3. ~~Client: extend `fetchStreamingApi` or add helper for partial JSON callbacks~~ done
+4. ~~`useArtifactGeneration`: wire up streaming for JSON types with throttled partial updates~~ done
+5. ~~Refactor `useCausalGraphLayout` from pure `useMemo` to incremental state~~ done
+6. ~~`CausalGraphView`: render partial graph data during streaming~~ done
+7. ~~Repeat partial rendering for other JSON panels~~ done (statistical-model, property-tests, dialectical-map)
 
 ## Risks & open questions
 
