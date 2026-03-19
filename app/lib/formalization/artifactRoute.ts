@@ -7,12 +7,6 @@ import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
-const SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache",
-  Connection: "keep-alive",
-} as const;
-
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];
 
