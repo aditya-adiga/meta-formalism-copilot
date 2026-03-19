@@ -4,6 +4,12 @@ import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
+
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
 The verifier uses Lean4 with Mathlib. Start every file with \`import Mathlib\`.
