@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
-import { generateSemiformal } from "@/app/lib/formalization/api";
+import { generateSemiformal, fetchApi } from "@/app/lib/formalization/api";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -42,17 +42,7 @@ export function useArtifactGeneration() {
         const route = ARTIFACT_ROUTE[type];
         if (!route) return [type, null];
 
-        const res = await fetch(route, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(`[${type}]`, data.error);
-          return [type, null];
-        }
-
+        const data = await fetchApi<Record<string, unknown>>(route, request);
         const responseKey = ARTIFACT_RESPONSE_KEY[type];
         return [type, data[responseKey] ?? null];
       } catch (err) {

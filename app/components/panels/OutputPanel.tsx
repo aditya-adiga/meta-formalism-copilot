@@ -8,6 +8,7 @@ import VerificationBadge from "@/app/components/ui/VerificationBadge";
 import type { VerificationStatus } from "@/app/lib/types/session";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { fetchApi } from "@/app/lib/formalization/api";
 
 type OutputPanelProps = {
   semiformalText: string;
@@ -46,19 +47,10 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
     setEditing(true);
     setEditEndpoint("edit/inline");
     try {
-      const response = await fetch("/api/edit/inline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullText: semiformalText, selection, instruction }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        const newText = semiformalText.slice(0, selection.start) + data.text + semiformalText.slice(selection.end);
-        onSemiformalTextChange(newText);
-        setRenderMode("rendered");
-      } else {
-        console.error("[inline edit]", data.error);
-      }
+      const data = await fetchApi<{ text: string }>("/api/edit/inline", { fullText: semiformalText, selection, instruction });
+      const newText = semiformalText.slice(0, selection.start) + data.text + semiformalText.slice(selection.end);
+      onSemiformalTextChange(newText);
+      setRenderMode("rendered");
     } catch (err) {
       console.error("[inline edit]", err);
     } finally {
@@ -71,18 +63,9 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
     setEditing(true);
     setEditEndpoint("edit/whole");
     try {
-      const response = await fetch("/api/edit/whole", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullText: semiformalText, instruction }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        onSemiformalTextChange(data.text);
-        setRenderMode("rendered");
-      } else {
-        console.error("[whole edit]", data.error);
-      }
+      const data = await fetchApi<{ text: string }>("/api/edit/whole", { fullText: semiformalText, instruction });
+      onSemiformalTextChange(data.text);
+      setRenderMode("rendered");
     } catch (err) {
       console.error("[whole edit]", err);
     } finally {
