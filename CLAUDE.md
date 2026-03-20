@@ -6,18 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Metaformalism Copilot is a Next.js web app for transforming insights and source material into personalized, context-sensitive formalisms. It's part of the [Live Conversational Threads](https://www.lesswrong.com/posts/uueHkKrGmeEsKGHPR/live-conversational-threads-not-an-ai-notetaker-2) research project. The philosophy ("Live Theory") emphasizes generalization via inclusion — producing multiple rigorous representations tailored to specific contexts rather than a single unified theory.
 
-## Environment
+## Prerequisites
 
-This project runs inside **WSL (Ubuntu on Windows)**. The repo lives at `/home/magfrump/aisc_lct/meta-formalism-copilot/`. When running shell commands, use Linux paths — never Windows paths like `\\wsl.localhost\...` or `C:\`. If you need to invoke something from a Windows context, use `wsl -e bash -c "..."`, but prefer running commands directly in the Linux environment.
-
-Key implications:
-- Node, npm, and all tooling are installed in the WSL Ubuntu environment
-- File watchers (e.g. `npm run dev`) work but may be slow on files mounted from Windows; the repo should stay on the Linux filesystem
-- Git is configured in the WSL environment; use that git, not Windows git
+- Node.js (v18+) and npm
+- An `ANTHROPIC_API_KEY` environment variable for LLM features
 
 ## Commands
 
-All commands run from the repo root (`/home/magfrump/aisc_lct/meta-formalism-copilot/`):
+All commands run from the repo root:
 
 ```bash
 npm run dev        # Start dev server at localhost:3000
