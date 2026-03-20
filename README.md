@@ -108,6 +108,7 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed 
 ## Project Documentation
 
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical structure, component hierarchy, and implementation details
+- [USER_GUIDE.md](./docs/USER_GUIDE.md) - Walkthrough of all features with step-by-step instructions
 - [docs/decisions/](./docs/decisions/) - Architectural decision records
 - [docs/thoughts/](./docs/thoughts/) - Working notes and exploration logs
 
