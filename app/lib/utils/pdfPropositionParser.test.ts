@@ -255,6 +255,34 @@ describe("identifyPropositionHeaders", () => {
     expect(headers[1].kind).toBe("theorem");
   });
 
+  it("identifies three-level numbering like 1.2.1", () => {
+    const lines = [
+      makeLine("Definition 1.2.1 Denote by H the complex upper half plane.", [
+        boldSpan("Definition 1.2.1"),
+        normalSpan(" Denote by H the complex upper half plane."),
+      ]),
+    ];
+
+    const headers = identifyPropositionHeaders(lines);
+    expect(headers).toHaveLength(1);
+    expect(headers[0].kind).toBe("definition");
+    expect(headers[0].number).toBe("1.2.1");
+  });
+
+  it("identifies headers with space (no period) after number", () => {
+    const lines = [
+      makeLine("Theorem 1.2.6 Any holomorphic function f on H...", [
+        boldSpan("Theorem 1.2.6"),
+        normalSpan(" Any holomorphic function f on H..."),
+      ]),
+    ];
+
+    const headers = identifyPropositionHeaders(lines);
+    expect(headers).toHaveLength(1);
+    expect(headers[0].kind).toBe("theorem");
+    expect(headers[0].number).toBe("1.2.6");
+  });
+
   it("identifies headers with colon separator", () => {
     const lines = [
       makeLine("Proposition 5: Let M be a manifold.", [
@@ -414,7 +442,7 @@ describe("isPdfTexCompiled", () => {
     expect(isPdfTexCompiled(lines)).toBe(true);
   });
 
-  it("returns false for <2 bold-confirmed headers", () => {
+  it("returns false for <2 bold-confirmed and <3 total headers", () => {
     const lines = [
       makeLine("Theorem 1. Statement A.", [boldSpan("Theorem 1."), normalSpan(" Statement A.")]),
       makeLine("Some other text.", [normalSpan("Some other text.")]),
@@ -423,13 +451,23 @@ describe("isPdfTexCompiled", () => {
     expect(isPdfTexCompiled(lines)).toBe(false);
   });
 
-  it("returns false for non-bold headers (body mentions)", () => {
+  it("returns false for only 2 non-bold headers", () => {
     const lines = [
       makeLine("Theorem 1. is mentioned.", [normalSpan("Theorem 1. is mentioned.")]),
       makeLine("Lemma 2. is also mentioned.", [normalSpan("Lemma 2. is also mentioned.")]),
     ];
 
     expect(isPdfTexCompiled(lines)).toBe(false);
+  });
+
+  it("returns true for ≥3 non-bold headers (opaque font fallback)", () => {
+    const lines = [
+      makeLine("Definition 1. A group is...", [normalSpan("Definition 1. A group is...")]),
+      makeLine("Theorem 2. Every group...", [normalSpan("Theorem 2. Every group...")]),
+      makeLine("Corollary 3. Hence...", [normalSpan("Corollary 3. Hence...")]),
+    ];
+
+    expect(isPdfTexCompiled(lines)).toBe(true);
   });
 
   it("returns false for empty input", () => {
