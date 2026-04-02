@@ -46,7 +46,7 @@ function makeVersion(
 export interface WorkspaceState {
   // --- Source inputs ---
   sourceText: string;
-  extractedFiles: { name: string; text: string }[];
+  extractedFiles: { name: string; text: string; file?: File }[];
   contextText: string;
 
   // --- Deductive artifacts (flat fields for pipeline compatibility) ---
@@ -305,7 +305,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
       // Only persist data fields, not action functions
       partialize: (state) => ({
         sourceText: state.sourceText,
-        extractedFiles: state.extractedFiles,
+        extractedFiles: state.extractedFiles.map(({ name, text }) => ({ name, text })),
         contextText: state.contextText,
         semiformalText: state.semiformalText,
         leanCode: state.leanCode,

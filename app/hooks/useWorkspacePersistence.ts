@@ -50,14 +50,12 @@ export function useWorkspacePersistence() {
   const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
   const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
 
-  // extractedFiles setter: the old API accepted { name, text, file? }[] but
-  // File objects can't be serialized. The store only keeps { name, text }.
-  // Callers that pass File objects will have them stripped on persistence.
+  // extractedFiles setter: the old API accepted { name, text, file? }[] and
+  // the store now carries the optional File in memory. The persist middleware's
+  // partialize strips File objects before writing to localStorage.
   const setExtractedFiles = useCallback(
     (v: { name: string; text: string; file?: File }[]) => {
-      useWorkspaceStore.getState().setExtractedFiles(
-        v.map(({ name, text }) => ({ name, text })),
-      );
+      useWorkspaceStore.getState().setExtractedFiles(v);
     },
     [],
   );
