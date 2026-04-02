@@ -1,170 +1,113 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+/**
+ * Compatibility shim: delegates to the Zustand workspace store while
+ * preserving the exact return API that page.tsx and other consumers expect.
+ *
+ * This shim exists during the migration period. Once page.tsx is wired
+ * directly to useWorkspaceStore (PR 2), this file will be deleted.
+ */
+
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
-import type { VerificationStatus } from "@/app/lib/types/session";
-import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData, type SaveWorkspaceInput } from "@/app/lib/utils/workspacePersistence";
-
-type WorkspaceState = {
-  sourceText: string;
-  extractedFiles: { name: string; text: string; file?: File }[];
-  contextText: string;
-  semiformalText: string;
-  leanCode: string;
-  semiformalDirty: boolean;
-  verificationStatus: VerificationStatus;
-  verificationErrors: string;
-  // Artifact data (JSON-stringified)
-  causalGraph: string | null;
-  statisticalModel: string | null;
-  propertyTests: string | null;
-  balancedPerspectives: string | null;
-  counterexamples: string | null;
-};
-
-const DEFAULT_STATE: WorkspaceState = {
-  sourceText: "",
-  extractedFiles: [],
-  contextText: "",
-  semiformalText: "",
-  leanCode: "",
-  semiformalDirty: false,
-  verificationStatus: "none",
-  verificationErrors: "",
-  causalGraph: null,
-  statisticalModel: null,
-  propertyTests: null,
-  balancedPerspectives: null,
-  counterexamples: null,
-};
+import { useWorkspaceStore } from "@/app/lib/stores/workspaceStore";
+import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
 
 export function useWorkspacePersistence() {
-  const [state, setState] = useState<WorkspaceState>(DEFAULT_STATE);
-
-  // Decomposition state tracked via ref (owned by useDecomposition, mirrored here for persistence)
-  const decompRef = useRef<PersistedDecomposition>({
-    nodes: [],
-    selectedNodeId: null,
-    paperText: "",
-    sources: [],
-  });
-
-  // Restored decomposition state — set once on mount, consumed by page.tsx to call resetState
-  const [restoredDecompState, setRestoredDecompState] = useState<PersistedDecomposition | null>(null);
-
-  // --- Hydrate from localStorage on mount ---
-  // This is the standard Next.js pattern: render SSR-safe defaults first, then
-  // hydrate from localStorage in a mount effect to avoid hydration mismatch.
+  // Trigger Zustand rehydrate once on mount (SSR-safe pattern)
+  const hydrated = useRef(false);
   useEffect(() => {
-    const data = loadWorkspace();
-    if (!data) return;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from external store (localStorage); must run post-mount to avoid SSR mismatch
-    setState({
-      sourceText: data.sourceText,
-      extractedFiles: data.extractedFiles,
-      contextText: data.contextText,
-      semiformalText: data.semiformalText,
-      leanCode: data.leanCode,
-      semiformalDirty: data.semiformalDirty,
-      verificationStatus: data.verificationStatus,
-      verificationErrors: data.verificationErrors,
-      causalGraph: data.causalGraph,
-      statisticalModel: data.statisticalModel,
-      propertyTests: data.propertyTests,
-      balancedPerspectives: data.balancedPerspectives,
-      counterexamples: data.counterexamples,
-    });
-
-    decompRef.current = data.decomposition;
-    setRestoredDecompState(data.decomposition);
+    if (!hydrated.current) {
+      hydrated.current = true;
+      useWorkspaceStore.persist.rehydrate();
+    }
   }, []);
 
-  // --- Debounced save on change ---
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Keep a ref to current state so scheduleSave always reads fresh data
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  // Subscribe to Zustand store fields that the old API exposed
+  const sourceText = useWorkspaceStore((s) => s.sourceText);
+  const extractedFiles = useWorkspaceStore((s) => s.extractedFiles);
+  const contextText = useWorkspaceStore((s) => s.contextText);
+  const semiformalText = useWorkspaceStore((s) => s.semiformalText);
+  const leanCode = useWorkspaceStore((s) => s.leanCode);
+  const semiformalDirty = useWorkspaceStore((s) => s.semiformalDirty);
+  const verificationStatus = useWorkspaceStore((s) => s.verificationStatus);
+  const verificationErrors = useWorkspaceStore((s) => s.verificationErrors);
+  const decomposition = useWorkspaceStore((s) => s.decomposition);
 
-  const artifactData: ArtifactPersistenceData = useMemo(() => ({
-    causalGraph: state.causalGraph,
-    statisticalModel: state.statisticalModel,
-    propertyTests: state.propertyTests,
-    balancedPerspectives: state.balancedPerspectives,
-    counterexamples: state.counterexamples,
-  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.balancedPerspectives, state.counterexamples]);
+  // Artifact content (read from versioned store, exposed as flat strings)
+  const causalGraph = useWorkspaceStore((s) => s.getArtifactContent("causal-graph"));
+  const statisticalModel = useWorkspaceStore((s) => s.getArtifactContent("statistical-model"));
+  const propertyTests = useWorkspaceStore((s) => s.getArtifactContent("property-tests"));
+  const balancedPerspectives = useWorkspaceStore((s) => s.getArtifactContent("balanced-perspectives"));
+  const counterexamples = useWorkspaceStore((s) => s.getArtifactContent("counterexamples"));
 
-  const artifactRef = useRef(artifactData);
-  useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
+  // Stable setter references from the store
+  const setSourceText = useWorkspaceStore((s) => s.setSourceText);
+  const setContextText = useWorkspaceStore((s) => s.setContextText);
+  const setSemiformalText = useWorkspaceStore((s) => s.setSemiformalText);
+  const setLeanCode = useWorkspaceStore((s) => s.setLeanCode);
+  const setSemiformalDirty = useWorkspaceStore((s) => s.setSemiformalDirty);
+  const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
+  const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
 
-  /** Build the current save payload from refs (always fresh). */
-  const buildSaveInput = useCallback((): SaveWorkspaceInput => {
-    const s = stateRef.current;
-    return {
-      sourceText: s.sourceText,
-      extractedFiles: s.extractedFiles,
-      contextText: s.contextText,
-      semiformalText: s.semiformalText,
-      leanCode: s.leanCode,
-      semiformalDirty: s.semiformalDirty,
-      verificationStatus: s.verificationStatus,
-      verificationErrors: s.verificationErrors,
-      decomposition: decompRef.current,
-      artifacts: artifactRef.current,
-    };
-  }, []);
+  // extractedFiles setter: the old API accepted { name, text, file? }[] and
+  // the store now carries the optional File in memory. The persist middleware's
+  // partialize strips File objects before writing to localStorage.
+  const setExtractedFiles = useCallback(
+    (v: { name: string; text: string; file?: File }[]) => {
+      useWorkspaceStore.getState().setExtractedFiles(v);
+    },
+    [],
+  );
 
-  // Stable save scheduler — reads from refs, never changes identity
-  const scheduleSave = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      saveWorkspace(buildSaveInput());
-    }, 500);
-  }, [buildSaveInput]);
+  // Artifact setters: map old flat-string setters to versioned store
+  const setCausalGraph = useCallback(
+    (v: string | null) => {
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("causal-graph", v);
+    },
+    [],
+  );
+  const setStatisticalModel = useCallback(
+    (v: string | null) => {
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("statistical-model", v);
+    },
+    [],
+  );
+  const setPropertyTests = useCallback(
+    (v: string | null) => {
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("property-tests", v);
+    },
+    [],
+  );
+  const setBalancedPerspectives = useCallback(
+    (v: string | null) => {
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("balanced-perspectives", v);
+    },
+    [],
+  );
+  const setCounterexamples = useCallback(
+    (v: string | null) => {
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("counterexamples", v);
+    },
+    [],
+  );
 
-  /** Flush any pending debounced save immediately. Call after critical state
-   *  transitions (e.g. generation complete) to avoid data loss on refresh. */
-  const flushSave = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-    saveWorkspace(buildSaveInput());
-  }, [buildSaveInput]);
+  // Decomposition persistence: shim calls setDecomposition on the store
+  const persistDecompState = useCallback(
+    (decompState: PersistedDecomposition) => {
+      useWorkspaceStore.getState().setDecomposition(decompState);
+    },
+    [],
+  );
 
-  useEffect(() => {
-    scheduleSave();
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [state, artifactData, scheduleSave]);
+  // Restored decomposition state: non-null when persisted decomposition has nodes.
+  // page.tsx guards against re-application with its own decompRestoredRef.
+  const restoredDecompState: PersistedDecomposition | null =
+    decomposition.nodes.length > 0 ? decomposition : null;
 
-  /** Call this whenever decomposition state changes so persistence stays in sync */
-  const persistDecompState = useCallback((decompState: PersistedDecomposition) => {
-    decompRef.current = decompState;
-    scheduleSave();
-  }, [scheduleSave]);
-
-  // --- Individual setters that match the useState API page.tsx expects ---
-  const setSourceText = useCallback((v: string) => setState((s) => ({ ...s, sourceText: v })), []);
-  const setExtractedFiles = useCallback((v: { name: string; text: string; file?: File }[]) => setState((s) => ({ ...s, extractedFiles: v })), []);
-  const setContextText = useCallback((v: string) => setState((s) => ({ ...s, contextText: v })), []);
-  const setSemiformalText = useCallback((v: string | ((prev: string) => string)) =>
-    setState((s) => ({ ...s, semiformalText: typeof v === "function" ? v(s.semiformalText) : v })), []);
-  const setLeanCode = useCallback((v: string | ((prev: string) => string)) =>
-    setState((s) => ({ ...s, leanCode: typeof v === "function" ? v(s.leanCode) : v })), []);
-  const setSemiformalDirty = useCallback((v: boolean | ((prev: boolean) => boolean)) =>
-    setState((s) => ({ ...s, semiformalDirty: typeof v === "function" ? v(s.semiformalDirty) : v })), []);
-  const setVerificationStatus = useCallback((v: VerificationStatus) => setState((s) => ({ ...s, verificationStatus: v })), []);
-  const setVerificationErrors = useCallback((v: string) => setState((s) => ({ ...s, verificationErrors: v })), []);
-  const setCausalGraph = useCallback((v: string | null) => setState((s) => ({ ...s, causalGraph: v })), []);
-  const setStatisticalModel = useCallback((v: string | null) => setState((s) => ({ ...s, statisticalModel: v })), []);
-  const setPropertyTests = useCallback((v: string | null) => setState((s) => ({ ...s, propertyTests: v })), []);
-  const setBalancedPerspectives = useCallback((v: string | null) => setState((s) => ({ ...s, balancedPerspectives: v })), []);
-  const setCounterexamples = useCallback((v: string | null) => setState((s) => ({ ...s, counterexamples: v })), []);
-
-  /** Build a PersistedWorkspace snapshot of the current state (synchronous) */
+  // Snapshot/restore: bridge between old PersistedWorkspace format and Zustand WorkspaceState
   const getSnapshot = useCallback((): PersistedWorkspace => {
-    const s = stateRef.current;
-    const a = artifactRef.current;
+    const s = useWorkspaceStore.getState();
     return {
       version: 2,
       sourceText: s.sourceText,
@@ -173,107 +116,75 @@ export function useWorkspacePersistence() {
       semiformalText: s.semiformalText,
       leanCode: s.leanCode,
       semiformalDirty: s.semiformalDirty,
-      verificationStatus: s.verificationStatus === "verifying" ? "none" : s.verificationStatus,
+      verificationStatus: sanitizeVerificationStatus(s.verificationStatus),
       verificationErrors: s.verificationErrors,
-      decomposition: { ...decompRef.current },
-      causalGraph: a.causalGraph,
-      statisticalModel: a.statisticalModel,
-      propertyTests: a.propertyTests,
-      balancedPerspectives: a.balancedPerspectives,
-      counterexamples: a.counterexamples,
+      decomposition: structuredClone(s.decomposition),
+      causalGraph: s.getArtifactContent("causal-graph"),
+      statisticalModel: s.getArtifactContent("statistical-model"),
+      propertyTests: s.getArtifactContent("property-tests"),
+      balancedPerspectives: s.getArtifactContent("balanced-perspectives"),
+      counterexamples: s.getArtifactContent("counterexamples"),
     };
   }, []);
 
-  /** Replace all workspace state from a snapshot (used when switching workspace sessions) */
   const resetToSnapshot = useCallback((data: PersistedWorkspace): PersistedDecomposition => {
-    // Cancel any pending debounced save
-    if (timerRef.current) clearTimeout(timerRef.current);
+    const store = useWorkspaceStore.getState();
+    store.setSourceText(data.sourceText);
+    store.setExtractedFiles(data.extractedFiles);
+    store.setContextText(data.contextText);
+    store.setSemiformalText(data.semiformalText);
+    store.setLeanCode(data.leanCode);
+    store.setSemiformalDirty(data.semiformalDirty);
+    store.setVerificationStatus(data.verificationStatus);
+    store.setVerificationErrors(data.verificationErrors);
+    store.setDecomposition(data.decomposition);
 
-    setState({
-      sourceText: data.sourceText,
-      extractedFiles: data.extractedFiles,
-      contextText: data.contextText,
-      semiformalText: data.semiformalText,
-      leanCode: data.leanCode,
-      semiformalDirty: data.semiformalDirty,
-      verificationStatus: data.verificationStatus,
-      verificationErrors: data.verificationErrors,
-      causalGraph: data.causalGraph,
-      statisticalModel: data.statisticalModel,
-      propertyTests: data.propertyTests,
-      balancedPerspectives: data.balancedPerspectives,
-      counterexamples: data.counterexamples,
-    });
-
-    decompRef.current = data.decomposition;
-
-    // Write to localStorage immediately (no debounce for session switches)
-    saveWorkspace({
-      sourceText: data.sourceText,
-      extractedFiles: data.extractedFiles,
-      contextText: data.contextText,
-      semiformalText: data.semiformalText,
-      leanCode: data.leanCode,
-      semiformalDirty: data.semiformalDirty,
-      verificationStatus: data.verificationStatus,
-      verificationErrors: data.verificationErrors,
-      decomposition: data.decomposition,
-      artifacts: {
-        causalGraph: data.causalGraph,
-        statisticalModel: data.statisticalModel,
-        propertyTests: data.propertyTests,
-        balancedPerspectives: data.balancedPerspectives,
-        counterexamples: data.counterexamples,
-      },
-    });
+    // Restore artifact data
+    if (data.causalGraph) store.setArtifactGenerated("causal-graph", data.causalGraph);
+    if (data.statisticalModel) store.setArtifactGenerated("statistical-model", data.statisticalModel);
+    if (data.propertyTests) store.setArtifactGenerated("property-tests", data.propertyTests);
+    if (data.balancedPerspectives) store.setArtifactGenerated("balanced-perspectives", data.balancedPerspectives);
+    if (data.counterexamples) store.setArtifactGenerated("counterexamples", data.counterexamples);
 
     return data.decomposition;
   }, []);
 
-  /** Clear all workspace state back to defaults */
   const clearWorkspace = useCallback((): PersistedDecomposition => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    setState(DEFAULT_STATE);
-
+    useWorkspaceStore.getState().clearWorkspace();
     const emptyDecomp: PersistedDecomposition = { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
-    decompRef.current = emptyDecomp;
-
-    saveWorkspace({
-      ...DEFAULT_STATE,
-      decomposition: emptyDecomp,
-    });
-
     return emptyDecomp;
   }, []);
 
-  // Stable return object that destructures the same as before
+  // No-op: Zustand persist middleware auto-saves on every set(). Exposed for
+  // API compatibility with consumers that call flushSave() after generation.
+  const flushSave = useCallback(() => {}, []);
+
   return useMemo(() => ({
-    sourceText: state.sourceText,
+    sourceText,
     setSourceText,
-    extractedFiles: state.extractedFiles,
+    extractedFiles,
     setExtractedFiles,
-    contextText: state.contextText,
+    contextText,
     setContextText,
-    semiformalText: state.semiformalText,
+    semiformalText,
     setSemiformalText,
-    leanCode: state.leanCode,
+    leanCode,
     setLeanCode,
-    semiformalDirty: state.semiformalDirty,
+    semiformalDirty,
     setSemiformalDirty,
-    verificationStatus: state.verificationStatus,
+    verificationStatus,
     setVerificationStatus,
-    verificationErrors: state.verificationErrors,
+    verificationErrors,
     setVerificationErrors,
-    causalGraph: state.causalGraph,
+    causalGraph,
     setCausalGraph,
-    statisticalModel: state.statisticalModel,
+    statisticalModel,
     setStatisticalModel,
-    propertyTests: state.propertyTests,
+    propertyTests,
     setPropertyTests,
-    balancedPerspectives: state.balancedPerspectives,
+    balancedPerspectives,
     setBalancedPerspectives,
-    counterexamples: state.counterexamples,
+    counterexamples,
     setCounterexamples,
     restoredDecompState,
     persistDecompState,
@@ -281,5 +192,14 @@ export function useWorkspacePersistence() {
     getSnapshot,
     resetToSnapshot,
     clearWorkspace,
-  }), [state, restoredDecompState, persistDecompState, flushSave, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setBalancedPerspectives, setCounterexamples, getSnapshot, resetToSnapshot, clearWorkspace]);
+  }), [
+    sourceText, setSourceText, extractedFiles, setExtractedFiles,
+    contextText, setContextText, semiformalText, setSemiformalText,
+    leanCode, setLeanCode, semiformalDirty, setSemiformalDirty,
+    verificationStatus, setVerificationStatus, verificationErrors, setVerificationErrors,
+    causalGraph, setCausalGraph, statisticalModel, setStatisticalModel,
+    propertyTests, setPropertyTests, balancedPerspectives, setBalancedPerspectives,
+    counterexamples, setCounterexamples,
+    restoredDecompState, persistDecompState, flushSave, getSnapshot, resetToSnapshot, clearWorkspace,
+  ]);
 }
