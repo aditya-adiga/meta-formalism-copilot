@@ -1,11 +1,10 @@
 /**
- * SPIKE: Test SSR hydration and migration from workspace-v2.
- *
- * Uses jsdom's built-in localStorage (vitest default env).
+ * Tests for SSR hydration and migration from workspace-v2 format.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { useWorkspaceStore } from "../workspaceStore";
+import { useWorkspaceStore, migrateFromV2 } from "../workspaceStore";
+import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
 beforeEach(() => {
   localStorage.clear();
@@ -20,7 +19,6 @@ describe("SSR hydration", () => {
   });
 
   it("rehydrates from localStorage on rehydrate() call", async () => {
-    // Pre-populate localStorage with saved state (Zustand persist format)
     const saved = {
       state: {
         sourceText: "persisted source",
@@ -49,7 +47,6 @@ describe("SSR hydration", () => {
     };
     localStorage.setItem("workspace-zustand-v1", JSON.stringify(saved));
 
-    // Rehydrate (this is what useEffect would call in a component)
     await useWorkspaceStore.persist.rehydrate();
 
     const state = useWorkspaceStore.getState();
@@ -59,13 +56,10 @@ describe("SSR hydration", () => {
   });
 
   it("persist middleware auto-saves on state change after hydration", async () => {
-    // First rehydrate (activates the persist listener)
     await useWorkspaceStore.persist.rehydrate();
 
-    // Make a change
     useWorkspaceStore.getState().setSourceText("auto-saved");
 
-    // Check localStorage was updated
     const raw = localStorage.getItem("workspace-zustand-v1");
     expect(raw).not.toBeNull();
     const stored = JSON.parse(raw!);
@@ -77,7 +71,6 @@ describe("SSR hydration", () => {
     useWorkspaceStore.getState().setSourceText("test");
 
     const stored = JSON.parse(localStorage.getItem("workspace-zustand-v1")!);
-    // Should not contain function keys
     expect(stored.state.setSourceText).toBeUndefined();
     expect(stored.state.setArtifactGenerated).toBeUndefined();
     expect(stored.state.getSnapshot).toBeUndefined();
@@ -85,61 +78,97 @@ describe("SSR hydration", () => {
 });
 
 describe("migration from workspace-v2", () => {
-  it("can migrate old flat artifact fields to versioned store", () => {
-    const oldWorkspace = {
+  it("migrates old flat artifact fields to versioned store", () => {
+    // Simulate old workspace-v2 data in localStorage
+    const oldData = {
       version: 2,
       sourceText: "old source",
-      extractedFiles: [],
+      extractedFiles: [{ name: "test.txt", text: "file content" }],
       contextText: "old context",
       semiformalText: "old proof",
       leanCode: "old lean",
       semiformalDirty: false,
-      verificationStatus: "none" as const,
+      verificationStatus: "none",
       verificationErrors: "",
       decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
       causalGraph: '{"variables":[],"edges":[]}',
       statisticalModel: null,
       propertyTests: '{"tests":[]}',
-      balancedPerspectives: null,
+      dialecticalMap: '{"positions":[]}',
       counterexamples: null,
     };
+    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));
 
-    // Migration function
-    function migrateFromV2(old: typeof oldWorkspace) {
-      const store = useWorkspaceStore.getState();
-      store.setSourceText(old.sourceText);
-      store.setContextText(old.contextText);
-      store.setSemiformalText(old.semiformalText);
-      store.setLeanCode(old.leanCode);
-      store.setVerificationStatus(old.verificationStatus);
-      store.setVerificationErrors(old.verificationErrors);
-      store.setDecomposition(old.decomposition);
-
-      const artifactMap: Record<string, string | null> = {
-        "causal-graph": old.causalGraph,
-        "statistical-model": old.statisticalModel,
-        "property-tests": old.propertyTests,
-        "balanced-perspectives": old.balancedPerspectives,
-        counterexamples: old.counterexamples,
-      };
-
-      for (const [key, content] of Object.entries(artifactMap)) {
-        if (content) {
-          store.setArtifactGenerated(key as "causal-graph", content);
-        }
-      }
-    }
-
-    migrateFromV2(oldWorkspace);
+    const success = migrateFromV2();
+    expect(success).toBe(true);
 
     const store = useWorkspaceStore.getState();
     expect(store.sourceText).toBe("old source");
+    expect(store.contextText).toBe("old context");
+    expect(store.semiformalText).toBe("old proof");
+    expect(store.leanCode).toBe("old lean");
+    expect(store.extractedFiles).toEqual([{ name: "test.txt", text: "file content" }]);
+
     expect(store.getArtifactContent("causal-graph")).toBe('{"variables":[],"edges":[]}');
     expect(store.getArtifactContent("property-tests")).toBe('{"tests":[]}');
+    expect(store.getArtifactContent("dialectical-map")).toBe('{"positions":[]}');
     expect(store.getArtifactContent("statistical-model")).toBeNull();
+    expect(store.getArtifactContent("counterexamples")).toBeNull();
 
+    // Migrated artifacts should have a single "generated" version
     const cgRec = store.artifacts["causal-graph"]!;
     expect(cgRec.versions).toHaveLength(1);
     expect(cgRec.versions[0].source).toBe("generated");
+  });
+
+  it("returns false when no workspace-v2 data exists", () => {
+    const success = migrateFromV2();
+    expect(success).toBe(false);
+  });
+
+  it("preserves decomposition state during migration", () => {
+    const nodes = [{
+      id: "n1",
+      label: "Prop 1",
+      kind: "proposition",
+      statement: "test statement",
+      proofText: "",
+      dependsOn: [],
+      sourceId: "doc-0",
+      sourceLabel: "Text Input",
+      semiformalProof: "",
+      leanCode: "",
+      verificationStatus: "unverified",
+      verificationErrors: "",
+      context: "",
+      selectedArtifactTypes: [],
+      artifacts: [],
+    }];
+    const oldData = {
+      version: 2,
+      sourceText: "",
+      extractedFiles: [],
+      contextText: "",
+      semiformalText: "",
+      leanCode: "",
+      semiformalDirty: false,
+      verificationStatus: "none",
+      verificationErrors: "",
+      decomposition: { nodes, selectedNodeId: "n1", paperText: "test paper", sources: [] },
+      causalGraph: null,
+      statisticalModel: null,
+      propertyTests: null,
+      dialecticalMap: null,
+      counterexamples: null,
+    };
+    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));
+
+    migrateFromV2();
+
+    const store = useWorkspaceStore.getState();
+    expect(store.decomposition.nodes).toHaveLength(1);
+    expect(store.decomposition.nodes[0].id).toBe("n1");
+    expect(store.decomposition.selectedNodeId).toBe("n1");
+    expect(store.decomposition.paperText).toBe("test paper");
   });
 });

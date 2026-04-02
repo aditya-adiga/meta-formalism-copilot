@@ -1,20 +1,19 @@
 /**
- * SPIKE: Validate Zustand store for workspace state management.
+ * Workspace Zustand store tests.
  *
- * Tests:
+ * Covers:
  * 1. Basic state get/set
- * 2. Artifact versioning (generate, edit, undo, redo)
+ * 2. Artifact versioning (generate, edit, undo, redo, cap)
  * 3. Snapshot/restore (workspace sessions)
  * 4. PipelineAccessors compatibility
- * 5. Selective subscriptions (React component won't re-render for unrelated changes)
- * 6. persist middleware hydration
+ * 5. Selective subscriptions
+ * 6. Backward-compatible artifact access
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useWorkspaceStore } from "../workspaceStore";
 import type { PipelineAccessors } from "@/app/hooks/useFormalizationPipeline";
 
-// Reset store between tests
 beforeEach(() => {
   useWorkspaceStore.setState(useWorkspaceStore.getInitialState());
 });
@@ -49,6 +48,18 @@ describe("workspaceStore", () => {
     expect(useWorkspaceStore.getState().leanCode).toBe("theorem p");
   });
 
+  it("supports functional updates for semiformalDirty", () => {
+    const { setSemiformalDirty } = useWorkspaceStore.getState();
+    setSemiformalDirty(false);
+    expect(useWorkspaceStore.getState().semiformalDirty).toBe(false);
+
+    setSemiformalDirty((prev) => !prev);
+    expect(useWorkspaceStore.getState().semiformalDirty).toBe(true);
+
+    setSemiformalDirty((prev) => prev || false);
+    expect(useWorkspaceStore.getState().semiformalDirty).toBe(true);
+  });
+
   // -------------------------------------------------------------------------
   // 2. Artifact versioning
   // -------------------------------------------------------------------------
@@ -62,11 +73,8 @@ describe("workspaceStore", () => {
 
     it("preserves edit history across regeneration", () => {
       const store = useWorkspaceStore.getState();
-      // Generate v1
       store.setArtifactGenerated("causal-graph", "v1-generated");
-      // User edits → v2
       store.setArtifactEdited("causal-graph", "v2-edited", "ai-edit", "add node X");
-      // Regenerate → v3
       store.setArtifactGenerated("causal-graph", "v3-regenerated");
 
       const rec = useWorkspaceStore.getState().artifacts["causal-graph"]!;
@@ -108,7 +116,6 @@ describe("workspaceStore", () => {
       store.setArtifactEdited("causal-graph", "v2", "manual-edit");
       store.setArtifactEdited("causal-graph", "v3", "manual-edit");
 
-      // Undo to v2, then make a new edit → v3 is gone
       store.undoArtifact("causal-graph");
       store.setArtifactEdited("causal-graph", "v2-fork", "manual-edit");
 
@@ -125,8 +132,17 @@ describe("workspaceStore", () => {
       }
       const rec = useWorkspaceStore.getState().artifacts["causal-graph"]!;
       expect(rec.versions.length).toBeLessThanOrEqual(20);
-      // Latest should still be the last one
       expect(store.getArtifactContent("causal-graph")).toBe("v24");
+    });
+
+    it("works with dialectical-map artifact key", () => {
+      const store = useWorkspaceStore.getState();
+      store.setArtifactGenerated("dialectical-map", '{"positions":[]}');
+      expect(store.getArtifactContent("dialectical-map")).toBe('{"positions":[]}');
+
+      store.setArtifactEdited("dialectical-map", '{"positions":["a"]}', "manual-edit");
+      expect(store.getArtifactContent("dialectical-map")).toBe('{"positions":["a"]}');
+      expect(store.canUndo("dialectical-map")).toBe(true);
     });
   });
 
@@ -143,12 +159,10 @@ describe("workspaceStore", () => {
 
       const snapshot = store.getSnapshot();
 
-      // Clear everything
       store.clearWorkspace();
       expect(store.getArtifactContent("causal-graph")).toBeNull();
       expect(useWorkspaceStore.getState().sourceText).toBe("");
 
-      // Restore
       store.resetToSnapshot(snapshot);
       expect(useWorkspaceStore.getState().sourceText).toBe("my source");
       expect(store.getArtifactContent("causal-graph")).toBe("graph-data");
@@ -160,10 +174,8 @@ describe("workspaceStore", () => {
       store.setArtifactGenerated("causal-graph", "original");
       const snapshot = store.getSnapshot();
 
-      // Mutate store after snapshot
       store.setArtifactEdited("causal-graph", "mutated", "manual-edit");
 
-      // Snapshot should still have original
       expect(snapshot.artifacts["causal-graph"]!.versions).toHaveLength(1);
       expect(snapshot.artifacts["causal-graph"]!.versions[0].content).toBe("original");
     });
@@ -174,9 +186,6 @@ describe("workspaceStore", () => {
   // -------------------------------------------------------------------------
   describe("pipeline accessors", () => {
     it("can build PipelineAccessors from store methods", () => {
-      // This is the pattern page.tsx would use: build accessors from store
-      const store = useWorkspaceStore.getState();
-
       const accessors: PipelineAccessors = {
         getSemiformal: () => useWorkspaceStore.getState().semiformalText,
         setSemiformal: (text) => useWorkspaceStore.getState().setSemiformalText(text),
@@ -187,7 +196,6 @@ describe("workspaceStore", () => {
         setVerificationErrors: (e) => useWorkspaceStore.getState().setVerificationErrors(e),
       };
 
-      // Simulate pipeline usage
       accessors.setSemiformal("proof step 1");
       expect(accessors.getSemiformal()).toBe("proof step 1");
 
@@ -199,7 +207,6 @@ describe("workspaceStore", () => {
     });
 
     it("accessors always read fresh state (no stale closures)", () => {
-      // Key advantage over useState: getState() always returns latest
       const accessors: PipelineAccessors = {
         getSemiformal: () => useWorkspaceStore.getState().semiformalText,
         setSemiformal: (text) => useWorkspaceStore.getState().setSemiformalText(text),
@@ -210,10 +217,7 @@ describe("workspaceStore", () => {
         setVerificationErrors: (e) => useWorkspaceStore.getState().setVerificationErrors(e),
       };
 
-      // External code changes state
       useWorkspaceStore.getState().setSemiformalText("externally set");
-
-      // Accessor sees the change immediately (no stale closure!)
       expect(accessors.getSemiformal()).toBe("externally set");
     });
   });
@@ -222,21 +226,13 @@ describe("workspaceStore", () => {
   // 5. Selective subscriptions
   // -------------------------------------------------------------------------
   describe("selective subscriptions", () => {
-    it("subscribe fires for all state changes (use useStore selector in React for selective re-renders)", () => {
+    it("subscribe fires for all state changes", () => {
       const listener = vi.fn();
-
-      // Zustand v5: vanilla subscribe fires on every change.
-      // Selective re-renders happen in React via useStore(store, selector).
-      // This test validates that the subscribe API works and that
-      // React components should use selectors for performance.
       const unsub = useWorkspaceStore.subscribe(listener);
 
       useWorkspaceStore.getState().setSourceText("changed");
       expect(listener).toHaveBeenCalledTimes(1);
 
-      // Vanilla subscribe fires for all changes — this is expected.
-      // React: useWorkspaceStore((s) => s.sourceText) only re-renders
-      // when sourceText changes, not when contextText changes.
       useWorkspaceStore.getState().setContextText("other change");
       expect(listener).toHaveBeenCalledTimes(2);
 
@@ -245,23 +241,20 @@ describe("workspaceStore", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 6. Backward-compatible artifact access pattern
+  // 6. Backward-compatible artifact access
   // -------------------------------------------------------------------------
-  describe("backward compat shim", () => {
+  describe("backward compat", () => {
     it("getArtifactContent returns null for missing artifacts", () => {
       const store = useWorkspaceStore.getState();
       expect(store.getArtifactContent("causal-graph")).toBeNull();
       expect(store.getArtifactContent("statistical-model")).toBeNull();
+      expect(store.getArtifactContent("dialectical-map")).toBeNull();
     });
 
     it("can simulate the old setter pattern via setArtifactGenerated", () => {
-      // Old pattern: setPersistedCausalGraph('{"data": "..."}')
-      // New pattern: setArtifactGenerated("causal-graph", '{"data": "..."}')
       const store = useWorkspaceStore.getState();
       store.setArtifactGenerated("causal-graph", '{"variables":[],"edges":[]}');
 
-      // Old read pattern: parseJson(persistedCausalGraph)
-      // New: getArtifactContent("causal-graph") then JSON.parse
       const content = store.getArtifactContent("causal-graph");
       expect(content).not.toBeNull();
       const parsed = JSON.parse(content!);
