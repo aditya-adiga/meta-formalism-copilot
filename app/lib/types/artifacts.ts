@@ -164,9 +164,9 @@ export const ARTIFACT_META: Record<ArtifactType, {
     description: "Isolates features or variables that are required or expected to remain consistent. States them in terms of invariants, preconditions, postconditions, and data generators. Generates pseudo-code to adapt into executable test specs for a project.",
     whenToUse: "Rules that should always hold, especially for computational or algorithmic claims. Test-driven software development.",
   },
-  "dialectical-map": {
-    label: "Dialectical Map",
-    chipLabel: "Dialectical Map",
+  "balanced-perspectives": {
+    label: "Balanced Perspectives",
+    chipLabel: "Balanced Perspectives",
     description: "Identifies distinct perspectives present in the source text. Hypothesizes tensions between those perspectives. Proposes a synthesis perspective attempting to resolve all tensions.",
     whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain. Decisions with many stakeholders who may have different values. When you have an established opinion and want to understand disagreements or reduce bias.",
   },
@@ -184,7 +184,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "balanced-perspectives",
   "counterexamples",
 ];
 
@@ -193,7 +193,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
-  "dialectical-map": "/api/formalization/dialectical-map",
+  "balanced-perspectives": "/api/formalization/balanced-perspectives",
   counterexamples: "/api/formalization/counterexamples",
 };
 
@@ -204,6 +204,6 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "causal-graph": "causalGraph",
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
-  "dialectical-map": "dialecticalMap",
+  "balanced-perspectives": "balancedPerspectives",
   counterexamples: "counterexamples",
 };
