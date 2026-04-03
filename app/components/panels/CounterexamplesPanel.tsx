@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
@@ -19,7 +19,7 @@ type CounterexamplesPanelProps = {
   counterexamples: CounterexamplesResponse["counterexamples"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 // Support legacy persisted data that used "counterexamples" as the array field name
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +30,7 @@ function getScenarios(data: any): CounterexamplesResponse["counterexamples"]["sc
 export default function CounterexamplesPanel({
   counterexamples, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: CounterexamplesPanelProps) {
   const scenarios = getScenarios(counterexamples);
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
@@ -54,6 +55,8 @@ export default function CounterexamplesPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {counterexamples && (
         <>
