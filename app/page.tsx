@@ -121,7 +121,7 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const dialecticalMapLoading = artifactLoadingState["balanced-perspectives"] === "generating";
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
@@ -177,7 +177,7 @@ export default function Home() {
         case "causal-graph": setPersistedCausalGraph(artifact.content); break;
         case "statistical-model": setPersistedStatisticalModel(artifact.content); break;
         case "property-tests": setPersistedPropertyTests(artifact.content); break;
-        case "dialectical-map": setPersistedDialecticalMap(artifact.content); break;
+        case "balanced-perspectives": setPersistedDialecticalMap(artifact.content); break;
         case "counterexamples": setPersistedCounterexamples(artifact.content); break;
       }
     }
@@ -239,8 +239,8 @@ export default function Home() {
     if (results["property-tests"]) {
       setPersistedPropertyTests(JSON.stringify(results["property-tests"]));
     }
-    if (results["dialectical-map"]) {
-      setPersistedDialecticalMap(JSON.stringify(results["dialectical-map"]));
+    if (results["balanced-perspectives"]) {
+      setPersistedDialecticalMap(JSON.stringify(results["balanced-perspectives"]));
     }
     if (results["counterexamples"]) {
       setPersistedCounterexamples(JSON.stringify(results["counterexamples"]));
@@ -663,7 +663,7 @@ export default function Home() {
             loading={propertyTestsLoading}
           />
         );
-      case "dialectical-map":
+      case "balanced-perspectives":
         return (
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
