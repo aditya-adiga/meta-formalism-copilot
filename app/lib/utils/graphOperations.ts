@@ -14,8 +14,9 @@ import type { PropositionNode, NodeKind } from "@/app/lib/types/decomposition";
 
 /**
  * Returns true if adding an edge from `fromId` to `toId` would create a cycle
- * in the dependency graph. Uses DFS from `fromId` following reverse-dependency
- * edges (i.e., checks if `toId` can reach `fromId` through dependsOn chains).
+ * in the dependency graph. Uses DFS from `fromId` following dependsOn chains
+ * to check if `fromId` can already reach `toId` — if so, adding
+ * "toId dependsOn fromId" would close a cycle.
  */
 export function wouldCreateCycle(
   nodes: PropositionNode[],
@@ -122,7 +123,8 @@ export function updateNodeStatement(
 
 /**
  * Add a dependency edge: `toId` depends on `fromId`.
- * Returns null if the edge would create a cycle or already exists.
+ * Returns null if either node doesn't exist, the edge already exists,
+ * or the edge would create a cycle.
  */
 export function addEdge(
   nodes: PropositionNode[],

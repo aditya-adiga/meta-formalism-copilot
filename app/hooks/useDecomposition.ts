@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type { DecompositionState, PropositionNode, SourceDocument, GraphLayout } from "@/app/lib/types/decomposition";
 import type { NewNodeInput } from "@/app/lib/utils/graphOperations";
 import {
@@ -24,6 +24,10 @@ const INITIAL_STATE: DecompositionState = {
 
 export function useDecomposition() {
   const [state, setState] = useState<DecompositionState>(INITIAL_STATE);
+  // Ref tracks latest nodes so addGraphEdge can read fresh state synchronously
+  // without depending on state.nodes in its useCallback deps (which caused stale closures).
+  const nodesRef = useRef(state.nodes);
+  nodesRef.current = state.nodes;
 
   const selectedNode = useMemo<PropositionNode | null>(
     () => state.nodes.find((n) => n.id === state.selectedNodeId) ?? null,
@@ -143,17 +147,17 @@ export function useDecomposition() {
     setState((prev) => ({ ...prev, nodes: updateNodeStatementOp(prev.nodes, nodeId, statement) }));
   }, []);
 
-  /** Returns false if the edge would create a cycle or is invalid. */
+  /** Returns false if the edge would create a cycle, already exists, or references a non-existent node. */
   const addGraphEdge = useCallback((fromId: string, toId: string): boolean => {
-    // Read state directly to avoid React 18 batching race — setState updater
-    // may not run synchronously, so reading `success` after setState is unsafe.
-    const result = addEdgeOp(state.nodes, fromId, toId);
+    // Use nodesRef for fresh state — avoids stale-closure risk when edges are
+    // added in rapid succession (the ref is updated on every render).
+    const result = addEdgeOp(nodesRef.current, fromId, toId);
     if (result) {
       setState((prev) => ({ ...prev, nodes: result }));
       return true;
     }
     return false;
-  }, [state.nodes]);
+  }, []);
 
   const removeGraphEdge = useCallback((fromId: string, toId: string) => {
     setState((prev) => ({ ...prev, nodes: removeEdgeOp(prev.nodes, fromId, toId) }));
