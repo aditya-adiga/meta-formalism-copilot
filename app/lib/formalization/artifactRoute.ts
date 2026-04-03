@@ -5,7 +5,7 @@ import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];

@@ -4,7 +4,7 @@ import { removeCachedResult } from "@/app/lib/llm/cache";
 import { decompositionSchema } from "@/app/lib/llm/schemas";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const SYSTEM_PROMPT = `You are a document structure analyzer. Given one or more source documents, decompose the content into its key structural units and their dependency/support relationships.
 

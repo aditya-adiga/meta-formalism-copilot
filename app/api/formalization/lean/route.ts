@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
