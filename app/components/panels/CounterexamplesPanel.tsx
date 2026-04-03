@@ -1,7 +1,7 @@
 "use client";
 
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -15,11 +15,12 @@ type CounterexamplesPanelProps = {
   counterexamples: CounterexamplesResponse["counterexamples"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 export default function CounterexamplesPanel({
   counterexamples, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: CounterexamplesPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
 
@@ -33,6 +34,8 @@ export default function CounterexamplesPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {counterexamples && (
         <>
