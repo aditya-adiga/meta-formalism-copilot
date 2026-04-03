@@ -33,6 +33,7 @@ import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
+import OnboardingOverlay, { useOnboarding } from "@/app/components/features/onboarding/OnboardingOverlay";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
@@ -115,6 +116,9 @@ export default function Home() {
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, clearStreamingPreviews, isAnyGenerating } = useArtifactGeneration();
+
+  // --- Onboarding ---
+  const { showOnboarding, closeOnboarding, openOnboarding } = useOnboarding();
 
   // --- Analytics ---
   const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
@@ -763,7 +767,9 @@ export default function Home() {
         renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
+        onOpenHelp={openOnboarding}
       />
+      <OnboardingOverlay open={showOnboarding} onClose={closeOnboarding} />
     </main>
   );
 }
