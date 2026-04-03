@@ -87,7 +87,7 @@ export default function Home() {
     "causal-graph": setPersistedCausalGraph,
     "statistical-model": setPersistedStatisticalModel,
     "property-tests": setPersistedPropertyTests,
-    "dialectical-map": setPersistedDialecticalMap,
+    "balanced-perspectives": setPersistedDialecticalMap,
   } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
@@ -127,7 +127,7 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const dialecticalMapLoading = artifactLoadingState["balanced-perspectives"] === "generating";
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
@@ -182,7 +182,7 @@ export default function Home() {
       "causal-graph": setPersistedCausalGraph,
       "statistical-model": setPersistedStatisticalModel,
       "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
+      "balanced-perspectives": setPersistedDialecticalMap,
       counterexamples: setPersistedCounterexamples,
     };
     for (const artifact of session.artifacts) {
@@ -241,7 +241,7 @@ export default function Home() {
       "causal-graph": setPersistedCausalGraph,
       "statistical-model": setPersistedStatisticalModel,
       "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
+      "balanced-perspectives": setPersistedDialecticalMap,
       counterexamples: setPersistedCounterexamples,
     };
     for (const [type, value] of Object.entries(results)) {
@@ -690,7 +690,7 @@ export default function Home() {
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
           />
         );
-      case "dialectical-map":
+      case "balanced-perspectives":
         return (
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
