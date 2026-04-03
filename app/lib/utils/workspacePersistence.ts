@@ -111,7 +111,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function coerceDecomposition(raw: unknown): PersistedDecomposition {
+export function coerceDecomposition(raw: unknown): PersistedDecomposition {
   if (!isObject(raw)) {
     return { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
   }
