@@ -86,11 +86,11 @@ export default function EditableSection({ value, onChange, children }: EditableS
         setEditText(data.text);
       } else {
         // JSON-aware editing for objects/arrays
-        const data = await fetchApi<{ content: string }>("/api/edit/artifact", {
+        const data = await fetchApi<{ text: string }>("/api/edit/artifact", {
           content: editText,
           instruction: aiInstruction,
         });
-        setEditText(data.content);
+        setEditText(data.text);
       }
       setAiInstruction("");
       setParseError(null);
