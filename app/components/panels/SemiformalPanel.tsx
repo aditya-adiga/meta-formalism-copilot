@@ -17,9 +17,11 @@ type SemiformalPanelProps = {
   showGenerateLean?: boolean;
   leanLoading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
+  isStale?: boolean;
+  onRegenerate?: () => void;
 };
 
-export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading, waitEstimate }: SemiformalPanelProps) {
+export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading, waitEstimate, isStale, onRegenerate }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
   const [editEndpoint, setEditEndpoint] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
@@ -103,6 +105,21 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
           )}
         </div>
       </div>
+
+      {isStale && (
+        <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-800">
+          <span>Generated from different inputs.</span>
+          {onRegenerate && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="font-medium underline hover:text-amber-900"
+            >
+              Regenerate
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <EditableOutput

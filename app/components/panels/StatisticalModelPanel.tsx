@@ -1,8 +1,8 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
-import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -12,7 +12,7 @@ type StatisticalModelPanelProps = {
   streamingPreview?: StatisticalModelResponse["statisticalModel"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 const ROLE_COLORS: Record<string, string> = {
   independent: "text-blue-700 bg-blue-50 border-blue-200",
@@ -33,10 +33,11 @@ function RoleBadge({ role }: { role: string }) {
 export default function StatisticalModelPanel({
   statisticalModel, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: StatisticalModelPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(statisticalModel, onContentChange);
 
-  const { displayData: displayModel, hasDisplayData } = mergeStreamingPreview(
+  const { displayData: displayModel, hasDisplayData } = useStreamingMerge(
     statisticalModel, streamingPreview,
     (d) => (d.variables?.length ?? 0) > 0,
   );
@@ -51,6 +52,8 @@ export default function StatisticalModelPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayModel && (
         <>
@@ -101,7 +104,7 @@ export default function StatisticalModelPanel({
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <p className="text-sm font-medium text-[var(--ink-black)]">{h.statement}</p>
                     <p className="mt-1 text-xs text-[#6B6560]">
-                      <span className="font-semibold">H₀:</span> {h.nullHypothesis}
+                      <span className="font-semibold">H&#x2080;:</span> {h.nullHypothesis}
                     </p>
                     <p className="mt-1 text-xs text-[#9A9590]">
                       <span className="font-semibold">Test:</span> {h.testSuggestion}

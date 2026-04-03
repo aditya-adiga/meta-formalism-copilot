@@ -2,7 +2,7 @@
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -12,11 +12,12 @@ type DialecticalMapPanelProps = {
   streamingPreview?: DialecticalMapResponse["dialecticalMap"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 export default function DialecticalMapPanel({
   dialecticalMap, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: DialecticalMapPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(dialecticalMap, onContentChange);
 
@@ -35,6 +36,8 @@ export default function DialecticalMapPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayMap && (
         <>

@@ -24,7 +24,8 @@ import SessionBanner from "@/app/components/features/session-banner/SessionBanne
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
-import { useWorkspaceStore, makeVersion, resolveArtifactContent, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
+import { useWorkspaceStore, makeVersion, resolveArtifactContent, resolveArtifactProvenance, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
+import { buildProvenance, buildInputHash } from "@/app/lib/utils/provenance";
 import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
@@ -51,6 +52,16 @@ const selectStatisticalModel = artifactSelector("statistical-model");
 const selectPropertyTests = artifactSelector("property-tests");
 const selectDialecticalMap = artifactSelector("dialectical-map");
 const selectCounterexamples = artifactSelector("counterexamples");
+
+// Provenance selectors — return the inputHash of the current version (or undefined)
+function provenanceSelector(key: ArtifactKey): (s: StoreState) => string | undefined {
+  return (s) => resolveArtifactProvenance(s.artifacts[key])?.inputHash;
+}
+const selectCausalGraphProvenance = provenanceSelector("causal-graph");
+const selectStatisticalModelProvenance = provenanceSelector("statistical-model");
+const selectPropertyTestsProvenance = provenanceSelector("property-tests");
+const selectDialecticalMapProvenance = provenanceSelector("dialectical-map");
+const selectCounterexamplesProvenance = provenanceSelector("counterexamples");
 
 function phaseToEndpoint(phase: LoadingPhase): string | null {
   switch (phase) {
@@ -169,6 +180,15 @@ export default function Home() {
   const persistedPropertyTests = useWorkspaceStore(selectPropertyTests);
   const persistedDialecticalMap = useWorkspaceStore(selectDialecticalMap);
   const persistedCounterexamples = useWorkspaceStore(selectCounterexamples);
+
+  // Provenance hashes for current artifact versions
+  const causalGraphInputHash = useWorkspaceStore(selectCausalGraphProvenance);
+  const statisticalModelInputHash = useWorkspaceStore(selectStatisticalModelProvenance);
+  const propertyTestsInputHash = useWorkspaceStore(selectPropertyTestsProvenance);
+  const dialecticalMapInputHash = useWorkspaceStore(selectDialecticalMapProvenance);
+  const counterexamplesInputHash = useWorkspaceStore(selectCounterexamplesProvenance);
+  const semiformalProvenance = useWorkspaceStore((s) => s.semiformalProvenance);
+  const setSemiformalProvenance = useWorkspaceStore((s) => s.setSemiformalProvenance);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
   const causalGraph = useMemo(() => {
@@ -365,6 +385,7 @@ export default function Home() {
   const storeArtifactResults = useCallback((
     results: Partial<Record<ArtifactType, unknown>>,
     nodeId?: string,
+    provenance?: import("@/app/lib/utils/provenance").GenerationProvenance,
   ) => {
     for (const [type, value] of Object.entries(results)) {
       if (value == null) continue;
@@ -400,7 +421,7 @@ export default function Home() {
         content: typeof results[key] === "string" ? results[key] as string : JSON.stringify(results[key]),
       }));
     if (entries.length > 0) {
-      useWorkspaceStore.getState().setArtifactsBatchGenerated(entries);
+      useWorkspaceStore.getState().setArtifactsBatchGenerated(entries, provenance);
     }
   }, [updateSessionArtifact, updateNode, decomp.nodes]);
 
@@ -427,6 +448,20 @@ export default function Home() {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
 
+  // --- Input provenance: hash of current inputs for staleness comparison ---
+  const currentInputHash = useMemo(
+    () => buildInputHash(combinedPaperText, contextText),
+    [combinedPaperText, contextText],
+  );
+
+  // Per-artifact staleness: true when the artifact was generated from different inputs
+  const causalGraphIsStale = !!(causalGraph && causalGraphInputHash && causalGraphInputHash !== currentInputHash);
+  const statisticalModelIsStale = !!(statisticalModel && statisticalModelInputHash && statisticalModelInputHash !== currentInputHash);
+  const propertyTestsIsStale = !!(propertyTests && propertyTestsInputHash && propertyTestsInputHash !== currentInputHash);
+  const dialecticalMapIsStale = !!(dialecticalMap && dialecticalMapInputHash && dialecticalMapInputHash !== currentInputHash);
+  const counterexamplesIsStale = !!(counterexamples && counterexamplesInputHash && counterexamplesInputHash !== currentInputHash);
+  const semiformalIsStale = !!(semiformalText && semiformalProvenance && semiformalProvenance.inputHash !== currentInputHash);
+
   // Extract the PDF File reference for structured parsing (non-persisted; only available
   // when the user uploaded a PDF in this session and it hasn't been cleared)
   const pdfFile = useMemo(() => {
@@ -440,11 +475,14 @@ export default function Home() {
   // --- Source documents for decomposition (each input as a separate document) ---
   const sourceDocuments: SourceDocument[] = useMemo(() => {
     const docs: SourceDocument[] = [];
+    let idx = 0;
     if (sourceText.trim()) {
-      docs.push({ sourceId: "doc-0", sourceLabel: "Text Input", text: sourceText });
+      docs.push({ sourceId: `doc-${idx}`, sourceLabel: "Text Input", text: sourceText });
+      idx++;
     }
     for (const f of extractedFiles) {
-      docs.push({ sourceId: `doc-${docs.length}`, sourceLabel: f.name, text: f.text });
+      docs.push({ sourceId: `doc-${idx}`, sourceLabel: f.name, text: f.text });
+      idx++;
     }
     return docs;
   }, [sourceText, extractedFiles]);
@@ -561,6 +599,7 @@ export default function Home() {
     nodeLabel?: string,
   ) => {
     const request = { sourceText: text, context, nodeId, nodeLabel };
+    const provenance = buildProvenance(text, context);
 
     // Clear persisted data for types being regenerated so streaming previews
     // are visible via mergeStreamingPreview (which prefers finalData over preview)
@@ -580,7 +619,9 @@ export default function Home() {
 
     const [, artifactResults] = await Promise.all([
       hasSemiformal
-        ? pipeline.handleGenerateSemiformal(text)
+        ? pipeline.handleGenerateSemiformal(text).then(() => {
+            setSemiformalProvenance(provenance);
+          })
         : Promise.resolve(),
       nonSemiformalTypes.length > 0
         ? generateArtifacts(nonSemiformalTypes, request)
@@ -588,9 +629,9 @@ export default function Home() {
     ]);
 
     if (artifactResults) {
-      storeArtifactResults(artifactResults, nodeId);
+      storeArtifactResults(artifactResults, nodeId, provenance);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId, setSemiformalProvenance]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -756,6 +797,8 @@ export default function Home() {
             showGenerateLean={semiformalReadyForLean}
             leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
             waitEstimate={waitEstimate}
+            isStale={semiformalIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "lean":
@@ -819,40 +862,28 @@ export default function Home() {
         return (
           <CausalGraphPanel
             causalGraph={causalGraph}
-            streamingPreview={streamingJsonPreview["causal-graph"] as CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
-
-            onContentChange={setPersistedCausalGraph}
-            onAiEdit={artifactEditing.causalGraph.handleAiEdit}
-            editing={artifactEditing.causalGraph.editing}
-            editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
+            isStale={causalGraphIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "statistical-model":
         return (
           <StatisticalModelPanel
             statisticalModel={statisticalModel}
-            streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
-
-            onContentChange={setPersistedStatisticalModel}
-            onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
-            editing={artifactEditing.statisticalModel.editing}
-            editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
+            isStale={statisticalModelIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "property-tests":
         return (
           <PropertyTestsPanel
             propertyTests={propertyTests}
-            streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
-
-            onContentChange={setPersistedPropertyTests}
-            onAiEdit={artifactEditing.propertyTests.handleAiEdit}
-            editing={artifactEditing.propertyTests.editing}
-            editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
+            isStale={propertyTestsIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "dialectical-map":
@@ -861,11 +892,12 @@ export default function Home() {
             dialecticalMap={dialecticalMap}
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
-
             onContentChange={setPersistedDialecticalMap}
             onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
             editing={artifactEditing.dialecticalMap.editing}
             editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
+            isStale={dialecticalMapIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "counterexamples":
@@ -873,11 +905,8 @@ export default function Home() {
           <CounterexamplesPanel
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
-
-            onContentChange={setPersistedCounterexamples}
-            onAiEdit={artifactEditing.counterexamples.handleAiEdit}
-            editing={artifactEditing.counterexamples.editing}
-            editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
+            isStale={counterexamplesIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "analytics":
@@ -897,17 +926,15 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
-    setPersistedCausalGraph,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
     statisticalModel, statisticalModelLoading,
-    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
     setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
     setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
-    setPersistedCounterexamples,
-    artifactEditing,
+    semiformalIsStale, causalGraphIsStale, statisticalModelIsStale,
+    propertyTestsIsStale, dialecticalMapIsStale, counterexamplesIsStale,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     streamingNodes,

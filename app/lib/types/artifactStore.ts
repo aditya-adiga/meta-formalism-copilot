@@ -7,6 +7,7 @@
  */
 
 import type { ArtifactType } from "./session";
+import type { GenerationProvenance } from "@/app/lib/utils/provenance";
 
 /** Subset of ArtifactType that uses structured JSON and the versioned store.
  *  Semiformal and lean are stored as flat string fields for pipeline compatibility. */
@@ -18,6 +19,8 @@ export type ArtifactVersion = {
   createdAt: string;
   source: "generated" | "ai-edit" | "manual-edit";
   editInstruction?: string;
+  /** Hash of the inputs used to generate this version (absent for pre-provenance data) */
+  provenance?: GenerationProvenance;
 };
 
 export type ArtifactRecord = {
