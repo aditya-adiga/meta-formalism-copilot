@@ -2,7 +2,8 @@
  *  The last call is always delivered (trailing edge): if multiple calls arrive during
  *  the cooldown window, the most recent args are stored and delivered when the timer fires.
  *  Call `.cancel()` on the returned function to clear any pending trailing invocation. */
-export function throttle<T extends (...args: Parameters<T>) => void>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function throttle<T extends (...args: any[]) => void>(
   fn: T,
   ms: number,
 ): ((...args: Parameters<T>) => void) & { cancel: () => void } {

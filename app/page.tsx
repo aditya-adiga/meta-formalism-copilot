@@ -251,7 +251,7 @@ export default function Home() {
   );
 
   // --- Auto-formalize queue ---
-  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue, reset: resetQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
   const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from persisted store once on mount (one-time read, no subscription)
@@ -385,6 +385,8 @@ export default function Home() {
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
+    cancelQueue,
+    resetQueue,
   });
 
   // --- Combined paper text for single-proof formalization ---
