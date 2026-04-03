@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import type { DecompositionState, PropositionNode, SourceDocument, GraphLayout } from "@/app/lib/types/decomposition";
+import type { NewNodeInput } from "@/app/lib/utils/graphOperations";
+import {
+  addNode as addNodeOp,
+  removeNode as removeNodeOp,
+  renameNode as renameNodeOp,
+  updateNodeStatement as updateNodeStatementOp,
+  addEdge as addEdgeOp,
+  removeEdge as removeEdgeOp,
+} from "@/app/lib/utils/graphOperations";
 import { fetchStreamingApi } from "@/app/lib/formalization/api";
 import { parse as parsePartialJson } from "partial-json";
 import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
@@ -25,6 +34,7 @@ const INITIAL_STATE: DecompositionState = {
   paperText: "",
   sources: [],
   extractionStatus: "idle",
+  graphLayout: undefined,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,19 +167,84 @@ export function useDecomposition() {
     }));
   }, []);
 
+  // --- Graph editing operations ---
+
+  const addGraphNode = useCallback((input: NewNodeInput): string => {
+    let newId = "";
+    setState((prev) => {
+      const [nodes, id] = addNodeOp(prev.nodes, input);
+      newId = id;
+      return { ...prev, nodes };
+    });
+    return newId;
+  }, []);
+
+  const removeGraphNode = useCallback((nodeId: string) => {
+    setState((prev) => ({
+      ...prev,
+      nodes: removeNodeOp(prev.nodes, nodeId),
+      selectedNodeId: prev.selectedNodeId === nodeId ? null : prev.selectedNodeId,
+    }));
+  }, []);
+
+  const renameGraphNode = useCallback((nodeId: string, label: string) => {
+    setState((prev) => ({ ...prev, nodes: renameNodeOp(prev.nodes, nodeId, label) }));
+  }, []);
+
+  const updateNodeStatement = useCallback((nodeId: string, statement: string) => {
+    setState((prev) => ({ ...prev, nodes: updateNodeStatementOp(prev.nodes, nodeId, statement) }));
+  }, []);
+
+  /** Returns false if the edge would create a cycle or is invalid. */
+  const addGraphEdge = useCallback((fromId: string, toId: string): boolean => {
+    // Read state directly to avoid React 18 batching race — setState updater
+    // may not run synchronously, so reading `success` after setState is unsafe.
+    const result = addEdgeOp(state.nodes, fromId, toId);
+    if (result) {
+      setState((prev) => ({ ...prev, nodes: result }));
+      return true;
+    }
+    return false;
+  }, [state.nodes]);
+
+  const removeGraphEdge = useCallback((fromId: string, toId: string) => {
+    setState((prev) => ({ ...prev, nodes: removeEdgeOp(prev.nodes, fromId, toId) }));
+  }, []);
+
+  const updateGraphLayout = useCallback((layout: GraphLayout) => {
+    setState((prev) => ({ ...prev, graphLayout: layout }));
+  }, []);
+
   /** Restore persisted decomposition state (called once on mount) */
   const resetState = useCallback(
-    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources?: SourceDocument[] }) => {
+    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources?: SourceDocument[]; graphLayout?: GraphLayout }) => {
       setState({
         nodes: restored.nodes,
         selectedNodeId: restored.selectedNodeId,
         paperText: restored.paperText,
         sources: restored.sources ?? [],
         extractionStatus: restored.nodes.length > 0 ? "done" : "idle",
+        graphLayout: restored.graphLayout,
       });
     },
     [],
   );
 
-  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState, streamingNodes };
+  return {
+    state,
+    selectedNode,
+    extractPropositions,
+    selectNode,
+    updateNode,
+    // Graph editing
+    addGraphNode,
+    removeGraphNode,
+    renameGraphNode,
+    updateNodeStatement,
+    addGraphEdge,
+    removeGraphEdge,
+    updateGraphLayout,
+    resetState,
+    streamingNodes,
+  };
 }
