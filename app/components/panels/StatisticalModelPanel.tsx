@@ -2,7 +2,7 @@
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -12,7 +12,7 @@ type StatisticalModelPanelProps = {
   streamingPreview?: StatisticalModelResponse["statisticalModel"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 const ROLE_COLORS: Record<string, string> = {
   independent: "text-blue-700 bg-blue-50 border-blue-200",
@@ -33,6 +33,7 @@ function RoleBadge({ role }: { role: string }) {
 export default function StatisticalModelPanel({
   statisticalModel, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: StatisticalModelPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(statisticalModel, onContentChange);
 
@@ -51,6 +52,8 @@ export default function StatisticalModelPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayModel && (
         <>

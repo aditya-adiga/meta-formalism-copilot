@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
@@ -16,7 +16,7 @@ type CausalGraphPanelProps = {
   loading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 type ViewMode = "graph" | "details";
 
@@ -119,6 +119,7 @@ function DetailsView({
 export default function CausalGraphPanel({
   causalGraph, streamingPreview, loading, waitEstimate,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
@@ -137,6 +138,8 @@ export default function CausalGraphPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
