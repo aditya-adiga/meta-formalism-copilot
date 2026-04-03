@@ -1,120 +1,181 @@
-# API Consistency Review: feat/zustand-wire-page (Loop 2)
+# API Consistency Review: feat/graph-persistence-editing
 
 **Reviewer:** Claude (API Consistency)
-**Branch:** `feat/zustand-wire-page` relative to `main`
+**Branch:** `feat/graph-persistence-editing` relative to `main`
 **Date:** 2026-04-03
-**Loop:** 2 (prior loop found 9 findings; fixes applied in commit 3ed18f8)
-
-## Prior Finding Disposition
-
-| Prior ID | Description | Status |
-|----------|-------------|--------|
-| F1 (A3) | Snapshot type asymmetry (`WorkspaceState` vs `PersistedWorkspace`) | ACKNOWLEDGED -- intentional bridge, resolves when `useWorkspaceSessions` migrates |
-| F2 (A2) | Node coercion less thorough than `loadWorkspace` | FIXED -- `coercePersistedState` now calls `coerceDecomposition` from `workspacePersistence.ts`, reusing the same field-by-field validation |
-| F3 (A1) | `ArtifactVersion` fields not validated during rehydration | FIXED -- new `coerceArtifactVersion` validates `id`, `content`, `createdAt`, `source`, and `editInstruction` with type checks and defaults |
-| F4 (A8) | Comment overstated persist middleware debouncing | FIXED -- revised to "persist middleware handles serialization lifecycle; custom debounced storage adapter rate-limits writes" |
-| F5 (A9) | Comment imprecise about setter stability | FIXED -- revised to "Zustand selectors return the same function identity across state changes, so Object.is comparison prevents re-renders" |
-| F6 (A4) | `GenerationProvenance` type unused | FIXED -- removed entirely from `artifactStore.ts` |
-| F7 (A5) | `migrateFromV2` used individual setters | FIXED -- single `useWorkspaceStore.setState({...})` call with comment referencing the shared pattern |
-| F8 | `file?: File` silently dropped on snapshot | OPEN -- unchanged; acknowledged as intentional (File is non-serializable) |
-| F9 | Hardcoded `validKeys` duplicates `ArtifactKey` type | OPEN -- unchanged; low risk, tracked for future cleanup |
 
 ---
 
 ## Baseline Conventions
 
-Same as Loop 1. Key additions relevant to this loop:
+Established API patterns in this codebase:
 
-- **Batch setState pattern.** Both `migrateFromV2` and `resetWorkspaceToSnapshot` now consistently use a single `useWorkspaceStore.setState({...})` call. This is the established convention for multi-field updates.
-- **Coercion delegation.** `coerceDecomposition` is now the single source of truth for node validation, shared between the Zustand `merge` path and the `loadWorkspace` path.
+1. **HTTP API routes** are all POST handlers under `app/api/`. Error responses follow `{ error: string, details?: string }` with status 502 for LLM failures and 400 for input validation.
+
+2. **Formalization routes** use `handleArtifactRoute()` from `artifactRoute.ts`, which provides a uniform contract: accept `ArtifactGenerationRequest`, return `{ [responseKey]: parsedData }`. Streaming is opt-in via `{ stream: true }` in the request body.
+
+3. **Edit routes** (`edit/inline`, `edit/whole`) accept `{ fullText, instruction, selection? }` and return `{ text: string }` uniformly for both inline and whole edits. They use `callLlm()` directly (not `handleArtifactRoute`).
+
+4. **Input field naming**: existing edit routes use `fullText` for the document content. Formalization routes use `sourceText`.
+
+5. **Response key convention**: formalization routes wrap output in a typed response key (`causalGraph`, `proof`, `leanCode`, etc.). Edit routes return flat `{ text }`.
+
+6. **Streaming protocol**: SSE with `event: token`, `event: done`, `event: error`. The `done` event includes `{ text, usage }`. Managed by `streamLlm()` and consumed by `fetchStreamingApi()`.
+
+7. **Internal hooks**: feature-specific hooks are thin wrappers over `fetchApi()`/`fetchStreamingApi()`, with state managed in the Zustand `workspaceStore`.
+
+8. **Decision docs**: numbered sequentially under `docs/decisions/NNN-title.md`.
 
 ---
 
 ## Findings
 
-### F1. Snapshot type asymmetry (carried forward, acknowledged)
+#### F1. New `edit/artifact` route uses inconsistent response shape for whole vs inline edits
 
 **Severity:** Inconsistent
-**Location:** `workspaceStore.ts:204-206` (store interface) vs `page.tsx:108-128` (bridge code)
+**Location:** `app/api/edit/artifact/route.ts:56-70`
 **Move:** 7 (Look for the asymmetry)
 **Confidence:** High
 
-Unchanged from Loop 1. The store's `getSnapshot()` returns `WorkspaceState` (versioned artifacts), but `useWorkspaceSessions` expects `PersistedWorkspace` (flat strings). The bridge in `page.tsx` converts between them. The store's `getSnapshot`/`resetToSnapshot` methods remain unused by any consumer.
+The new `POST /api/edit/artifact` endpoint returns `{ text: string }` for inline edits but `{ content: string }` for whole edits. This is a polymorphic response from a single endpoint, requiring the consumer to know which mode was used to parse the response. The existing `edit/inline` and `edit/whole` routes both return `{ text }` uniformly.
 
-Acknowledged as intentional -- the asymmetry resolves when `useWorkspaceSessions` migrates to the Zustand store. No action required this loop.
+The consumer in `useArtifactEditing.ts` (lines 39 and 48) correctly handles both shapes, but this creates a fragile coupling: any new consumer of `/api/edit/artifact` must implement the same conditional parsing. The existing edit routes established a convention of always returning `{ text }`.
+
+**Recommendation:** Unify the response key to `{ text }` for both inline and whole-artifact edits, matching the existing edit routes. The consumer can distinguish the two modes by whether it needs to do substring replacement (inline) or full replacement (whole).
 
 ---
 
-### F2 (NEW). Batch artifact update in `page.tsx` duplicates version-building logic
+#### F2. New `edit/artifact` route uses `content` as input field name, diverging from `fullText` convention
 
 **Severity:** Minor
-**Location:** `page.tsx:332-349` vs `workspaceStore.ts:323-340` (`setArtifactGenerated`)
-**Move:** 4 (Check for prior art)
+**Location:** `app/api/edit/artifact/route.ts:25`
+**Move:** 2 (Check naming against the grain)
+**Confidence:** Medium
+
+The existing edit routes accept `{ fullText, instruction }` while the new artifact edit route accepts `{ content, instruction }`. The new naming is arguably clearer for JSON artifacts, and it's consumed by new code only (`useArtifactEditing`, `EditableSection`), so there's no breaking change. However, having two naming conventions for "the document being edited" in the same `edit/` route family creates cognitive overhead for contributors.
+
+**Recommendation:** This is establishing a new pattern for structured artifact editing, which is defensible. Consider adding a comment noting that `content` is used (rather than `fullText`) because this route handles JSON artifacts, not prose text.
+
+---
+
+#### F3. `useAllArtifactEditing` is dead code referencing deleted `useWorkspacePersistence`
+
+**Severity:** Inconsistent
+**Location:** `app/hooks/useArtifactEditing.ts:69-115`
+**Move:** 3 (Trace the consumer contract)
 **Confidence:** High
 
-The `handleFormalizationComplete` callback builds `ArtifactRecord` objects inline (lines 338-342) using the same version-capping and index-pointing logic as `setArtifactGenerated` in the store. This was introduced to batch multiple artifact updates into a single `setState` call (replacing N individual `setArtifactGenerated` calls), which is a good efficiency improvement. However, it means the version-building logic now exists in two places.
+(From Stage 1 fact-check, Claim 17.) The `useAllArtifactEditing` function is exported but never called anywhere in the codebase. Its docstring references `useWorkspacePersistence` which has been deleted on this branch. Its parameter shape (`{ causalGraph: string | null; setCausalGraph: ... }`) matches the old persistence hook's flat-string interface, not the new Zustand store's `ArtifactRecord`-based API. Any future consumer would need to bridge between the store's `getArtifactContent(key)`/`setArtifactEdited(key, ...)` interface and this hook's setter-per-type interface.
 
-Additionally, there is a subtle race: `existing` artifacts are read via `getState()` on line 337, but the final merge on line 346 uses a functional `setState((s) => ...)`. If another state update occurs between reading `existing` and calling `setState`, the `artifactUpdates` map could be built against stale artifact data. In practice this is unlikely (the callback runs synchronously), but it breaks the pattern established by `setArtifactGenerated` which reads and writes atomically within a single `set((s) => ...)` call.
-
-**Recommendation:** Extract a `buildArtifactRecord(existing: ArtifactRecord | undefined, content: string, source: ArtifactVersion["source"]): ArtifactRecord` helper from the store and use it in both locations. For the race condition, either read `existing` inside the functional `setState` callback, or document that this is safe because the callback runs synchronously.
+**Recommendation:** Remove `useAllArtifactEditing` entirely. The individual `useArtifactEditing` hook is the correct granular abstraction and is already used directly by panel components.
 
 ---
 
-### F3 (carried forward). `file?: File` silently dropped on snapshot
+#### F4. Lean route's streaming TransformStream has fragile SSE parsing
 
-**Severity:** Minor
-**Location:** `workspaceStore.ts` (`WorkspaceState.extractedFiles` type) vs `getSnapshot` (strips `file`)
-**Move:** 7 (Look for the asymmetry)
-**Confidence:** High
+**Severity:** Inconsistent
+**Location:** `app/api/formalization/lean/route.ts:112-143`
+**Move:** 4 (Verify error consistency)
+**Confidence:** Medium
 
-Unchanged. The `partialize` function relies on `JSON.stringify` to silently drop `File` references, while `getSnapshot` explicitly maps to `{ name, text }`. Both approaches work but handle the same concern differently. A `SnapshotExtractedFile` type alias would make the lossy conversion explicit.
+The lean route implements a custom `TransformStream` to post-process the `done` event from `streamLlm()`. The SSE parsing logic splits on `\n\n` and uses a regex (`/^event: (\w+)\ndata: ([\s\S]+)$/`) to match events. This has two issues:
+
+1. **Chunking assumption**: SSE events from `sseEvent()` are formatted as `event: X\ndata: Y\n\n`. If a TCP chunk boundary falls mid-event, the `split("\n\n")` will produce partial blocks that fail the regex, and the fallback `controller.enqueue(chunk)` will emit raw bytes that are not valid SSE.
+
+2. **Pattern divergence**: All other artifact routes using streaming delegate entirely to `handleArtifactRoute()` + `streamLlm()`, which handles the SSE lifecycle cleanly. The lean route's custom transform is the only place that re-parses its own server's SSE output. This is because lean needs post-processing (`stripCodeFences`, `stripImports`), but the same need could arise for other routes.
+
+**Recommendation:** Consider extending `streamLlm()` or `handleArtifactRoute()` with an optional `transformFinalText` callback, so the lean route can inject its post-processing without re-parsing SSE. Short-term, add a comment noting the chunking assumption and why it's acceptable (single-process server, events are small).
 
 ---
 
-### F4 (carried forward). Hardcoded `validKeys` duplicates `ArtifactKey` type
+#### F5. Duplicate decision doc numbering: two `005-*` files
 
 **Severity:** Minor
-**Location:** `workspaceStore.ts:120`
+**Location:** `docs/decisions/005-streaming-api-responses.md`, `docs/decisions/005-zustand-state-management.md`
 **Move:** 2 (Check naming against the grain)
 **Confidence:** High
 
-Unchanged. The array `["causal-graph", "statistical-model", "property-tests", "dialectical-map", "counterexamples"]` in `coercePersistedState` duplicates the `ArtifactKey` type. Adding a new artifact type requires updating this array, `PERSISTED_ARTIFACT_FIELDS`, and the `ArtifactType` union.
+Two decision documents share the `005` prefix. The established convention is sequential unique numbering. This also occurs at the `001` level (`001-formal-artifact-types.md` and `001-vitest-test-framework.md`), suggesting a recurring coordination issue.
+
+**Recommendation:** Renumber one of the 005 docs (e.g., Zustand to 006) to restore unique ordering.
+
+---
+
+#### F6. `CLAUDE.md` references deleted `useWorkspacePersistence` hook
+
+**Severity:** Minor
+**Location:** `CLAUDE.md` (hooks section, architecture section)
+**Move:** 3 (Trace the consumer contract)
+**Confidence:** High
+
+(From Stage 1 fact-check, Claims 14-16.) The CLAUDE.md architecture section lists `useWorkspacePersistence` in the hooks directory and describes state persistence as "persisted to localStorage via `useWorkspacePersistence`". This hook has been deleted and replaced by the Zustand `workspaceStore`. Developer documentation drift is an API consistency issue for internal interfaces -- contributors following CLAUDE.md will look for a hook that doesn't exist.
+
+**Recommendation:** Update CLAUDE.md to reference `workspaceStore` and the Zustand-based persistence layer.
+
+---
+
+#### F7. Lean route lacks input validation, inconsistent with `edit/artifact` and `artifactRoute`
+
+**Severity:** Minor
+**Location:** `app/api/formalization/lean/route.ts:74-76`
+**Move:** 6 (Verify error consistency)
+**Confidence:** Medium
+
+The lean route destructures `informalProof` from the request body but never validates it. If `informalProof` is missing or empty, the route will send an empty string to the LLM and return whatever it generates. By contrast, `handleArtifactRoute` validates `sourceText` with a 400 response, and the new `edit/artifact` route validates `content` and `instruction`. This is a pre-existing gap (present on main), but the branch adds streaming support that also lacks validation, widening the impact surface.
+
+**Recommendation:** Add a guard `if (!informalProof) return NextResponse.json({ error: "informalProof is required" }, { status: 400 })` before the streaming and non-streaming paths, consistent with the validation pattern in `artifactRoute.ts`.
+
+---
+
+#### F8. `hardcoded validKeys` in `coercePersistedState` lists `dialectical-map` instead of `balanced-perspectives`
+
+**Severity:** Inconsistent
+**Location:** `app/lib/stores/workspaceStore.ts:120-121`
+**Move:** 2 (Check naming against the grain)
+**Confidence:** High
+
+The `validKeys` array in `coercePersistedState` was noted in the prior review (F4) as duplicating the `ArtifactKey` type. This branch renames `dialectical-map` to `balanced-perspectives` across the codebase, but the hardcoded array in `coercePersistedState` may still contain the old name. Let me verify...
+
+Actually, re-reading the store code at line 121, the array reads: `["causal-graph", "statistical-model", "property-tests", "balanced-perspectives", "counterexamples"]` -- this appears correct. The prior review's F4 listed `dialectical-map` because it was written before the rename. This finding is **withdrawn** -- the rename was applied correctly here.
 
 ---
 
 ## What Looks Good
 
-1. **F2/A2 fix is thorough.** By reusing `coerceDecomposition` from `workspacePersistence.ts`, the Zustand rehydration path now validates every `PropositionNode` field identically to `loadWorkspace`. The `export` change to `coerceDecomposition` is minimal and non-breaking.
+1. **New `edit/artifact` route follows the established error handling pattern.** The `OpenRouterError` catch, 502 status for LLM failures, and `{ error, details }` shape all match `edit/inline` and `edit/whole` exactly.
 
-2. **F3/A1 fix (`coerceArtifactVersion`) is well-structured.** The new function validates `id` and `content` as required strings (returning `null` if missing), provides sensible defaults for `createdAt` and `source`, and correctly handles the optional `editInstruction` field. The `VALID_ARTIFACT_SOURCES` set is a clean validation pattern.
+2. **`fetchApi` and `fetchStreamingApi` provide clean abstractions.** The new `api.ts` module centralizes HTTP concerns (JSON serialization, error extraction, SSE parsing) so that hook consumers don't duplicate fetch boilerplate. The streaming API transparently adds `{ stream: true }` to the body.
 
-3. **F7/A5 fix (migration batching) is consistent.** `migrateFromV2` now builds artifacts in a local variable and commits everything in a single `setState` call, with a comment explicitly referencing the matching pattern in `resetWorkspaceToSnapshot`.
+3. **Streaming SSE protocol is consistent.** The `streamLlm()` function emits the same `token`/`done`/`error` event types as the non-streaming `callLlm()` returns `{ text, usage }`. The `fetchStreamingApi` consumer correctly handles all three event types.
 
-4. **Partialize memoization is a nice addition.** The `sanitizeDecomposition` function with reference caching avoids re-mapping decomposition nodes on every `set()` when only unrelated fields changed. This is a meaningful performance improvement for large decomposition graphs.
+4. **`ArtifactGenerationRequest` is a well-designed uniform contract.** All formalization routes now accept the same request shape, with `transformBody` for backward compatibility where needed (e.g., semiformal's legacy `{ text }` field).
 
-5. **All 25 store tests pass.** Test coverage for versioning, migration, hydration, and pipeline compatibility remains green.
+5. **Artifact type maps (`ARTIFACT_ROUTE`, `ARTIFACT_RESPONSE_KEY`) are consistent.** Every structured artifact type has entries in both maps, and the `responseKey` matches the actual JSON key returned by each route.
 
-6. **Comment fixes (A8-A10) are accurate.** The revised comments correctly describe what the persist middleware does vs what the custom adapter does, and how Zustand setter stability works.
+6. **`useFieldUpdaters` hook cleanly centralizes the spread-serialize pattern.** Panel components can update individual fields without duplicating `JSON.stringify({ ...data, [key]: value })` logic.
+
+7. **Zustand store's versioned artifact API (`setArtifactGenerated`, `setArtifactEdited`, `undoArtifact`, `redoArtifact`) is symmetric and well-typed.** The `ArtifactVersion.source` discriminant (`generated` / `ai-edit` / `manual-edit`) cleanly separates provenance.
 
 ---
 
 ## Summary Table
 
-| ID | Severity | Status | Location | Description |
-|----|----------|--------|----------|-------------|
-| F1 | Inconsistent | Carried (acknowledged) | `workspaceStore.ts`, `page.tsx:108-128` | Store snapshot type differs from consumer; bridge is intentional |
-| F2 | Minor | NEW | `page.tsx:332-349` | Batch artifact update duplicates version-building logic from store |
-| F3 | Minor | Carried | `workspaceStore.ts` | `file?: File` silently dropped with no type distinction |
-| F4 | Minor | Carried | `workspaceStore.ts:120` | Hardcoded artifact key array duplicates type definition |
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| F1 | `edit/artifact` returns `{ text }` or `{ content }` depending on mode | Inconsistent | `api/edit/artifact/route.ts:56-70` | High |
+| F2 | `edit/artifact` uses `content` instead of `fullText` for input | Minor | `api/edit/artifact/route.ts:25` | Medium |
+| F3 | `useAllArtifactEditing` is dead code with stale docstring | Inconsistent | `hooks/useArtifactEditing.ts:69-115` | High |
+| F4 | Lean streaming TransformStream re-parses own SSE with fragile chunking | Inconsistent | `api/formalization/lean/route.ts:112-143` | Medium |
+| F5 | Duplicate decision doc number (two `005-*` files) | Minor | `docs/decisions/005-*.md` | High |
+| F6 | CLAUDE.md references deleted `useWorkspacePersistence` | Minor | `CLAUDE.md` | High |
+| F7 | Lean route lacks input validation (pre-existing, widened) | Minor | `api/formalization/lean/route.ts:74-76` | Medium |
 
 ---
 
 ## Overall Assessment
 
-The fixes in commit 3ed18f8 successfully resolve 6 of the 9 prior findings. The most important fixes -- A1 (ArtifactVersion field validation) and A2 (node coercion reuse) -- close the two consistency gaps that posed actual data-integrity risk. The migration batching fix (A5) eliminates the internal inconsistency where one code path used batch `setState` and another used individual setters. The comment and dead-code fixes (A4, A8-A10) are clean.
+The branch introduces well-structured API additions (artifact editing route, streaming infrastructure, Zustand store with versioning) that are largely consistent with established codebase conventions. Error handling, response shapes, and the SSE streaming protocol follow existing patterns.
 
-No fixes introduced regressions. One **new Minor finding** (F2) was identified: the batch artifact update in `page.tsx` duplicates version-building logic from the store, introduced as a side effect of optimizing for fewer `setState` calls. This is a maintainability concern, not a correctness issue.
+The most significant API consistency issue is **F1** (polymorphic response shape in `edit/artifact`), which forces consumers to handle two different response keys from the same endpoint. This should be unified before merge. **F3** (dead code) and **F4** (fragile SSE re-parsing in the lean streaming path) are secondary consistency concerns that should be addressed but don't block the PR. The documentation drift items (F5, F6) are straightforward to fix.
 
-The sole **Inconsistent** finding (F1, snapshot type asymmetry) remains acknowledged as intentional bridge code. The three **Minor** findings (F2-F4) are all maintainability items with no impact on current functionality.
-
-**Verdict:** Approve. All prior Inconsistent findings except the acknowledged bridge (F1) are resolved. The remaining findings are Minor and can be addressed in a follow-up cleanup.
+**Verdict:** Request changes on F1 (response shape inconsistency) and F3 (dead code removal). The remaining findings are minor improvements that can be addressed in the same PR or a follow-up.

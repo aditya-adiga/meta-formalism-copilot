@@ -1,140 +1,153 @@
-# Security Code Review: feat/zustand-wire-page (Loop 2)
+# Security Code Review: feat/graph-persistence-editing
 
-**Branch:** `feat/zustand-wire-page` relative to `main`
-**Scope:** 20 files changed -- workspaceStore.ts, page.tsx, artifactStore.ts, workspacePersistence.ts, tests, package.json, docs
-**Reviewer:** Claude Opus 4.6 (security review)
+**Branch:** `feat/graph-persistence-editing` relative to `main`
+**Scope:** 86 files changed (+6,679 / -1,615 lines) -- full branch diff
+**Reviewer:** Claude Opus 4.6 (security review pipeline)
 **Date:** 2026-04-03
-**Loop:** 2 (prior loop found 5 findings; fixes applied in commit 3ed18f8)
 
 ## Trust Boundary Map
 
-This diff is entirely client-side. The trust boundaries are:
+1. **Browser -> Next.js API routes (HTTP):** All `/api/*` POST handlers accept untrusted JSON from the client. Routes: `edit/artifact`, `formalization/lean`, `formalization/semiformal`, `formalization/balanced-perspectives`, `formalization/causal-graph`, `formalization/statistical-model`, `formalization/property-tests`, `formalization/counterexamples`, `decomposition/extract`. Input is destructured from `request.json()` with minimal validation (typically just checking `sourceText` or `content` is truthy).
 
-1. **localStorage -> Zustand store (rehydration)**: Data read from `workspace-zustand-v1` localStorage key is untrusted (modifiable by browser extensions, XSS payloads, or manual editing). Zustand's `persist` middleware deserializes it via `JSON.parse`, then the custom `merge` function passes it through `coercePersistedState()` before it reaches the store.
+2. **API routes -> LLM providers (outbound HTTP):** User-supplied text is interpolated into LLM prompts and sent to Anthropic or OpenRouter. API keys (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`) are read from `process.env` and passed as `Authorization` headers.
 
-2. **Old workspace-v2 localStorage -> Zustand store (migration)**: `migrateFromV2()` reads the old `workspace-v2` key via `loadWorkspace()`, which performs its own defensive coercion (including the now-shared `coerceDecomposition`), then writes into the store via a single `setState()` call.
+3. **LLM responses -> API response (downstream):** LLM output is parsed (JSON or raw text), post-processed (`stripCodeFences`, `stripImports`), and returned to the client. For artifact editing (`edit/artifact`), LLM-returned text is validated as JSON for whole-edit mode; inline-edit mode returns unvalidated text.
 
-3. **Zustand store -> localStorage (persistence)**: The `partialize` function controls what is written. It sanitizes `verificationStatus` and node statuses before serialization, with memoization via `sanitizeDecomposition` to avoid redundant node mapping. The debounced storage adapter wraps `setItem` in a try/catch for quota errors.
+4. **API routes -> filesystem (cache + analytics):** LLM responses are cached to `data/cache/{sha256-hash}.json`. Analytics entries are appended to `data/analytics.jsonl`. Both use filesystem I/O with paths derived from deterministic hashing.
 
-4. **Snapshot/restore boundary**: `getSnapshot()` produces a deep copy via `structuredClone`. `resetToSnapshot()` receives a `WorkspaceState` and applies it via `set({ ...data })`. Callers in `page.tsx` sanitize `verificationStatus` before calling, but the store method itself does not.
+5. **SSE streaming boundary:** `streamLlm.ts` produces SSE events (token, done, error) via `ReadableStream`. The lean route adds a `TransformStream` that re-parses SSE events mid-stream. Client-side `fetchStreamingApi` reads and parses these events.
 
-5. **Zustand store -> React components**: Same client-side JS context; no trust transition. Components read via selectors and write via setters.
+6. **localStorage -> Zustand store:** Covered in prior review (loop 2). Deserialization is validated via `coercePersistedState`.
 
-No server-side code, API routes, authentication, or cryptographic operations are changed in this diff. The `ANTHROPIC_API_KEY` is not touched.
-
-## Fix Verification (from Loop 1)
-
-### A1 (ArtifactVersion field validation) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Added `coerceArtifactVersion()` function that validates each field of an `ArtifactVersion` individually: `id` must be a string (rejects if not), `content` must be a string (rejects if not), `createdAt` falls back to `new Date().toISOString()`, `source` is validated against a `VALID_ARTIFACT_SOURCES` Set (falls back to `"generated"`), and `editInstruction` is accepted only if it is a string. `coerceArtifactRecord` now maps through `coerceArtifactVersion` and filters nulls instead of just checking `isObject`.
-
-**Assessment:** The fix is correct and complete. It closes the deserialization gap identified in Loop 1 Finding 1. The approach is consistent with how other fields in `coercePersistedState` are validated (typeof checks with safe defaults or rejection). The `VALID_ARTIFACT_SOURCES` Set prevents injection of unexpected source values. No new issues introduced.
-
-### A4 (GenerationProvenance removal) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Removed the unused `GenerationProvenance` type from `app/lib/types/artifactStore.ts`.
-
-**Assessment:** Clean removal. The type was dead code with a misleading comment. No references existed, so no downstream breakage.
-
-### A2 (Node coercion reuse) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** The inline decomposition coercion in `coercePersistedState()` was replaced with a call to the existing `coerceDecomposition()` function from `workspacePersistence.ts` (which was made `export`). The inline version had used `isObject` filtering with a spread-and-cast pattern that did not validate individual node fields. The shared `coerceDecomposition()` validates every field of each `PropositionNode` individually (id, label, kind, statement, proofText, dependsOn, sourceId, sourceLabel, etc.).
-
-**Assessment:** This is a meaningful security improvement. The prior inline version could pass through nodes with non-string fields (e.g., `id: 42` or `statement: null`) because it only checked `isObject` at the node level. The shared function validates each field with typeof checks and safe defaults. Single source of truth eliminates drift risk between the two code paths.
+7. **Puppeteer in scripts:** `load-example-workspace.mjs` optionally launches a headless browser to inject localStorage data.
 
 ## Findings
 
-### 1. resetToSnapshot applies data without internal sanitization
-
+#### 1. LLM response fragment leaked in 502 error responses
 **Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` line 406 (`resetToSnapshot: (data) => set({ ...data })`)
-**Move:** Find the implicit sanitization assumption
-**Confidence:** Low
-
-This finding persists from Loop 1 (was Finding 2). `resetToSnapshot` spreads the provided `WorkspaceState` directly into the store with no validation. Currently, the only caller (`page.tsx:resetWorkspaceToSnapshot`) sanitizes `verificationStatus` via `sanitizeVerificationStatus()` before calling. However, the store's public API does not enforce this -- a future caller could pass unsanitized data (e.g., `verificationStatus: "verifying"` from a stale session snapshot), leaving the app in a stuck loading state.
-
-The `partialize` function would sanitize the value before it reaches localStorage, so this would only affect the in-memory state until the next page load. The blast radius is limited to the current session.
-
-**Recommendation:** Move sanitization into the store's `resetToSnapshot` method as defense-in-depth.
-
-### 2. Non-atomic migration check (TOCTOU)
-
-**Severity:** Informational
-**Location:** `app/lib/stores/workspaceStore.ts` lines 478-493 (`onRehydrateStorage`)
-**Move:** Identify time-of-check to time-of-use gaps
-**Confidence:** Low
-
-Persists from Loop 1 (was Finding 4). The rehydration callback checks for `workspace-v2` and `workspace-zustand-v1` keys, parses the Zustand key, then conditionally runs `migrateFromV2()`. This is not atomic. In practice this is benign: migration is effectively idempotent, and this is a single-user client app. The `catch` block correctly falls through to migration if the Zustand key is corrupted.
-
-**Recommendation:** No action needed.
-
-### 3. Debounced write can lose data on tab close
-
-**Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` lines 38-47 (`createDebouncedStorage.setItem`)
+**Location:** `app/api/edit/artifact/route.ts:80-83`, `app/lib/formalization/artifactRoute.ts:106-109`
 **Move:** Check the error path, not just the happy path
 **Confidence:** Medium
 
-Persists from Loop 1 (was Finding 5). The debounced storage adapter delays `localStorage.setItem` by 300ms. If the user closes the tab during the debounce window, the pending write is lost. This is a known tradeoff documented in the spike.
+When the LLM returns invalid JSON, the 502 error response includes `details: responseText.slice(0, 500)`. This leaks up to 500 characters of raw LLM output to the client. In this single-user app the client is also the user, so the risk is minimal. However, if the app were ever exposed to multiple users or if the LLM hallucinates content that includes fragments from its training data, this error detail could inadvertently leak information.
 
-**Recommendation:** Consider adding a `beforeunload` listener that flushes the pending debounced write synchronously. This is a robustness improvement, not a security fix.
+**Recommendation:** Consider returning a generic error message to the client and only logging the LLM response server-side (which is already done via `console.error`). This is defense-in-depth, not an active vulnerability.
 
-### 4. Batch artifact update in page.tsx duplicates store logic
-
-**Severity:** Informational
-**Location:** `app/page.tsx` lines 329-348 (inside `handleAllResults` callback)
-**Move:** Trace the trust boundaries
+#### 2. No request body size limits on API routes
+**Severity:** Medium
+**Location:** All `app/api/*/route.ts` POST handlers
+**Move:** Ask "what if there are a million of these?"
 **Confidence:** Medium
 
-The `handleAllResults` callback in `page.tsx` manually constructs `ArtifactRecord` objects with version slicing logic (`existing.versions.slice(-MAX_VERSIONS + 1)`) that duplicates the logic inside `setArtifactGenerated`. This was done for batching (single `setState` call instead of N separate calls). While the logic is currently correct and identical to the store's version, having two copies means a future change to the versioning cap or truncation strategy could be applied to one but not the other.
+None of the API routes validate the size of the incoming request body. A client (or attacker with network access) could POST an arbitrarily large JSON body, causing memory exhaustion on the server. The `content` field in `edit/artifact` and `sourceText` in formalization routes are passed directly to LLM prompts, which have token limits -- but the server still parses and holds the full string in memory before the LLM call.
 
-This is not a security vulnerability. It is noted because divergent logic in the persistence path could lead to unexpected state if the two implementations drift.
+Next.js has a default body size limit of 1MB for API routes (`bodyParser.sizeLimit`), which provides some protection. However, for the streaming routes where the body is read via `request.json()` (not the body parser), this limit may not apply.
 
-**Recommendation:** Consider extracting the version-building logic into a shared helper (e.g., `buildUpdatedVersions(existing, newContent, source)`) that both the store action and the page callback use.
+**Recommendation:** Add explicit length checks on user-provided text fields (e.g., reject `content` or `sourceText` > 500KB) in the API routes. This prevents abuse and also avoids sending excessively large prompts to the LLM.
+
+#### 3. OpenRouter API key sent without scope restrictions
+**Severity:** Low
+**Location:** `app/lib/llm/streamLlm.ts:224-228`, `app/lib/llm/callLlm.ts:171-178`
+**Move:** Follow the secrets
+**Confidence:** Medium
+
+The `OPENROUTER_API_KEY` is used as a Bearer token for both non-streaming and streaming calls. The key appears to have full account access (model selection, usage). If this key is leaked (e.g., via a server-side error that includes headers, or log aggregation), it could be used to make arbitrary LLM calls on the account.
+
+This is inherent to the OpenRouter API design and not a code-level bug. The Anthropic SDK client is similarly instantiated with the full API key.
+
+**Recommendation:** Ensure `.env.local` is in `.gitignore` (it is, via Next.js defaults). Consider setting spending limits on the OpenRouter account. No code change needed.
+
+#### 4. Analytics data committed to repository
+**Severity:** Low
+**Location:** `data/analytics.jsonl` (68 new lines)
+**Move:** Follow the secrets
+**Confidence:** High
+
+The `data/` directory is in `.gitignore`, but `data/analytics.jsonl` was committed in this branch's history (visible in the diff). This file contains usage data including endpoints, models, token counts, costs, and timestamps. While this does not contain API keys or user content, it reveals infrastructure details (model choices, cost structure, usage patterns).
+
+**Recommendation:** Remove `data/analytics.jsonl` from the branch before merging. If it was committed intentionally for the example workspace, move it to a non-tracked location or document why it is tracked.
+
+#### 5. SSE stream transform assumes single-event chunks
+**Severity:** Low
+**Location:** `app/api/formalization/lean/route.ts:100-138` (TransformStream)
+**Move:** Check the error path, not just the happy path
+**Confidence:** Medium
+
+The lean route's `TransformStream` splits incoming chunks on `\n\n` and attempts to regex-match each block as `^event: (\w+)\ndata: ([\s\S]+)$`. If the upstream SSE encoder produces a chunk that spans multiple events or splits an event across chunks, the regex will fail and the fallback re-enqueues the original `chunk` bytes. This could result in duplicate or malformed SSE events being sent to the client.
+
+This is a correctness issue rather than a security vulnerability. The SSE encoder (`sseEvent()`) always produces complete events, so in practice chunks align with events. However, the Node.js stream backpressure system does not guarantee this.
+
+**Recommendation:** Buffer incomplete events across `transform` calls (similar to the line-buffering in `streamOpenRouter`) rather than falling back to re-enqueuing the raw chunk.
+
+#### 6. Anthropic client singleton ignores key changes
+**Severity:** Informational
+**Location:** `app/lib/llm/callLlm.ts:11-17`
+**Move:** Trace the trust boundaries
+**Confidence:** High
+
+`getAnthropicClient` caches the first Anthropic SDK client instance and reuses it forever, regardless of whether `apiKey` changes. If `ANTHROPIC_API_KEY` were rotated while the server is running, the old key would continue to be used. This is pre-existing behavior (not introduced in this branch), now exported for use by `streamLlm.ts` as well.
+
+**Recommendation:** Either invalidate the cached client when the key changes, or document that key rotation requires a server restart.
+
+#### 7. Inline edit applies replacement at character offsets without re-validation
+**Severity:** Low
+**Location:** `app/hooks/useArtifactEditing.ts:47-49`
+**Move:** Identify time-of-check to time-of-use gaps
+**Confidence:** Low
+
+When performing an inline edit, the client sends `selection.start` and `selection.end` offsets. After the API returns the replacement text, the hook applies it to the current content using string slicing: `content.slice(0, selection.start) + data.text + content.slice(selection.end)`. If the content changed between when the selection was made and when the edit completes (e.g., a concurrent whole-document edit or streaming update), the offsets would be stale, producing corrupted content.
+
+In practice, the UI likely prevents concurrent edits (the editing state blocks other operations). This is more of a UX robustness concern than a security issue.
+
+**Recommendation:** Either lock the content during edit operations (which appears to be the current behavior via `editEndpoint` loading state) or re-validate offsets against current content before applying the splice.
+
+#### 8. `SIMULATE_STREAM_FROM_CACHE` flag available in production
+**Severity:** Informational
+**Location:** `app/lib/llm/streamLlm.ts:98`
+**Move:** Invert the access control model
+**Confidence:** Low
+
+The `SIMULATE_STREAM_FROM_CACHE` environment variable enables simulated streaming from cached results. This is a development/testing feature. If set in production, it adds a 15ms delay per 20-character chunk, which could slow responses but is otherwise harmless.
+
+**Recommendation:** Document this as a dev-only flag. Optionally guard it with a `NODE_ENV === 'development'` check.
 
 ## What Looks Good
 
-- **Complete deserialization validation chain.** After the A1 fix, every field at every nesting level of persisted data is type-checked before entering the store: top-level scalars in `coercePersistedState`, artifact records via `coerceArtifactRecord`, individual versions via `coerceArtifactVersion`, and decomposition nodes via the shared `coerceDecomposition`. This is thorough.
+- **API key handling.** API keys are read from environment variables and never logged, returned in responses, or written to cache/analytics. The Anthropic SDK and OpenRouter fetch calls correctly use the keys only in authorization headers.
 
-- **Single source of truth for decomposition coercion.** The A2 fix eliminated the duplicated inline coercion and now both the v2 migration path (`loadWorkspace`) and the Zustand rehydration path (`coercePersistedState`) use the same `coerceDecomposition()` function. This prevents drift.
+- **LLM cache uses SHA-256 hashing of deterministic inputs.** Cache keys are derived from `(model, systemPrompt, userContent, maxTokens)` via `createHash("sha256")`. The hash is used as a filename in a fixed directory (`data/cache/`). No path traversal is possible because the hash output is a fixed-length hex string.
 
-- **Quota error handling in debounced storage.** `localStorage.setItem` is wrapped in try/catch with a console.warn on quota exceeded.
+- **JSON parse validation on whole-edit responses.** The `edit/artifact` route validates that whole-edit LLM responses are valid JSON before returning them to the client. Invalid responses get a 502 error.
 
-- **`partialize` sanitizes transient states on write.** `verificationStatus: "verifying"` is stripped to `"none"` before persistence. Node verification statuses are sanitized via the memoized `sanitizeDecomposition`.
+- **Deserialization validation is thorough.** The Zustand store's `merge` function validates every field at every nesting level via `coercePersistedState`, `coerceArtifactRecord`, `coerceArtifactVersion`, and `coerceDecomposition`. This was verified in the prior security review loop.
 
-- **`getSnapshot` uses `structuredClone` for deep copy.** Prevents mutation of the snapshot from affecting the live store. `extractedFiles` correctly strips non-serializable `File` references.
+- **SSE event encoding uses JSON.stringify.** The `sseEvent()` helper serializes data via `JSON.stringify`, preventing injection of SSE control characters into event payloads.
 
-- **SSR hydration handled correctly.** `skipHydration: true` with `rehydrate()` in a client-side `useEffect` avoids Next.js hydration mismatches.
+- **Streaming reader properly releases lock.** `fetchStreamingApi` uses `try/finally` with `reader.releaseLock()` to ensure the reader is released even on errors.
 
-- **No secrets in the diff.** The `ANTHROPIC_API_KEY` is not touched. No credentials, tokens, or sensitive data flow through the changed code.
+- **Error paths return safe status codes.** LLM failures return 502 (Bad Gateway), input validation failures return 400, and internal errors are caught and logged.
 
-- **`currentVersionIndex` bounds-checked on both read and write paths.** `coerceArtifactRecord` clamps the index; `undoArtifact`/`redoArtifact` guard against out-of-bounds; `resolveArtifactContent` uses optional chaining with `?? null`.
+- **No `dangerouslySetInnerHTML` or equivalent.** UI components render user content and LLM output via React's JSX text interpolation, which auto-escapes HTML.
 
-- **Artifact version cap (MAX_VERSIONS = 20) prevents unbounded growth.** Both `setArtifactGenerated` and `setArtifactEdited` trim to the cap.
+- **`stripCodeFences` is safe.** Uses regex matching to extract content from markdown fences. No evaluation of the content. No ReDoS risk from the simple regex pattern.
 
-- **All 174 tests pass.** Including hydration and migration tests that exercise the deserialization paths.
+- **Cache and analytics writes are non-fatal.** All filesystem writes in the LLM call path are wrapped in try/catch blocks so failures do not break the request.
 
 ## Summary Table
 
-| # | Finding | Severity | Status | Location | Confidence |
-|---|---------|----------|--------|----------|------------|
-| A1 | ArtifactVersion inner fields not validated | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A2 | Decomposition coercion duplicated inline | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A4 | Unused GenerationProvenance type | Informational | FIXED (3ed18f8) | artifactStore.ts | -- |
-| 1 | resetToSnapshot accepts unsanitized data | Low | Open (unchanged) | workspaceStore.ts:406 | Low |
-| 2 | Non-atomic migration check (TOCTOU) | Informational | Open (accepted) | workspaceStore.ts:478-493 | Low |
-| 3 | Debounced write can lose data on tab close | Low | Open (accepted) | workspaceStore.ts:38-47 | Medium |
-| 4 | Batch artifact update duplicates store logic | Informational | NEW | page.tsx:329-348 | Medium |
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| 1 | LLM response fragment in 502 errors | Low | edit/artifact/route.ts:80, artifactRoute.ts:106 | Medium |
+| 2 | No request body size limits | Medium | All API routes | Medium |
+| 3 | OpenRouter API key scope | Low | streamLlm.ts:224, callLlm.ts:171 | Medium |
+| 4 | Analytics data committed to repo | Low | data/analytics.jsonl | High |
+| 5 | SSE transform assumes single-event chunks | Low | formalization/lean/route.ts:100 | Medium |
+| 6 | Anthropic client ignores key rotation | Informational | callLlm.ts:11-17 | High |
+| 7 | Inline edit offset TOCTOU | Low | useArtifactEditing.ts:47-49 | Low |
+| 8 | SIMULATE_STREAM_FROM_CACHE in production | Informational | streamLlm.ts:98 | Low |
 
 ## Overall Assessment
 
-The three fixes from Loop 1 are correct and complete. The `coerceArtifactVersion` function (A1) closes the last gap in the deserialization validation chain. The `coerceDecomposition` reuse (A2) eliminates duplicated logic and ensures consistent node-level validation across both the v2 migration and Zustand rehydration paths. The `GenerationProvenance` removal (A4) is clean dead-code removal.
+The branch introduces a significant amount of new server-side code (streaming LLM infrastructure, artifact editing API, SSE transport) alongside the client-side Zustand migration. The security posture is reasonable for a single-user research tool. API keys are handled correctly, LLM responses are validated before use, deserialization is thorough, and error paths are safe.
 
-No new security vulnerabilities were introduced by the fixes. The one new finding (Finding 4, Informational) is a maintainability concern about duplicated version-building logic in `page.tsx`, not a security issue.
-
-The two remaining Low findings (resetToSnapshot sanitization, debounced write data loss) and the Informational TOCTOU are acceptable for a single-user client-side application. None represent exploitable vulnerabilities in the current threat model.
-
-No Critical or High severity issues found. The branch is ready to merge from a security perspective.
+The only Medium-severity finding is the lack of request body size limits, which is worth addressing before any multi-user deployment. The Low findings are defense-in-depth improvements. No Critical or High severity issues were found. The committed analytics data (Finding 4) should be cleaned up before merge as a hygiene matter.

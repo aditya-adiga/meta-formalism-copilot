@@ -1,188 +1,200 @@
-# Performance Code Review: Zustand State Management Migration (Loop 2)
+# Performance Code Review: `feat/graph-persistence-editing` branch
 
-**Branch:** `feat/zustand-wire-page`
-**Reviewer:** Performance review (Loop 2)
+**Branch:** `feat/graph-persistence-editing`
+**Base:** `main`
+**Reviewer:** Performance review (automated)
 **Date:** 2026-04-03
-**Scope:** `workspaceStore.ts`, `page.tsx`, `artifactStore.ts`, tests, package.json
-**Prior loop:** 8 findings (2 Medium, 3 Low, 3 Informational). Fixes applied in commit 3ed18f8.
+**Scope:** All files changed on branch (~86 files, +6679/-1615 lines). Focus on hot paths, state management, streaming, serialization, and scaling behavior.
 
 ## Data Flow and Hot Paths
 
-Unchanged from Loop 1. The critical performance paths are:
+The branch introduces or modifies several performance-critical paths:
 
-1. **Keystroke path:** setter -> `set()` -> `partialize()` (synchronous) -> debounced `setItem` (300ms coalesce) -> `JSON.stringify` + `localStorage.setItem`. The `partialize` function runs at keystroke frequency; serialization and I/O are debounced.
+1. **Keystroke path (hot):** User types in `TextInput` or `ContextInput` -> `setSourceText`/`setContextText` on Zustand store -> `partialize()` runs synchronously -> debounced `setItem` coalesces writes at 300ms. The `partialize` function runs at keystroke frequency (~10-30 calls/sec during typing).
 
-2. **Selector evaluation:** Every `set()` call evaluates all 21 active selectors in `page.tsx` via `Object.is` comparison. Cost: ~21 function calls + 21 comparisons per `set()` (microseconds).
+2. **Streaming token path (hot):** SSE tokens arrive at ~66/sec (20-char chunks, 15ms simulated delay). Each token -> throttled callback (50ms) -> `parsePartialJson` -> `setStreamingJsonPreview` React state update. For Anthropic streams, token rate depends on model but is typically 30-100 tokens/sec.
 
-3. **Artifact generation:** Now batched into a single `set()` call via `storeArtifactResults`. Previously 5 separate `set()` calls.
+3. **Workspace auto-save (periodic):** Every 5 seconds, `saveCurrentSession` snapshots the entire workspace via `getWorkspaceSnapshot()` + `getSessionsSnapshot()`, serializes to JSON, and writes to localStorage. This involves `structuredClone` of decomposition and artifacts.
 
-4. **Snapshot/restore:** Infrequent (user-initiated session switch). Uses `structuredClone`.
+4. **Decomposition sync (effect):** Every time `decomp.nodes`, `selectedNodeId`, `paperText`, `sources`, or `graphLayout` changes, a `useEffect` persists the full decomposition to the Zustand store (`setDecomposition`), triggering `partialize()` and the debounced localStorage write.
 
-## Fix Verification
+5. **Artifact generation completion:** `storeArtifactResults` runs once per generation batch. Iterates over results (up to 5 artifact types), calling `updateSessionArtifact` + `updateNode` + `setArtifactsBatchGenerated`.
 
-### F1/A6: `sanitizeDecomposition` memoization — CORRECT
+6. **Causal graph layout (render-time):** `useCausalGraphLayout` runs Dagre layout inside `useMemo` when `causalGraph` reference changes, which happens on every streaming preview update.
 
-**Location:** `app/lib/stores/workspaceStore.ts:288-308`
-
-The memoization uses reference equality (`===`) on the `decomposition` object to skip re-mapping nodes when the decomposition has not changed. This is correct because:
-
-- Zustand's `set()` returns new state objects via spread, so unchanged fields keep their object identity. When `set({ sourceText: "..." })` is called, `state.decomposition` retains the same reference.
-- `sanitizeNodeStatus` is a pure function (maps to one of 3 valid strings or "unverified"), so the memoized result is stable for a given input.
-- The module-level `_lastDecompRef` / `_lastDecompSanitized` variables are appropriate since there is exactly one store instance.
-
-On the keystroke path, this reduces `partialize` from O(N) node allocations to O(1) reference comparison when decomposition has not changed. This fully resolves the original F1 finding.
-
-No new issue introduced.
-
-### F2/A7: `storeArtifactResults` batching — CORRECT WITH CAVEAT
-
-**Location:** `app/page.tsx:332-349`
-
-The batched implementation correctly replicates `setArtifactGenerated` behavior:
-
-- Version capping: `existing.versions.slice(-MAX_VERSIONS + 1)` matches the store's `setArtifactGenerated` (line 344 in workspaceStore.ts).
-- `currentVersionIndex: versions.length - 1` matches the store implementation.
-- `makeVersion(content, "generated")` produces the same version shape.
-- The `setState` callback form (`(s) => ({ artifacts: { ...s.artifacts, ...artifactUpdates } })`) correctly merges with current state.
-
-**Caveat (new, Low):** The `existing` variable is read from `getState()` on line 337, outside the `setState` callback on line 346. Since JavaScript is single-threaded and no `await` intervenes between lines 334-349, the state cannot change between the reads and the write. However, if this code were ever made async (e.g., awaiting between artifact processing), the `getState()` reads would become stale. The `setArtifactGenerated` store method avoids this by reading `existing` inside the `set()` callback. This is not a bug today but is a fragility worth noting. See F1 below.
-
-### F3/A5: `migrateFromV2` batching — CORRECT
-
-**Location:** `app/lib/stores/workspaceStore.ts:252-283`
-
-Single `setState` call replaces 13+ individual setter calls. The artifact records are built correctly with `makeVersion` and the right structure. Migration runs at most once per user. No issues.
-
-### F4/A4: `GenerationProvenance` removal — CORRECT
-
-**Location:** `app/lib/types/artifactStore.ts`
-
-The unused type has been removed. The file now contains only actively-used types. No issues.
+**Assumed data sizes:**
+- Source text: typically 500-10,000 chars; up to ~50,000 for uploaded PDFs
+- Decomposition nodes: typically 5-50 nodes; theoretical max ~200 for large papers
+- Artifact JSON: 1-10KB per artifact type; 5 artifact types
+- Workspace sessions: 1-5 sessions in localStorage; each session stores full workspace snapshot
+- Version history: capped at MAX_VERSIONS=20 per artifact type
 
 ## Findings
 
-### F1. `storeArtifactResults` reads `existing` outside `setState` callback
+#### F1. Workspace auto-save serializes entire workspace every 5 seconds unconditionally
 
-**Severity:** Low
-**Location:** `app/page.tsx:337`
-**Move:** Premature read (Move 5 variant — reading state snapshot before entering the atomic update)
-**Confidence:** Medium
-
-```ts
-const existing = useWorkspaceStore.getState().artifacts[key]; // line 337 — read
-// ... build artifactUpdates ...
-useWorkspaceStore.setState((s) => ({                          // line 346 — write
-  artifacts: { ...s.artifacts, ...artifactUpdates },
-});
-```
-
-The `existing` read on line 337 happens outside the `setState` callback. The `artifactUpdates` map is built with potentially stale `existing` data. Today this is safe because the code is synchronous with no intervening state changes. But it diverges from the pattern used by `setArtifactGenerated` (which reads `existing` inside the `set()` callback), creating an inconsistency that could become a bug if the surrounding code changes.
-
-**Recommendation:** Move the `existing` read and `artifactUpdates` construction inside the `setState` callback:
-
-```ts
-useWorkspaceStore.setState((s) => {
-  const updates: Partial<Record<ArtifactKey, ArtifactRecord>> = {};
-  for (const key of Object.values(PERSISTED_ARTIFACT_FIELDS)) {
-    if (results[key]) {
-      const content = typeof results[key] === "string" ? results[key] as string : JSON.stringify(results[key]);
-      const existing = s.artifacts[key];
-      const version = makeVersion(content, "generated");
-      const versions = existing
-        ? [...existing.versions.slice(-MAX_VERSIONS + 1), version]
-        : [version];
-      updates[key] = { type: key, currentVersionIndex: versions.length - 1, versions };
-    }
-  }
-  return { artifacts: { ...s.artifacts, ...updates } };
-});
-```
-
-### F2. `handleRestoreSession` still calls `setArtifactGenerated` individually per artifact
-
-**Severity:** Low
-**Location:** `app/page.tsx:272-283`
-**Move:** Hidden multiplication (Move 1)
+**Severity:** Medium
+**Location:** `app/hooks/useWorkspaceSessions.ts:221-228`
+**Move:** Serialization tax (Move 6)
 **Confidence:** High
 
-The `handleRestoreSession` callback loops over `session.artifacts` and calls `setArtifactGenerated` individually for each artifact type (up to 5 calls). This was not addressed in the prior loop's fixes for F2, though it follows the same unbatched pattern.
+The `saveCurrentSession` function runs on a 5-second interval regardless of whether any state has changed. Each invocation calls `getWorkspaceSnapshot()` which performs `structuredClone` on both the decomposition and artifacts objects (lines 452-453 of `workspaceStore.ts`), then `JSON.stringify`s the entire `WorkspaceSessionsState` (including all sessions) for localStorage persistence.
 
-Combined with the 5 individual setter calls on lines 265-269 (for non-decomposition restore), a session restore can trigger up to 10 separate `set()` calls. Each runs `partialize` (now O(1) for decomposition thanks to the memoization fix) and evaluates 21 selectors.
+For a workspace with 3 sessions, 50 decomposition nodes, and 5 artifact types each with version history, the serialized state could be 100-500KB. `structuredClone` + `JSON.stringify` at this size takes 1-5ms, running every 5 seconds regardless of changes.
 
-This is a user-initiated action (session switch), so the absolute cost is small. But it would be cleaner to batch the artifact updates the same way `storeArtifactResults` now does.
+**Recommendation:** Add a dirty flag or generation counter that increments on any store mutation. Skip the save if the counter has not changed since the last save. This eliminates the serialization cost entirely when the user is idle (the common case between typing bursts).
 
-**Recommendation:** Batch the artifact restore into a single `setState` call, consistent with the pattern established in `storeArtifactResults`. Optionally, also batch the 5 setter calls on lines 265-269 into a single `setState`.
+#### F2. Throttle drops intermediate calls instead of delivering trailing edge
 
-### F3. Double `JSON.stringify` in `storeArtifactResults` (residual from Loop 1 F5)
+**Severity:** Medium
+**Location:** `app/lib/utils/throttle.ts:19-25`
+**Move:** Work that moved to the wrong place (Move 3)
+**Confidence:** High
+
+The fact-check report (Claim 13) correctly identified this: when the throttle timer is pending and a new call arrives, the new call is silently dropped (the `else if (!timer)` guard on line 19 means only the first call after the leading edge sets a trailing timer). Subsequent calls during the trailing window are lost.
+
+On the streaming path, this means: if 3 tokens arrive within 50ms, only the first token's accumulated text gets delivered. The second and third are dropped, and the user never sees them until the next leading-edge call. This creates visually "jumpy" streaming updates where the preview skips chunks.
+
+The JSDoc comment (line 2) says "The last call is always delivered" but this is not true -- only the *second* call after the leading edge is delivered (via the trailing timer), and all subsequent calls before the timer fires are dropped.
+
+**Recommendation:** Update the throttle to store the latest args and deliver them on trailing edge:
+```typescript
+} else {
+  // Always update to latest args so trailing edge delivers the most recent call
+  pendingArgs = args;
+  if (!timer) {
+    timer = setTimeout(() => {
+      lastRun = Date.now();
+      timer = null;
+      fn(...pendingArgs);
+    }, remaining);
+  }
+}
+```
+
+#### F3. Dagre layout runs on every streaming preview update during generation
+
+**Severity:** Medium
+**Location:** `app/components/features/causal-graph/useCausalGraphLayout.ts:34-125`
+**Move:** Count the hidden multiplications (Move 1)
+**Confidence:** Medium
+
+The `useMemo` depends on the `causalGraph` reference (line 125). During streaming, `streamingJsonPreview` provides a new parsed object on every throttled token callback (~20 times/sec after throttling). The `useStreamingMerge` hook in `CausalGraphPanel` picks `streamingPreview` as `displayData` when `finalData` is null, passing it to `useCausalGraphLayout`.
+
+Each invocation checks `newNodeIds.length > 0` and only runs Dagre for new nodes (good incremental design). However, the function still:
+- Creates a `Set` of confounders (line 49)
+- Filters variables for new nodes (line 63)
+- Maps all variables to ReactFlow nodes (lines 109-122)
+- Maps all edges to ReactFlow edges (lines 91-106)
+
+For a graph with 20 variables and 30 edges, this is ~50 object allocations per streaming update. At 20 updates/sec during generation, that is ~1000 allocations/sec. Not catastrophic, but the Dagre layout (line 78) could also run repeatedly as new nodes appear in the partial JSON.
+
+**Recommendation:** Memoize the ReactFlow node/edge arrays separately from the Dagre layout. Consider a shallow-comparison check (e.g., comparing `variables.length` and `edges.length`) to skip the full rebuild when only descriptions are streaming in but the graph structure has not changed.
+
+#### F4. `storeArtifactResults` performs linear scan per artifact type for node upsert
 
 **Severity:** Low
-**Location:** `app/page.tsx:309, 336`
+**Location:** `app/page.tsx:351-357`
+**Move:** Ask "what's the size of N?" (Move 2)
+**Confidence:** High
+
+When storing results for a node, the function calls `decomp.nodes.find((n) => n.id === nodeId)` inside a loop over artifact types (up to 5 iterations). Each `find` is O(N) over the nodes array. Additionally, `artifacts.filter((a) => a.type !== artifactType)` scans the node's artifact list.
+
+With N=50 nodes and up to 5 artifact types, this is 5 * 50 = 250 comparisons per generation. The `updateNode` call on each iteration also likely triggers a state update, meaning up to 5 individual `setState` calls with the decomposition array.
+
+The absolute cost is small (sub-millisecond), but the unbatched `updateNode` calls each propagate through the decomposition sync effect (line 270-278 of page.tsx), triggering `setDecomposition` on the Zustand store.
+
+**Recommendation:** Look up the node once before the loop and batch the artifact updates into a single `updateNode` call.
+
+#### F5. `EditableSection` serializes value on every render for change detection
+
+**Severity:** Low
+**Location:** `app/components/features/output-editing/EditableSection.tsx:36`
 **Move:** Serialization tax (Move 6)
 **Confidence:** Medium
 
-The prior loop's F5 finding (double `JSON.stringify`) was not addressed. The first loop (lines 306-329) computes `content` via `JSON.stringify` for session/node updates. The second loop (lines 334-344) re-computes content from the raw `results[key]` object. Both loops stringify the same values independently.
+`const serialized = JSON.stringify(value)` runs on every render of every `EditableSection`. In the CausalGraphPanel details view, there is one `EditableSection` per variable, edge, confounder, plus the summary -- potentially 50+ sections. Each serializes its `value` prop.
 
-For typical artifact sizes (1-10KB JSON), the waste is a few hundred microseconds -- negligible in absolute terms. This is a code quality issue more than a performance issue.
+Most of these `value` props are small objects (3-5 fields), so the per-call cost is microseconds. But during streaming preview updates (~20/sec), every `EditableSection` re-renders and re-serializes because the parent `displayData` reference changes.
 
-**Recommendation:** Build a `Map<ArtifactKey, string>` of serialized content in the first loop and reuse it in the second loop.
+**Recommendation:** Move the `JSON.stringify` inside the `useEffect` that compares `prevSerializedRef`, or use `useRef` with a comparison function to avoid serialization when the component is not in editing mode.
 
-### F4. 21 individual selector subscriptions (residual from Loop 1 F4)
+#### F6. Decomposition sync effect triggers on every node selection change
+
+**Severity:** Low
+**Location:** `app/page.tsx:270-278`
+**Move:** Hidden multiplication (Move 1)
+**Confidence:** High
+
+The `useEffect` that syncs decomposition to the Zustand store lists `decomp.selectedNodeId` as a dependency. Clicking a different node in the graph triggers a full `setDecomposition` call, which runs `partialize()` (with the `sanitizeDecomposition` memoization, this is O(1) if nodes have not changed) and the debounced localStorage write.
+
+This is correctly mitigated by the `sanitizeDecomposition` memoization for the partialize path and the 300ms localStorage debounce. The remaining cost is the `setDecomposition` shallow merge and 21 selector evaluations -- on the order of microseconds.
+
+**Recommendation:** No action needed. The memoization and debounce make this a negligible cost. Noted for completeness.
+
+#### F7. `useAllArtifactEditing` instantiates 5 hooks unconditionally
 
 **Severity:** Informational
-**Location:** `app/page.tsx:84-101`
-**Move:** Find the contention point (Move 7)
-**Confidence:** Medium
+**Location:** `app/hooks/useArtifactEditing.ts:72-115`
+**Move:** Work that moved to the wrong place (Move 3)
+**Confidence:** Low
 
-Unchanged from Loop 1. 21 `useWorkspaceStore(...)` calls evaluate on every `set()`. The comment on lines 92-93 was improved to correctly describe the `Object.is` mechanism. The count is fine for current usage but does not scale well.
+`useAllArtifactEditing` always creates 5 `useArtifactEditing` instances (one per artifact type), each with a `useWaitTimeEstimate` hook. These are all active regardless of which panel the user is viewing. The hooks are lightweight (just state + callbacks), so the overhead is minimal.
 
-No action needed at this time.
+**Recommendation:** No action needed at current scale. If more artifact types are added, consider lazy initialization.
+
+#### F8. `handleRestoreSession` calls `setArtifactGenerated` per-artifact (residual)
+
+**Severity:** Low
+**Location:** `app/page.tsx:300-311`
+**Move:** Hidden multiplication (Move 1)
+**Confidence:** High
+
+Previously identified in the existing performance review (F2). The loop calls `setArtifactGenerated` individually for each artifact in `session.artifacts` (up to 5 calls), each triggering `set()` -> `partialize()` -> 21 selector evaluations. This is a user-initiated action (session restore) so absolute impact is small.
+
+**Recommendation:** Batch into a single `setArtifactsBatchGenerated` call, consistent with `storeArtifactResults`.
 
 ## What Looks Good
 
-1. **`sanitizeDecomposition` memoization is well-placed and correct.** Module-level cache with reference equality is the right approach for a single-instance store. The comment block (lines 288-290) clearly explains the purpose.
+1. **Debounced localStorage writes at 300ms.** The `createDebouncedStorage` adapter correctly coalesces rapid state updates into a single localStorage write. This is the most impactful performance pattern in the store, preventing JSON.stringify on every keystroke.
 
-2. **`migrateFromV2` batching is clean.** The single `setState` call with a comment referencing the matching pattern in `resetWorkspaceToSnapshot` helps readers understand the consistency.
+2. **`sanitizeDecomposition` memoization.** The module-level reference-equality cache (lines 292-309 of workspaceStore.ts) correctly skips O(N) node mapping in `partialize` when only unrelated state changes. This removes the main per-keystroke scaling bottleneck.
 
-3. **`storeArtifactResults` batching correctly replicates version capping.** The `slice(-MAX_VERSIONS + 1)` and `currentVersionIndex: versions.length - 1` match the store's `setArtifactGenerated` exactly.
+3. **Throttled streaming callbacks at 50ms.** The `useArtifactGeneration` hook throttles both semiformal text updates and partial-JSON parsing to 50ms intervals, preventing React from batching hundreds of state updates per second during LLM streaming.
 
-4. **Comment improvements are accurate.** The docstring fix (line 5: "persist middleware handles serialization lifecycle; custom debounced storage adapter rate-limits writes") and the selector comment fix (lines 92-93) correctly describe the actual mechanisms.
+4. **Incremental Dagre layout.** The `useCausalGraphLayout` hook only runs Dagre for new nodes, preserving existing positions. The `edgesJustArrived` detection correctly handles the transition from position-only to edge-aware layout without unnecessary full re-layouts.
 
-5. **`coerceArtifactVersion` validation is thorough.** The new per-version validation (lines 69-79) catches corrupted localStorage data that the previous `filter(isObject)` cast would have silently passed through.
+5. **Version capping at MAX_VERSIONS=20.** The `slice(-MAX_VERSIONS + 1)` pattern in both `setArtifactGenerated` and `setArtifactEdited` prevents unbounded version history growth. At 20 versions of ~5KB each, per-artifact storage is bounded at ~100KB.
 
-6. **`coerceDecomposition` reuse eliminates code duplication.** The inline decomposition coercion in `coercePersistedState` was replaced with a call to the shared `coerceDecomposition` function, reducing duplication and ensuring consistent validation.
+6. **`skipHydration: true` for SSR safety.** Defers Zustand hydration to `useEffect`, preventing hydration mismatch errors and avoiding unnecessary server-side localStorage access.
 
-7. **`GenerationProvenance` removal is clean.** No dead code remains in `artifactStore.ts`.
+7. **Stable Zustand selector functions.** The top-level `artifactSelector` factory (page.tsx lines 44-51) creates selector functions once at module load, not inside the component. This prevents selector identity changes on every render.
+
+8. **`setArtifactsBatchGenerated` batching.** The store action correctly merges multiple artifact updates into a single `set()` call, reducing the selector evaluation overhead from 5x to 1x on the artifact generation completion path.
+
+9. **Streaming preview is kept outside the Zustand store.** Transient streaming state (`streamingPreview`, `streamingJsonPreview`) lives in React `useState` in `useArtifactGeneration`, avoiding high-frequency Zustand `set()` calls and the associated `partialize` + serialization overhead.
 
 ## Summary Table
 
-| #  | Finding | Severity | Location | Confidence | Status |
-|----|---------|----------|----------|------------|--------|
-| F1 | `storeArtifactResults` reads `existing` outside `setState` callback | Low | page.tsx:337 | Medium | New |
-| F2 | `handleRestoreSession` calls `setArtifactGenerated` individually | Low | page.tsx:272-283 | High | New (same pattern as prior F2) |
-| F3 | Double `JSON.stringify` in `storeArtifactResults` | Low | page.tsx:309,336 | Medium | Residual (prior F5) |
-| F4 | 21 individual selector subscriptions | Informational | page.tsx:84-101 | Medium | Residual (prior F4) |
-
-### Prior findings disposition
-
-| Prior # | Severity | Status | Notes |
-|---------|----------|--------|-------|
-| F1 (partialize node mapping) | Medium | **Fixed** | `sanitizeDecomposition` memoization is correct |
-| F2 (storeArtifactResults batching) | Medium | **Fixed** | Batched into single `setState`; version capping correct |
-| F3 (migrateFromV2 batching) | Low | **Fixed** | Single `setState` call |
-| F4 (21 selectors) | Low | **Residual** | Comment improved; count unchanged |
-| F5 (double JSON.stringify) | Low | **Residual** | Not addressed in this fix cycle |
-| F6 (debounced storage single-key) | Informational | **Residual** | No change needed |
-| F7 (structuredClone in snapshots) | Informational | **Accepted** | Correct for call frequency |
-| F8 (GenerationProvenance unused) | Informational | **Fixed** | Type removed |
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| F1 | Auto-save serializes workspace every 5s unconditionally | Medium | useWorkspaceSessions.ts:221-228 | High |
+| F2 | Throttle drops intermediate calls (not true trailing edge) | Medium | throttle.ts:19-25 | High |
+| F3 | Dagre layout hook rebuilds node/edge arrays on every streaming update | Medium | useCausalGraphLayout.ts:34-125 | Medium |
+| F4 | Linear scan + unbatched updateNode per artifact in storeArtifactResults | Low | page.tsx:351-357 | High |
+| F5 | EditableSection JSON.stringify on every render for change detection | Low | EditableSection.tsx:36 | Medium |
+| F6 | Decomposition sync effect triggers on node selection (mitigated) | Low | page.tsx:270-278 | High |
+| F7 | 5 editing hooks instantiated unconditionally | Informational | useArtifactEditing.ts:72-115 | Low |
+| F8 | handleRestoreSession unbatched setArtifactGenerated (residual) | Low | page.tsx:300-311 | High |
 
 ## Overall Assessment
 
-The two medium-severity findings from Loop 1 are correctly fixed. The `sanitizeDecomposition` memoization eliminates per-keystroke node mapping waste, and the `storeArtifactResults` batching reduces 5 `set()` calls to 1 on the artifact generation path.
+The codebase demonstrates strong performance awareness in its architecture. The Zustand store migration correctly separates transient streaming state from persisted state, debounces localStorage writes, memoizes the decomposition sanitization in `partialize`, and batches artifact updates on the generation path. The streaming pipeline is well-throttled and uses incremental layout for graph visualization.
 
-No new medium or high severity issues were introduced by the fixes. The remaining findings are all Low or Informational:
+The three medium-severity findings represent real optimization opportunities:
 
-- **F1** (premature `getState()` read) is a fragility, not a current bug. Safe to defer.
-- **F2** (`handleRestoreSession` unbatched) is the same pattern that was fixed in `storeArtifactResults`, applied to a lower-frequency code path (user-initiated session restore). Safe to defer.
-- **F3** and **F4** are residual from Loop 1 and do not warrant blocking the PR.
+- **F1** (unconditional 5-second auto-save) is the most impactful -- it performs `structuredClone` + `JSON.stringify` of potentially hundreds of KB of data every 5 seconds even when the user is idle. A dirty flag would eliminate this waste entirely.
+- **F2** (throttle dropping trailing calls) causes visually choppy streaming updates. The fix is straightforward and improves user experience.
+- **F3** (Dagre layout on streaming updates) performs unnecessary array rebuilds during streaming but is bounded by the throttle rate and the incremental Dagre optimization.
 
-**Recommendation:** The PR is ready to merge from a performance perspective. The remaining Low findings are improvement opportunities that can be addressed in a follow-up.
+None of these findings are blocking -- the application will function correctly and perform acceptably for typical workloads (single user, <50 nodes, <5 sessions). The recommendations are improvements for smoothness and efficiency, not corrections for correctness or scaling failures.
