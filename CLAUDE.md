@@ -26,7 +26,7 @@ npm run test:ui    # Run tests with Vitest UI
 
 ## Architecture
 
-The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for navigation. The root `page.tsx` orchestrates all state and renders the active panel via a `PanelShell` layout. State is persisted to localStorage via `useWorkspacePersistence` and survives page refreshes.
+The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for navigation. The root `page.tsx` orchestrates all state and renders the active panel via a `PanelShell` layout. State is managed by a Zustand store (`lib/stores/workspaceStore.ts`) with `persist` middleware that debounces writes to localStorage, surviving page refreshes.
 
 ### Directory Layout (under `app/`)
 
@@ -34,7 +34,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - `layout.tsx` — Sets up fonts (EB Garamond serif + Geist Mono) and metadata
 - `globals.css` — CSS variables (`--ivory-cream`, `--ink-black`, `--paper-shadow`) and Tailwind v4 config via `@theme inline`
 - `components/layout/` — `PanelShell` (Icon Rail + focus pane layout), `IconRail` (sidebar navigation)
-- `components/panels/` — One component per panel: `InputPanel`, `SemiformalPanel`, `LeanPanel`, `GraphPanel`, `NodeDetailPanel`, `CausalGraphPanel`, `StatisticalModelPanel`, `PropertyTestsPanel`, `BalancedPerspectivesPanel`, `AnalyticsPanel`
+- `components/panels/` — One component per panel: `InputPanel`, `SemiformalPanel`, `LeanPanel`, `GraphPanel`, `NodeDetailPanel`, `CausalGraphPanel`, `StatisticalModelPanel`, `PropertyTestsPanel`, `BalancedPerspectivesPanel`, `CounterexamplesPanel`, `AnalyticsPanel`; plus `ArtifactPanelShell` (shared layout for structured artifact panels), `SourcePanel`, `OutputPanel`, `ContextPanel`
 - `components/features/` — Feature modules organized by domain:
   - `source-input/` — `TextInput`, `FileUpload` (.txt, .doc, .docx, .pdf)
   - `context-input/` — `ContextInput`, `RefinementButtons`, `RefinementPreview`
@@ -45,7 +45,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
   - `causal-graph/` — Graph visualization components
   - `lean-display/` — Lean code display with syntax highlighting
 - `components/ui/` — Shared UI components and icons
-- `hooks/` — Custom hooks: `useWorkspacePersistence`, `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useAnalytics`, etc.
+- `hooks/` — Custom hooks: `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useArtifactGeneration`, `useArtifactEditing`, `useAnalytics`, etc.
 - `lib/types/` — TypeScript type definitions for panels, sessions, artifacts, decomposition
 - `lib/llm/` — LLM integration (Anthropic SDK, schemas, caching)
 - `lib/formalization/` — Shared artifact generation logic

@@ -53,6 +53,9 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
   const fnsRef = useRef(fns);
   useEffect(() => { fnsRef.current = fns; }, [fns]);
 
+  // Dirty flag: skip auto-save when workspace hasn't changed since last save
+  const lastSavedSnapshotRef = useRef<string | null>(null);
+
   // Debounced persist
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(false);
@@ -106,13 +109,20 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     setState({ sessions: [session], activeSessionId: session.id });
   }, []);
 
-  /** Snapshot the current workspace into the active workspace session */
+  /** Snapshot the current workspace into the active workspace session.
+   *  Skips the save if the workspace hasn't changed since the last save
+   *  (avoids structuredClone + JSON.stringify overhead when idle). */
   const saveCurrentSession = useCallback(() => {
     const activeId = stateRef.current.activeSessionId;
     if (!activeId) return;
 
     const ws = fnsRef.current.getWorkspaceSnapshot();
     const sessions = fnsRef.current.getSessionsSnapshot();
+
+    // Dirty check: skip if snapshot is identical to last save
+    const snapshotKey = JSON.stringify(ws);
+    if (snapshotKey === lastSavedSnapshotRef.current) return;
+    lastSavedSnapshotRef.current = snapshotKey;
 
     setState((prev) => ({
       ...prev,

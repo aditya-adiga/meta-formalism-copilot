@@ -76,7 +76,7 @@ const steps: OnboardingStep[] = [
           <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Causal Graph</strong> &mdash; variables &amp; causal relationships</div>
           <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Statistical Model</strong> &mdash; hypotheses &amp; tests</div>
           <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Property Tests</strong> &mdash; invariants &amp; test specs</div>
-          <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Dialectical Map</strong> &mdash; multi-perspective arguments</div>
+          <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Balanced Perspectives</strong> &mdash; multi-perspective arguments</div>
           <div className="rounded border border-[#DDD9D5] px-2 py-1"><strong>Counterexamples</strong> &mdash; adversarial scenarios</div>
         </div>
         <p>

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       if (isInline) {
         return NextResponse.json({ text: mockInlineResponse(selection.text, instruction) });
       }
-      return NextResponse.json({ content: mockWholeResponse(content, instruction) });
+      return NextResponse.json({ text: mockWholeResponse(content, instruction) });
     }
 
     if (isInline) {
@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
     const cleaned = stripCodeFences(responseText);
     try {
       JSON.parse(cleaned);
-      return NextResponse.json({ content: cleaned });
+      return NextResponse.json({ text: cleaned });
     } catch {
       // Try the raw response before giving up
       try {
         JSON.parse(responseText);
-        return NextResponse.json({ content: responseText });
+        return NextResponse.json({ text: responseText });
       } catch {
         console.error("[edit/artifact] LLM returned invalid JSON:", responseText.slice(0, 300));
         return NextResponse.json(

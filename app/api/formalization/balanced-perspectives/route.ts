@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { handleArtifactRoute } from "@/app/lib/formalization/artifactRoute";
 import { balancedPerspectivesSchema } from "@/app/lib/llm/schemas";
 
-const SYSTEM_PROMPT = `You are a dialectical analyst. Given source text and optional context, map the dialectical structure: identify distinct perspectives, their core claims and supporting arguments, tensions between perspectives, and synthesize an equilibrium position.
+const SYSTEM_PROMPT = `You are a balanced-perspectives analyst. Given source text and optional context, map the perspectives landscape: identify distinct perspectives, their core claims and supporting arguments, tensions between perspectives, and synthesize an equilibrium position.
 
 Return a JSON object with this exact shape:
 {
@@ -31,7 +31,7 @@ Return a JSON object with this exact shape:
       }
     ]
   },
-  "summary": "string (2-4 sentence summary of the dialectical landscape)"
+  "summary": "string (2-4 sentence summary of the perspectives landscape)"
 }
 
 Important:

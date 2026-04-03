@@ -9,7 +9,7 @@
  * - Semiformal/lean kept as flat strings for pipeline compatibility
  * - Streaming preview state stays outside this store (keep transient state local)
  *
- * See docs/decisions/005-zustand-state-management.md for rationale.
+ * See docs/decisions/006-zustand-state-management.md for rationale.
  */
 
 import { create } from "zustand";

@@ -29,6 +29,10 @@ type StreamLlmOptions = {
   maxTokens: number;
   anthropicModel?: string;
   openRouterModel?: string;
+  /** Optional transform applied to the final accumulated text before the `done` event.
+   *  Use this to post-process LLM output (e.g., strip code fences, remove imports)
+   *  without re-parsing the SSE stream in a TransformStream. */
+  transformFinalText?: (text: string) => string;
 };
 
 /** Record analytics and write to cache (same as callLlm's recordAndCache). */
@@ -69,6 +73,7 @@ export function streamLlm({
   maxTokens,
   anthropicModel,
   openRouterModel,
+  transformFinalText,
 }: StreamLlmOptions): ReadableStream<Uint8Array> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -87,14 +92,15 @@ export function streamLlm({
         const cached = await getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
         if (cached) {
           console.log(`[${endpoint}] stream cache hit (model: ${effectiveModel}, hash: ${cacheHash.slice(0, 8)})`);
+          const finalText = transformFinalText ? transformFinalText(cached.text) : cached.text;
 
           if (process.env.SIMULATE_STREAM_FROM_CACHE === "true") {
             // Simulate token-by-token streaming from cache for testing
             // partial-JSON rendering without making expensive API calls.
             console.log(`[${endpoint}] simulating stream from cache (${cached.text.length} chars)`);
-            await simulateStreamFromCache(controller, cached.text, cached.usage);
+            await simulateStreamFromCache(controller, finalText, cached.usage);
           } else {
-            controller.enqueue(sseEvent("done", { text: cached.text, usage: cached.usage }));
+            controller.enqueue(sseEvent("done", { text: finalText, usage: cached.usage }));
           }
           controller.close();
           return;
@@ -109,6 +115,7 @@ export function streamLlm({
             maxTokens,
             endpoint,
             cacheHash,
+            transformFinalText,
           });
         } else if (openRouterKey && openRouterModel) {
           await streamOpenRouter(controller, {
@@ -119,6 +126,7 @@ export function streamLlm({
             maxTokens,
             endpoint,
             cacheHash,
+            transformFinalText,
           });
         } else {
           // Mock fallback
@@ -185,6 +193,7 @@ type StreamProviderOptions = {
   maxTokens: number;
   endpoint: string;
   cacheHash: string;
+  transformFinalText?: (text: string) => string;
 };
 
 async function streamAnthropic(
@@ -220,8 +229,9 @@ async function streamAnthropic(
     latencyMs,
   };
 
-  await recordAndCache(opts.endpoint, usage, accumulated, opts.cacheHash);
-  controller.enqueue(sseEvent("done", { text: accumulated, usage }));
+  const finalText = opts.transformFinalText ? opts.transformFinalText(accumulated) : accumulated;
+  await recordAndCache(opts.endpoint, usage, finalText, opts.cacheHash);
+  controller.enqueue(sseEvent("done", { text: finalText, usage }));
   controller.close();
 }
 
@@ -304,7 +314,8 @@ async function streamOpenRouter(
     latencyMs,
   };
 
-  await recordAndCache(opts.endpoint, usage, accumulated, opts.cacheHash);
-  controller.enqueue(sseEvent("done", { text: accumulated, usage }));
+  const finalText = opts.transformFinalText ? opts.transformFinalText(accumulated) : accumulated;
+  await recordAndCache(opts.endpoint, usage, finalText, opts.cacheHash);
+  controller.enqueue(sseEvent("done", { text: finalText, usage }));
   controller.close();
 }
