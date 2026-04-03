@@ -145,7 +145,7 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const dialecticalMapLoading = artifactLoadingState["balanced-perspectives"] === "generating";
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
@@ -702,7 +702,7 @@ export default function Home() {
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
           />
         );
-      case "dialectical-map":
+      case "balanced-perspectives":
         return (
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
