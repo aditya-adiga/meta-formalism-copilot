@@ -26,7 +26,7 @@ export function wouldCreateCycle(
   if (fromId === toId) return true;
 
   // We're adding: toId dependsOn fromId (edge points from dependency to dependent).
-  // A cycle exists if fromId is already reachable from toId via dependsOn.
+  // A cycle exists if toId is already reachable from fromId via dependsOn.
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const visited = new Set<string>();
 
