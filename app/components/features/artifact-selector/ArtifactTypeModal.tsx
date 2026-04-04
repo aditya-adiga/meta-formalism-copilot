@@ -37,11 +37,11 @@ export default function ArtifactTypeModal({
       onClick={onClose}
     >
       <div
-        className="mx-4 max-w-lg w-full rounded-lg border border-[#DDD9D5] bg-white p-5 shadow-xl"
+        className="mx-4 max-w-lg w-full max-h-[85vh] rounded-lg border border-[#DDD9D5] bg-white p-5 shadow-xl flex flex-col"
         style={{ fontFamily: "var(--font-serif, 'EB Garamond', serif)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <h2 className="text-lg font-semibold text-[var(--ink-black)]">
             Choose Formalization Types
           </h2>
@@ -54,7 +54,7 @@ export default function ArtifactTypeModal({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 overflow-y-auto">
           {SELECTABLE_ARTIFACT_TYPES.map((type) => {
             const meta = ARTIFACT_META[type];
             const isActive = selected.includes(type);
