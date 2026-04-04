@@ -31,6 +31,9 @@ export function transformSseStream(
 
         if (!eventBlock.trim()) continue;
 
+        // This regex assumes our own streamLlm output format (single event: line,
+        // single data: line). It does not handle multi-line `data:` fields per the
+        // full SSE spec — which is fine since we control the producer.
         const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
         if (!eventMatch) {
           // Not a recognized SSE block — forward as-is
