@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import { decompositionSchema } from "@/app/lib/llm/schemas";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
@@ -113,14 +113,48 @@ export async function POST(request: NextRequest) {
 
   // Streaming path: stream raw tokens for partial-JSON rendering on the client
   if (wantStream) {
-    const stream = streamLlm({
+    const rawStream = streamLlm({
       endpoint: "decomposition/extract",
       systemPrompt: SYSTEM_PROMPT,
       userContent: userMessage,
       maxTokens: 16384,
       openRouterModel: OPENROUTER_MODEL,
     });
-    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+
+    // Transform the `done` event to substitute mock content when no API key is set.
+    // Follows the same pattern as formalization/lean/route.ts.
+    const decoder = new TextDecoder();
+    const textEncoder = new TextEncoder();
+    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        const text = decoder.decode(chunk, { stream: true });
+        const events = text.split("\n\n").filter(Boolean);
+        for (const eventBlock of events) {
+          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
+          if (!eventMatch) {
+            controller.enqueue(chunk);
+            continue;
+          }
+          const [, eventType, dataStr] = eventMatch;
+          if (eventType === "done") {
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.usage?.provider === "mock") {
+                data.text = JSON.stringify(mockResponse(documents));
+              }
+              controller.enqueue(sseEvent("done", data));
+            } catch {
+              controller.enqueue(chunk);
+            }
+          } else {
+            controller.enqueue(textEncoder.encode(eventBlock + "\n\n"));
+          }
+        }
+      },
+    }));
+
+    // Next.js route handlers accept Response; cast avoids a type mismatch with NextResponse
+    return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
   }
 
   try {

@@ -56,11 +56,11 @@ export function useDecomposition() {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
         }
-        // Zero nodes -> fall through
+        // Zero nodes → fall through
       }
     } catch (err) {
       console.error("[decomposition/latex-parse]", err);
-      // Parse error -> fall through
+      // Parse error → fall through
     }
 
     // Fast path 2: structured PDF parsing for TeX-compiled PDFs (no LLM call)
@@ -77,10 +77,10 @@ export function useDecomposition() {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
         }
-        // null or empty -> fall through to LLM
+        // null or empty → fall through to LLM
       } catch (err) {
         console.error("[decomposition/pdf-parse]", err);
-        // Parse error -> fall through to LLM
+        // Parse error → fall through to LLM
       }
     }
 
