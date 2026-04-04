@@ -33,9 +33,10 @@ export default function EditableSection({ value, onChange, children }: EditableS
   // Uses a ref to track the previous serialized value so we only close on
   // genuine external changes, not after the user's own save.
   const prevSerializedRef = useRef<string | null>(null);
-  const serialized = JSON.stringify(value);
+  const serialized = editing ? JSON.stringify(value) : null;
   useEffect(() => {
-    if (prevSerializedRef.current !== null && prevSerializedRef.current !== serialized && editing) {
+    if (!editing || serialized === null) return;
+    if (prevSerializedRef.current !== null && prevSerializedRef.current !== serialized) {
       setEditing(false);
     }
     prevSerializedRef.current = serialized;
