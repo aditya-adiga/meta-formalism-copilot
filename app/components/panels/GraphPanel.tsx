@@ -25,6 +25,7 @@ const SOURCE_COLORS = [
 
 type GraphPanelProps = {
   propositions: PropositionNode[];
+  streamingPropositions?: PropositionNode[] | null;
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
   hasContent: boolean;
@@ -41,6 +42,7 @@ type GraphPanelProps = {
 
 export default function GraphPanel({
   propositions,
+  streamingPropositions,
   selectedNodeId,
   onSelectNode,
   hasContent,
@@ -54,7 +56,11 @@ export default function GraphPanel({
   onResumeQueue,
   onCancelQueue,
 }: GraphPanelProps) {
-  const hasNodes = propositions.length > 0;
+  // Show final nodes when available, fall back to streaming preview during extraction
+  const displayPropositions = propositions.length > 0
+    ? propositions
+    : (streamingPropositions ?? []);
+  const hasNodes = displayPropositions.length > 0;
   const [exporting, setExporting] = useState(false);
   const [showArtifactPicker, setShowArtifactPicker] = useState(false);
   const [queueArtifactTypes, setQueueArtifactTypes] = useState<ArtifactType[]>([]);
@@ -256,7 +262,7 @@ export default function GraphPanel({
 
         {hasNodes && (
           <ProofGraph
-            propositions={propositions}
+            propositions={displayPropositions}
             selectedNodeId={selectedNodeId}
             onSelectNode={onSelectNode}
             sourceColorMap={sourceColorMap}

@@ -12,8 +12,31 @@ const INITIAL_STATE: DecompositionState = {
   extractionStatus: "idle",
 };
 
+/** Map raw LLM proposition data to full PropositionNode with client-side defaults. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toPropositionNodes(raw: any[], labelMap: Map<string, string>): PropositionNode[] {
+  return raw.map((p) => ({
+    id: p.id ?? "",
+    label: p.label ?? "",
+    kind: p.kind ?? "claim",
+    statement: p.statement ?? "",
+    proofText: p.proofText ?? "",
+    dependsOn: p.dependsOn ?? [],
+    sourceId: p.sourceId ?? "",
+    sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
+    semiformalProof: "",
+    leanCode: "",
+    verificationStatus: "unverified" as const,
+    verificationErrors: "",
+    context: "",
+    selectedArtifactTypes: [],
+    artifacts: [],
+  }));
+}
+
 export function useDecomposition() {
   const [state, setState] = useState<DecompositionState>(INITIAL_STATE);
+  const [streamingNodes, setStreamingNodes] = useState<PropositionNode[] | null>(null);
 
   const selectedNode = useMemo<PropositionNode | null>(
     () => state.nodes.find((n) => n.id === state.selectedNodeId) ?? null,
@@ -23,6 +46,7 @@ export function useDecomposition() {
   const extractPropositions = useCallback(async (documents: SourceDocument[], pdfFile?: File | null) => {
     const combinedText = documents.map((d) => d.text).join("\n\n");
     setState((prev) => ({ ...prev, paperText: combinedText, sources: documents, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
+    setStreamingNodes(null);
 
     // Fast path 1: deterministic LaTeX source parsing (no LLM call)
     try {
@@ -33,11 +57,11 @@ export function useDecomposition() {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
         }
-        // Zero nodes → fall through
+        // Zero nodes -> fall through
       }
     } catch (err) {
       console.error("[decomposition/latex-parse]", err);
-      // Parse error → fall through
+      // Parse error -> fall through
     }
 
     // Fast path 2: structured PDF parsing for TeX-compiled PDFs (no LLM call)
@@ -54,43 +78,35 @@ export function useDecomposition() {
           setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
           return;
         }
-        // null or empty → fall through to LLM
+        // null or empty -> fall through to LLM
       } catch (err) {
         console.error("[decomposition/pdf-parse]", err);
-        // Parse error → fall through to LLM
+        // Parse error -> fall through to LLM
       }
     }
+
+    // LLM path: stream with partial-JSON rendering
+    const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
 
     try {
       const data = await fetchApi<{ propositions: Array<Record<string, unknown>> }>("/api/decomposition/extract", { documents });
 
-      // Build a lookup from sourceId → sourceLabel for filling in node fields
-      const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
+      const { text: finalText } = await fetchStreamingApi(
+        "/api/decomposition/extract",
+        { documents },
+        { onToken },
+      );
 
-      // API returns partial nodes without client-side fields; fill defaults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nodes: PropositionNode[] = data.propositions.map((p: any) => ({
-        id: p.id,
-        label: p.label,
-        kind: p.kind,
-        statement: p.statement,
-        proofText: p.proofText ?? "",
-        dependsOn: p.dependsOn ?? [],
-        sourceId: p.sourceId ?? "",
-        sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
-        semiformalProof: "",
-        leanCode: "",
-        verificationStatus: "unverified" as const,
-        verificationErrors: "",
-        context: "",
-        selectedArtifactTypes: [],
-        artifacts: [],
-      }));
+      // Parse the final complete JSON
+      const propositions = JSON.parse(stripCodeFences(finalText));
+      const nodes = toPropositionNodes(propositions, labelMap);
 
       setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
+      setStreamingNodes(null);
     } catch (err) {
       console.error("[decomposition]", err);
       setState((prev) => ({ ...prev, extractionStatus: "error" }));
+      setStreamingNodes(null);
     }
   }, []);
 
@@ -119,5 +135,5 @@ export function useDecomposition() {
     [],
   );
 
-  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState };
+  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState, streamingNodes };
 }

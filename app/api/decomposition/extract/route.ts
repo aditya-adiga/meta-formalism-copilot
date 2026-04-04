@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import { decompositionSchema } from "@/app/lib/llm/schemas";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
@@ -107,7 +108,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "documents array or text is required" }, { status: 400 });
   }
 
+  const wantStream = Boolean(body.stream);
   const userMessage = formatDocuments(documents);
+
+  // Streaming path: stream raw tokens for partial-JSON rendering on the client
+  if (wantStream) {
+    const stream = streamLlm({
+      endpoint: "decomposition/extract",
+      systemPrompt: SYSTEM_PROMPT,
+      userContent: userMessage,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+  }
 
   try {
     const { text: responseText, usage, cacheKey } = await callLlm({
