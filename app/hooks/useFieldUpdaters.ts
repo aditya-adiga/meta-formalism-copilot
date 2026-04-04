@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Provides updateField and updateArrayItem helpers for editing
@@ -13,7 +13,7 @@ export function useFieldUpdaters(
   onContentChange?: (json: string) => void,
 ) {
   const dataRef = useRef(data);
-  dataRef.current = data;
+  useEffect(() => { dataRef.current = data; });
 
   const updateField = useCallback((key: string, value: unknown) => {
     if (!dataRef.current || !onContentChange) return;
