@@ -646,6 +646,18 @@ export default function Home() {
     });
   }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
 
+  // --- Manual edit handlers for structured artifact panels ---
+  const handleArtifactContentChange = useCallback((key: ArtifactKey) => {
+    return (json: string) => {
+      useWorkspaceStore.getState().setArtifactEdited(key, json, "manual-edit");
+    };
+  }, []);
+  const handleCausalGraphContentChange = useMemo(() => handleArtifactContentChange("causal-graph"), [handleArtifactContentChange]);
+  const handleStatisticalModelContentChange = useMemo(() => handleArtifactContentChange("statistical-model"), [handleArtifactContentChange]);
+  const handlePropertyTestsContentChange = useMemo(() => handleArtifactContentChange("property-tests"), [handleArtifactContentChange]);
+  const handleDialecticalMapContentChange = useMemo(() => handleArtifactContentChange("dialectical-map"), [handleArtifactContentChange]);
+  const handleCounterexamplesContentChange = useMemo(() => handleArtifactContentChange("counterexamples"), [handleArtifactContentChange]);
+
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
     const sessionBannerElement = activeSession ? (
@@ -743,6 +755,7 @@ export default function Home() {
             causalGraph={causalGraph}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
+            onContentChange={handleCausalGraphContentChange}
           />
         );
       case "statistical-model":
@@ -750,6 +763,7 @@ export default function Home() {
           <StatisticalModelPanel
             statisticalModel={statisticalModel}
             loading={statisticalModelLoading}
+            onContentChange={handleStatisticalModelContentChange}
           />
         );
       case "property-tests":
@@ -757,6 +771,7 @@ export default function Home() {
           <PropertyTestsPanel
             propertyTests={propertyTests}
             loading={propertyTestsLoading}
+            onContentChange={handlePropertyTestsContentChange}
           />
         );
       case "dialectical-map":
@@ -764,6 +779,7 @@ export default function Home() {
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
             loading={dialecticalMapLoading}
+            onContentChange={handleDialecticalMapContentChange}
           />
         );
       case "counterexamples":
@@ -771,6 +787,7 @@ export default function Home() {
           <CounterexamplesPanel
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
+            onContentChange={handleCounterexamplesContentChange}
           />
         );
       case "analytics":
@@ -790,11 +807,11 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
-    statisticalModel, statisticalModelLoading,
-    propertyTests, propertyTestsLoading,
-    dialecticalMap, dialecticalMapLoading,
-    counterexamples, counterexamplesLoading,
+    causalGraph, causalGraphLoading, causalGraphWaitEstimate, handleCausalGraphContentChange,
+    statisticalModel, statisticalModelLoading, handleStatisticalModelContentChange,
+    propertyTests, propertyTestsLoading, handlePropertyTestsContentChange,
+    dialecticalMap, dialecticalMapLoading, handleDialecticalMapContentChange,
+    counterexamples, counterexamplesLoading, handleCounterexamplesContentChange,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
   ]);
