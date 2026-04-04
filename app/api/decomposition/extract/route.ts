@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { transformSseStream } from "@/app/lib/llm/transformSseStream";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import { decompositionSchema } from "@/app/lib/llm/schemas";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
@@ -122,35 +123,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Transform the `done` event to substitute mock content when no API key is set.
-    // Follows the same pattern as formalization/lean/route.ts.
-    const decoder = new TextDecoder();
-    const textEncoder = new TextEncoder();
-    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true });
-        const events = text.split("\n\n").filter(Boolean);
-        for (const eventBlock of events) {
-          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
-          if (!eventMatch) {
-            controller.enqueue(chunk);
-            continue;
-          }
-          const [, eventType, dataStr] = eventMatch;
-          if (eventType === "done") {
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.usage?.provider === "mock") {
-                data.text = JSON.stringify(mockResponse(documents));
-              }
-              controller.enqueue(sseEvent("done", data));
-            } catch {
-              controller.enqueue(chunk);
-            }
-          } else {
-            controller.enqueue(textEncoder.encode(eventBlock + "\n\n"));
-          }
-        }
-      },
+    const transformed = rawStream.pipeThrough(transformSseStream((data) => {
+      if (data.usage?.provider === "mock") {
+        data.text = JSON.stringify(mockResponse(documents));
+      }
     }));
 
     // Next.js route handlers accept Response; cast avoids a type mismatch with NextResponse
