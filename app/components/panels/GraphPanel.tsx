@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
 // Dynamic import to avoid SSR issues with ReactFlow
@@ -52,11 +53,11 @@ export default function GraphPanel({
   onResumeQueue,
   onCancelQueue,
 }: GraphPanelProps) {
-  // Show final nodes when available, fall back to streaming preview during extraction
-  const displayPropositions = propositions.length > 0
-    ? propositions
-    : (streamingPropositions ?? []);
-  const hasNodes = displayPropositions.length > 0;
+  const { displayData: displayPropositions, hasDisplayData: hasNodes } = useStreamingMerge(
+    propositions.length > 0 ? propositions : null,
+    streamingPropositions,
+    (data) => data.length > 0,
+  );
   const [exporting, setExporting] = useState(false);
   const sourceCount = sourceDocuments.length;
 
@@ -217,7 +218,7 @@ export default function GraphPanel({
           </div>
         )}
 
-        {hasNodes && (
+        {hasNodes && displayPropositions && (
           <ProofGraph
             propositions={displayPropositions}
             selectedNodeId={selectedNodeId}

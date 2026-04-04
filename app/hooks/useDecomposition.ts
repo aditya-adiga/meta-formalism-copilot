@@ -15,7 +15,6 @@ const INITIAL_STATE: DecompositionState = {
   extractionStatus: "idle",
 };
 
-/** Map raw LLM proposition data to full PropositionNode with client-side defaults. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPropositionNodes(raw: any[], labelMap: Map<string, string>): PropositionNode[] {
   return raw.map((p) => ({
