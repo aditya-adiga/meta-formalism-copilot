@@ -68,6 +68,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
       }, 50);
 
       const proof = await generateSemiformalStreaming(inputText, undefined, onToken);
+      onToken.cancel();
       a.setSemiformal(proof);
       a.onSessionUpdate?.({ semiformalText: proof });
     } catch (err) {
@@ -197,6 +198,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
         onToken,
       );
 
+      onToken.cancel();
       a.setLeanCode(newCode);
       a.onSessionUpdate?.({ leanCode: newCode });
 

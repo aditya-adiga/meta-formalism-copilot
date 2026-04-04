@@ -20,7 +20,7 @@ import type { ArtifactKey, ArtifactVersion, ArtifactRecord } from "@/app/lib/typ
 import { MAX_VERSIONS } from "@/app/lib/types/artifactStore";
 import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 import type { GenerationProvenance } from "@/app/lib/utils/provenance";
-import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition } from "@/app/lib/utils/workspacePersistence";
+import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject } from "@/app/lib/utils/workspacePersistence";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 
@@ -60,10 +60,6 @@ function createDebouncedStorage(): {
 // Rehydration validation — coerce deserialized localStorage data to safe types.
 // Reuses coerceDecomposition from workspacePersistence for thorough node validation.
 // ---------------------------------------------------------------------------
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 const VALID_ARTIFACT_SOURCES = new Set(["generated", "ai-edit", "manual-edit"]);
 
