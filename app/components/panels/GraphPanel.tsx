@@ -56,11 +56,11 @@ export default function GraphPanel({
   onResumeQueue,
   onCancelQueue,
 }: GraphPanelProps) {
-  // Show final nodes when available, fall back to streaming preview during extraction
-  const displayPropositions = propositions.length > 0
-    ? propositions
-    : (streamingPropositions ?? []);
-  const hasNodes = displayPropositions.length > 0;
+  const { displayData: displayPropositions, hasDisplayData: hasNodes } = useStreamingMerge(
+    propositions.length > 0 ? propositions : null,
+    streamingPropositions,
+    (data) => data.length > 0,
+  );
   const [exporting, setExporting] = useState(false);
   const [showArtifactPicker, setShowArtifactPicker] = useState(false);
   const [queueArtifactTypes, setQueueArtifactTypes] = useState<ArtifactType[]>([]);
@@ -260,7 +260,7 @@ export default function GraphPanel({
           </div>
         )}
 
-        {hasNodes && (
+        {hasNodes && displayPropositions && (
           <ProofGraph
             propositions={displayPropositions}
             selectedNodeId={selectedNodeId}
