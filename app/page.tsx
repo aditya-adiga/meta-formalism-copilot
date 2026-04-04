@@ -23,7 +23,8 @@ import SessionBanner from "@/app/components/features/session-banner/SessionBanne
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
-import { useWorkspaceStore, makeVersion, resolveArtifactContent, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
+import { useWorkspaceStore, makeVersion, resolveArtifactContent, resolveArtifactProvenance, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
+import { buildProvenance, buildInputHash } from "@/app/lib/utils/provenance";
 import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
@@ -49,6 +50,16 @@ const selectStatisticalModel = artifactSelector("statistical-model");
 const selectPropertyTests = artifactSelector("property-tests");
 const selectBalancedPerspectives = artifactSelector("balanced-perspectives");
 const selectCounterexamples = artifactSelector("counterexamples");
+
+// Provenance selectors — return the inputHash of the current version (or undefined)
+function provenanceSelector(key: ArtifactKey): (s: StoreState) => string | undefined {
+  return (s) => resolveArtifactProvenance(s.artifacts[key])?.inputHash;
+}
+const selectCausalGraphProvenance = provenanceSelector("causal-graph");
+const selectStatisticalModelProvenance = provenanceSelector("statistical-model");
+const selectPropertyTestsProvenance = provenanceSelector("property-tests");
+const selectBalancedPerspectivesProvenance = provenanceSelector("balanced-perspectives");
+const selectCounterexamplesProvenance = provenanceSelector("counterexamples");
 
 function phaseToEndpoint(phase: LoadingPhase): string | null {
   switch (phase) {
@@ -167,6 +178,15 @@ export default function Home() {
   const persistedPropertyTests = useWorkspaceStore(selectPropertyTests);
   const persistedBalancedPerspectives = useWorkspaceStore(selectBalancedPerspectives);
   const persistedCounterexamples = useWorkspaceStore(selectCounterexamples);
+
+  // Provenance hashes for current artifact versions
+  const causalGraphInputHash = useWorkspaceStore(selectCausalGraphProvenance);
+  const statisticalModelInputHash = useWorkspaceStore(selectStatisticalModelProvenance);
+  const propertyTestsInputHash = useWorkspaceStore(selectPropertyTestsProvenance);
+  const balancedPerspectivesInputHash = useWorkspaceStore(selectBalancedPerspectivesProvenance);
+  const counterexamplesInputHash = useWorkspaceStore(selectCounterexamplesProvenance);
+  const semiformalProvenance = useWorkspaceStore((s) => s.semiformalProvenance);
+  const setSemiformalProvenance = useWorkspaceStore((s) => s.setSemiformalProvenance);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
   const causalGraph = useMemo(() => {
@@ -330,6 +350,7 @@ export default function Home() {
   const storeArtifactResults = useCallback((
     results: Partial<Record<ArtifactType, unknown>>,
     nodeId?: string,
+    provenance?: import("@/app/lib/utils/provenance").GenerationProvenance,
   ) => {
     for (const [type, value] of Object.entries(results)) {
       if (value == null) continue;
@@ -365,7 +386,7 @@ export default function Home() {
         content: typeof results[key] === "string" ? results[key] as string : JSON.stringify(results[key]),
       }));
     if (entries.length > 0) {
-      useWorkspaceStore.getState().setArtifactsBatchGenerated(entries);
+      useWorkspaceStore.getState().setArtifactsBatchGenerated(entries, provenance);
     }
   }, [updateSessionArtifact, updateNode, decomp.nodes]);
 
@@ -393,6 +414,20 @@ export default function Home() {
   const combinedPaperText = useMemo(() => {
     return [sourceText, ...extractedFiles.map((f) => `--- ${f.name} ---\n${f.text}`)].filter(Boolean).join("\n\n");
   }, [sourceText, extractedFiles]);
+
+  // --- Input provenance: hash of current inputs for staleness comparison ---
+  const currentInputHash = useMemo(
+    () => buildInputHash(combinedPaperText, contextText),
+    [combinedPaperText, contextText],
+  );
+
+  // Per-artifact staleness: true when the artifact was generated from different inputs
+  const causalGraphIsStale = !!(causalGraph && causalGraphInputHash && causalGraphInputHash !== currentInputHash);
+  const statisticalModelIsStale = !!(statisticalModel && statisticalModelInputHash && statisticalModelInputHash !== currentInputHash);
+  const propertyTestsIsStale = !!(propertyTests && propertyTestsInputHash && propertyTestsInputHash !== currentInputHash);
+  const balancedPerspectivesIsStale = !!(balancedPerspectives && balancedPerspectivesInputHash && balancedPerspectivesInputHash !== currentInputHash);
+  const counterexamplesIsStale = !!(counterexamples && counterexamplesInputHash && counterexamplesInputHash !== currentInputHash);
+  const semiformalIsStale = !!(semiformalText && semiformalProvenance && semiformalProvenance.inputHash !== currentInputHash);
 
   // Extract the PDF File reference for structured parsing (non-persisted; only available
   // when the user uploaded a PDF in this session and it hasn't been cleared)
@@ -531,6 +566,7 @@ export default function Home() {
     nodeLabel?: string,
   ) => {
     const request = { sourceText: text, context, nodeId, nodeLabel };
+    const provenance = buildProvenance(text, context);
 
     // Navigate to the first selected artifact panel
     const firstType = artifactTypes[0];
@@ -542,7 +578,9 @@ export default function Home() {
 
     const [, artifactResults] = await Promise.all([
       hasSemiformal
-        ? pipeline.handleGenerateSemiformal(text)
+        ? pipeline.handleGenerateSemiformal(text).then(() => {
+            setSemiformalProvenance(provenance);
+          })
         : Promise.resolve(),
       nonSemiformalTypes.length > 0
         ? generateArtifacts(nonSemiformalTypes, request)
@@ -550,9 +588,9 @@ export default function Home() {
     ]);
 
     if (artifactResults) {
-      storeArtifactResults(artifactResults, nodeId);
+      storeArtifactResults(artifactResults, nodeId, provenance);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId, setSemiformalProvenance]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -717,6 +755,8 @@ export default function Home() {
             showGenerateLean={semiformalReadyForLean}
             leanLoading={loadingPhase === "lean" || loadingPhase === "retrying" || loadingPhase === "verifying" || loadingPhase === "reverifying"}
             waitEstimate={waitEstimate}
+            isStale={semiformalIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "lean":
@@ -781,6 +821,8 @@ export default function Home() {
             causalGraph={causalGraph}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
+            isStale={causalGraphIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "statistical-model":
@@ -788,6 +830,8 @@ export default function Home() {
           <StatisticalModelPanel
             statisticalModel={statisticalModel}
             loading={statisticalModelLoading}
+            isStale={statisticalModelIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "property-tests":
@@ -795,6 +839,8 @@ export default function Home() {
           <PropertyTestsPanel
             propertyTests={propertyTests}
             loading={propertyTestsLoading}
+            isStale={propertyTestsIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "balanced-perspectives":
@@ -802,6 +848,8 @@ export default function Home() {
           <BalancedPerspectivesPanel
             balancedPerspectives={balancedPerspectives}
             loading={balancedPerspectivesLoading}
+            isStale={balancedPerspectivesIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "counterexamples":
@@ -809,6 +857,8 @@ export default function Home() {
           <CounterexamplesPanel
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
+            isStale={counterexamplesIsStale}
+            onRegenerate={handleGenerate}
           />
         );
       case "analytics":
@@ -833,6 +883,8 @@ export default function Home() {
     propertyTests, propertyTestsLoading,
     balancedPerspectives, balancedPerspectivesLoading,
     counterexamples, counterexamplesLoading,
+    semiformalIsStale, causalGraphIsStale, statisticalModelIsStale,
+    propertyTestsIsStale, balancedPerspectivesIsStale, counterexamplesIsStale,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,

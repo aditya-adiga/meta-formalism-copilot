@@ -2,7 +2,7 @@
 
 import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -12,11 +12,12 @@ type BalancedPerspectivesPanelProps = {
   streamingPreview?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 export default function BalancedPerspectivesPanel({
   balancedPerspectives, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: BalancedPerspectivesPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(balancedPerspectives, onContentChange);
 
@@ -35,6 +36,8 @@ export default function BalancedPerspectivesPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayMap && (
         <>
