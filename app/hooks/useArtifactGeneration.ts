@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { ArtifactType } from "@/app/lib/types/session";
+import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
-import { fetchStreamingApi } from "@/app/lib/formalization/api";
+import { fetchStreamingApi, fetchApi } from "@/app/lib/formalization/api";
 import { throttle } from "@/app/lib/utils/throttle";
 import { parse as parsePartialJson } from "partial-json";
 import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
+import { isCustomType } from "@/app/lib/types/customArtifact";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -17,7 +19,9 @@ export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "genera
  * Special cases:
  * - "lean" is never generated here — it's step 2 of the deductive pipeline
  * - "semiformal" is handled by useFormalizationPipeline, not this hook
- * - All other types use ARTIFACT_ROUTE and return JSON keyed by their type
+ * - Custom types (prefixed "custom-") use /api/formalization/custom with the
+ *   system prompt in the request body
+ * - All other built-in types use ARTIFACT_ROUTE and return JSON keyed by their type
  */
 export function useArtifactGeneration() {
   const [loadingState, setLoadingState] = useState<ArtifactLoadingState>({});
@@ -26,10 +30,16 @@ export function useArtifactGeneration() {
   const generateArtifacts = useCallback(async (
     selectedTypes: ArtifactType[],
     request: ArtifactGenerationRequest,
+    customTypeDefs?: CustomArtifactTypeDefinition[],
   ): Promise<Partial<Record<ArtifactType, unknown>>> => {
     // Filter out "lean" — it's never directly generated via this hook
     const types = selectedTypes.filter((t) => t !== "lean");
     if (types.length === 0) return {};
+
+    // Index custom definitions by ID for fast lookup
+    const customDefsMap = new Map(
+      (customTypeDefs ?? []).map((d) => [d.id, d]),
+    );
 
     // Set all selected types to "generating"
     const initialState: ArtifactLoadingState = {};
@@ -39,10 +49,26 @@ export function useArtifactGeneration() {
 
     const promises = types.map(async (type): Promise<[ArtifactType, unknown | null]> => {
       try {
+        // Custom artifact types: send the system prompt in the request body
+        if (isCustomType(type)) {
+          const def = customDefsMap.get(type);
+          if (!def) return [type, null];
+
+          const data = await fetchApi<Record<string, unknown>>(
+            "/api/formalization/custom",
+            {
+              ...request,
+              customSystemPrompt: def.systemPrompt,
+              customOutputFormat: def.outputFormat,
+            },
+          );
+          return [type, data.result ?? null];
+        }
+
+        // Built-in artifact types: stream JSON with partial-JSON parsing for progressive rendering
         const route = ARTIFACT_ROUTE[type];
         if (!route) return [type, null];
 
-        // Stream JSON artifacts with partial-JSON parsing for progressive rendering
         const responseKey = ARTIFACT_RESPONSE_KEY[type];
         const onPartial = throttle((accumulated: string) => {
           try {

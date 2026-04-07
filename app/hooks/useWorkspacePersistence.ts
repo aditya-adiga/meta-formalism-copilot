@@ -12,6 +12,7 @@ import { useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import { useWorkspaceStore } from "@/app/lib/stores/workspaceStore";
 import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
+import type { CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 
 export function useWorkspacePersistence() {
   // Trigger Zustand rehydrate once on mount (SSR-safe pattern)
@@ -33,6 +34,14 @@ export function useWorkspacePersistence() {
   const verificationStatus = useWorkspaceStore((s) => s.verificationStatus);
   const verificationErrors = useWorkspaceStore((s) => s.verificationErrors);
   const decomposition = useWorkspaceStore((s) => s.decomposition);
+
+  // Custom artifact types (user-defined)
+  const customArtifactTypes = useWorkspaceStore((s) => s.customArtifactTypes);
+  const customArtifactData = useWorkspaceStore((s) => s.customArtifactData);
+  const addCustomArtifactType = useWorkspaceStore((s) => s.addCustomArtifactType);
+  const updateCustomArtifactType = useWorkspaceStore((s) => s.updateCustomArtifactType);
+  const removeCustomArtifactType = useWorkspaceStore((s) => s.removeCustomArtifactType);
+  const setCustomArtifactContent = useWorkspaceStore((s) => s.setCustomArtifactContent);
 
   // Artifact content (read from versioned store, exposed as flat strings)
   const causalGraph = useWorkspaceStore((s) => s.getArtifactContent("causal-graph"));
@@ -124,6 +133,8 @@ export function useWorkspacePersistence() {
       propertyTests: s.getArtifactContent("property-tests"),
       dialecticalMap: s.getArtifactContent("dialectical-map"),
       counterexamples: s.getArtifactContent("counterexamples"),
+      customArtifactTypes: structuredClone(s.customArtifactTypes),
+      customArtifactData: { ...s.customArtifactData },
     };
   }, []);
 
@@ -145,6 +156,19 @@ export function useWorkspacePersistence() {
     if (data.propertyTests) store.setArtifactGenerated("property-tests", data.propertyTests);
     if (data.dialecticalMap) store.setArtifactGenerated("dialectical-map", data.dialecticalMap);
     if (data.counterexamples) store.setArtifactGenerated("counterexamples", data.counterexamples);
+
+    // Restore custom artifact types + generated data
+    store.setCustomArtifactTypes(data.customArtifactTypes ?? []);
+    if (data.customArtifactData) {
+      for (const [id, content] of Object.entries(data.customArtifactData)) {
+        store.setCustomArtifactContent(id as CustomArtifactTypeId, content);
+      }
+    } else {
+      // Clear any stale custom data if the snapshot has none
+      for (const id of Object.keys(useWorkspaceStore.getState().customArtifactData)) {
+        store.setCustomArtifactContent(id as CustomArtifactTypeId, null);
+      }
+    }
 
     return data.decomposition;
   }, []);
@@ -187,6 +211,12 @@ export function useWorkspacePersistence() {
     getSnapshot,
     resetToSnapshot,
     clearWorkspace,
+    customArtifactTypes,
+    customArtifactData,
+    addCustomArtifactType,
+    updateCustomArtifactType,
+    removeCustomArtifactType,
+    setCustomArtifactContent,
   }), [
     sourceText, setSourceText, extractedFiles, setExtractedFiles,
     contextText, setContextText, semiformalText, setSemiformalText,
@@ -196,5 +226,7 @@ export function useWorkspacePersistence() {
     propertyTests, setPropertyTests, dialecticalMap, setDialecticalMap,
     counterexamples, setCounterexamples,
     restoredDecompState, persistDecompState, getSnapshot, resetToSnapshot, clearWorkspace,
+    customArtifactTypes, customArtifactData,
+    addCustomArtifactType, updateCustomArtifactType, removeCustomArtifactType, setCustomArtifactContent,
   ]);
 }
