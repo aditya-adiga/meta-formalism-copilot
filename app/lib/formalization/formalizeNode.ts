@@ -1,5 +1,6 @@
 import type { PropositionNode, NodeArtifact } from "@/app/lib/types/decomposition";
-import type { ArtifactType } from "@/app/lib/types/session";
+import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
+import { isCustomType } from "@/app/lib/types/customArtifact";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import { generateSemiformal, fetchApi } from "@/app/lib/formalization/api";
@@ -111,12 +112,15 @@ async function generateNonDeductiveArtifacts(
 ): Promise<Array<{ type: ArtifactType; content: unknown }>> {
   const promises = types.map(async (type): Promise<{ type: ArtifactType; content: unknown } | null> => {
     if (signal?.cancelled) return null;
-    const route = ARTIFACT_ROUTE[type];
+    // formalizeNode only handles built-in types (custom types go through useArtifactGeneration)
+    if (isCustomType(type)) return null;
+    const builtinType = type as BuiltinArtifactType;
+    const route = ARTIFACT_ROUTE[builtinType];
     if (!route) return null;
 
     try {
       const data = await fetchApi<Record<string, unknown>>(route, request);
-      const key = ARTIFACT_RESPONSE_KEY[type];
+      const key = ARTIFACT_RESPONSE_KEY[builtinType];
       return { type, content: data[key] ?? null };
     } catch (err) {
       console.error(`[formalizeNode:${type}]`, err);
