@@ -43,7 +43,7 @@ export default function ArtifactPanelShell({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {header}
       {loading && !hasData ? (
         <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">

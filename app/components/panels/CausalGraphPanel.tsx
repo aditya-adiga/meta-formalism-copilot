@@ -107,8 +107,8 @@ export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }:
     >
       {causalGraph && (
         <div className="flex flex-col h-full">
-          {/* View toggle */}
-          <div className="flex gap-1 mb-3">
+          {/* View toggle — sticky so it doesn't scroll away with graph content */}
+          <div className="sticky top-0 z-10 flex gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
             <button
               onClick={() => setViewMode("graph")}
               className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
