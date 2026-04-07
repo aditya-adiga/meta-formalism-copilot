@@ -95,7 +95,7 @@ export const ENDPOINT_PRIORS: Record<string, EndpointPrior> = {
     outputTokensToLatencyMs: { slope: 12, intercept: 1000, r2: 0 },
     model: "claude-sonnet-4-6",
   },
-  "formalization/dialectical-map": {
+  "formalization/perspective-balance": {
     n: 0,
     meanOutputTokens: 2000,
     stddevOutputTokens: 1000,
@@ -142,7 +142,7 @@ const MAX_OUTPUT_TOKENS: Record<string, number> = {
   "formalization/semiformal": 8192,
   "formalization/lean": 8192,
   "formalization/causal-graph": 8192,
-  "formalization/dialectical-map": 8192,
+  "formalization/perspective-balance": 8192,
   "formalization/property-tests": 8192,
   "formalization/statistical-model": 8192,
   "decomposition/extract": 8192,

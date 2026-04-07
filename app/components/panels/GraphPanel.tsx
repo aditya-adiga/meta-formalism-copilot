@@ -3,8 +3,10 @@
 import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
 // Dynamic import to avoid SSR issues with ReactFlow
@@ -32,7 +34,8 @@ type GraphPanelProps = {
   extractionStatus: "idle" | "extracting" | "done" | "error";
   onDecompose: () => void;
   queueProgress: QueueProgress;
-  onFormalizeAll: () => void;
+  onFormalizeAll: (artifactTypes: ArtifactType[]) => void;
+  globalArtifactTypes: ArtifactType[];
   onPauseQueue: () => void;
   onResumeQueue: () => void;
   onCancelQueue: () => void;
@@ -49,6 +52,7 @@ export default function GraphPanel({
   onDecompose,
   queueProgress,
   onFormalizeAll,
+  globalArtifactTypes,
   onPauseQueue,
   onResumeQueue,
   onCancelQueue,
@@ -59,6 +63,8 @@ export default function GraphPanel({
     (data) => data.length > 0,
   );
   const [exporting, setExporting] = useState(false);
+  const [showArtifactPicker, setShowArtifactPicker] = useState(false);
+  const [queueArtifactTypes, setQueueArtifactTypes] = useState<ArtifactType[]>([]);
   const sourceCount = sourceDocuments.length;
 
   const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
@@ -106,9 +112,15 @@ export default function GraphPanel({
             />
           )}
           {/* Formalize All / queue controls */}
-          {hasNodes && !queueActive && queueProgress.status !== "done" && (
+          {hasNodes && !queueActive && queueProgress.status !== "done" && !showArtifactPicker && (
             <button
-              onClick={onFormalizeAll}
+              onClick={() => {
+                // Default to global selection, or semiformal if nothing selected globally
+                setQueueArtifactTypes(
+                  globalArtifactTypes.length > 0 ? [...globalArtifactTypes] : ["semiformal"],
+                );
+                setShowArtifactPicker(true);
+              }}
               disabled={extractionStatus === "extracting"}
               className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
@@ -177,6 +189,37 @@ export default function GraphPanel({
                 backgroundColor: queueProgress.failed > 0 ? "#dc2626" : "#15803d",
               }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Artifact type picker — shown when user clicks Formalize All */}
+      {showArtifactPicker && (
+        <div className="border-b border-[#DDD9D5] bg-[#FDFCFB] px-6 py-3">
+          <p className="mb-2 text-xs font-medium text-[#6B6560]">
+            Select formalization types to generate for all nodes:
+          </p>
+          <ArtifactChipSelector
+            selected={queueArtifactTypes}
+            onChange={setQueueArtifactTypes}
+          />
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={() => {
+                setShowArtifactPicker(false);
+                onFormalizeAll(queueArtifactTypes);
+              }}
+              disabled={queueArtifactTypes.length === 0}
+              className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+            >
+              Start ({queueArtifactTypes.length} type{queueArtifactTypes.length !== 1 ? "s" : ""})
+            </button>
+            <button
+              onClick={() => setShowArtifactPicker(false)}
+              className="rounded-full border border-[#DDD9D5] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

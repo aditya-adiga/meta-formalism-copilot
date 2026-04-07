@@ -16,6 +16,7 @@ import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
 import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
 import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
+import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -71,6 +72,7 @@ export default function Home() {
     statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
     propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
     dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
+    counterexamples: persistedCounterexamples, setCounterexamples: setPersistedCounterexamples,
   } = useWorkspacePersistence();
 
   // Shared map: artifact type → persisted-state setter (used by restore, store, and clear)
@@ -79,7 +81,8 @@ export default function Home() {
     "statistical-model": setPersistedStatisticalModel,
     "property-tests": setPersistedPropertyTests,
     "dialectical-map": setPersistedDialecticalMap,
-  } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+    "counterexamples": setPersistedCounterexamples,
+  } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap, setPersistedCounterexamples]);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
   const causalGraph = useMemo(() => {
@@ -106,6 +109,12 @@ export default function Home() {
     catch { return null; }
   }, [persistedDialecticalMap]);
 
+  const counterexamples = useMemo(() => {
+    if (!persistedCounterexamples) return null;
+    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
+    catch { return null; }
+  }, [persistedCounterexamples]);
+
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
@@ -123,13 +132,14 @@ export default function Home() {
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
   const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
   const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
 
   // --- Auto-formalize queue ---
-  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode);
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
   const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from localStorage once on mount
@@ -516,12 +526,14 @@ export default function Home() {
     propertyTestsLoading,
     hasDialecticalMap: dialecticalMap !== null,
     dialecticalMapLoading,
+    hasCounterexamples: counterexamples !== null,
+    counterexamplesLoading,
   });
 
   // --- Export All handler ---
   const hasExportableContent = Boolean(
     semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
-    || causalGraph || statisticalModel || propertyTests || dialecticalMap
+    || causalGraph || statisticalModel || propertyTests || dialecticalMap || counterexamples
   );
 
   const handleExportAll = useCallback(async () => {
@@ -535,8 +547,9 @@ export default function Home() {
       statisticalModel,
       propertyTests,
       dialecticalMap,
+      counterexamples,
     });
-  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
@@ -610,6 +623,7 @@ export default function Home() {
             onDecompose={handleDecompose}
             queueProgress={queueProgress}
             onFormalizeAll={startQueue}
+            globalArtifactTypes={selectedArtifactTypes}
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
@@ -662,6 +676,13 @@ export default function Home() {
             loading={dialecticalMapLoading}
           />
         );
+      case "counterexamples":
+        return (
+          <CounterexamplesPanel
+            counterexamples={counterexamples}
+            loading={counterexamplesLoading}
+          />
+        );
       case "analytics":
         return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
       default:
@@ -683,6 +704,7 @@ export default function Home() {
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
     dialecticalMap, dialecticalMapLoading,
+    counterexamples, counterexamplesLoading,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     streamingNodes,

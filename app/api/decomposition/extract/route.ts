@@ -12,7 +12,7 @@ Adapt your extraction to the document type:
 - For empirical/scientific writing: extract hypotheses (as "claim"), methodology, observations, evidence, and conclusions
 - For mixed or informal content: extract claims, questions, assumptions, observations, and narrative context
 
-Each document is identified by a sourceId. Return a JSON array of nodes. Each node has:
+Each document is identified by a sourceId. Return a JSON object with a "propositions" key containing an array of nodes. Each node has:
 - "id": a globally unique identifier using the format "<sourceId>/<localId>", e.g. "doc-0/claim-1", "doc-0/def-1"
 - "label": a short descriptive label, e.g. "Main Thesis", "Definition 2.1", "Supporting Evidence 3"
 - "kind": one of "definition", "lemma", "theorem", "proposition", "corollary", "axiom", "claim", "evidence", "assumption", "objection", "rebuttal", "question", "observation", "narrative", "methodology", "conclusion"
@@ -28,7 +28,7 @@ Important:
 - Extract ALL meaningful structural units, even if unlabeled in the source
 - Aim for 3-15 nodes per document — enough to capture structure without excessive fragmentation
 - When multiple documents are provided, look for cross-document dependencies where one document's propositions build on, reference, or share concepts with another's. Dependencies may be explicit (direct citation) or implicit (shared definitions, overlapping claims)
-- Return ONLY the JSON array, no commentary or markdown fences`;
+- Return ONLY the JSON object, no commentary or markdown fences`;
 
 /** Format documents array into labeled sections for the user message */
 function formatDocuments(documents: SourceDocument[]): string {

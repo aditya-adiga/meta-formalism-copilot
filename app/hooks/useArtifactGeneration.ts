@@ -73,8 +73,8 @@ export function useArtifactGeneration() {
         // Parse the final complete JSON
         try {
           const parsed = JSON.parse(stripCodeFences(finalText));
-          const responseKey = ARTIFACT_RESPONSE_KEY[type];
-          return [type, parsed[responseKey] ?? parsed];
+          const responseKey2 = ARTIFACT_RESPONSE_KEY[type];
+          return [type, parsed[responseKey2] ?? parsed];
         } catch {
           console.error(`[${type}] Failed to parse final JSON`);
           return [type, null];

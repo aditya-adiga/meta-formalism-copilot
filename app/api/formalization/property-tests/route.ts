@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handleArtifactRoute } from "@/app/lib/formalization/artifactRoute";
+import { propertyTestsSchema } from "@/app/lib/llm/schemas";
 
 const SYSTEM_PROMPT = `You are a property-based testing specification analyst. Given source text and optional context, identify testable properties: invariants, preconditions, postconditions, and boundary behaviors. Express each as a pseudocode specification with data generators.
 
@@ -62,5 +63,6 @@ export async function POST(request: NextRequest) {
     systemPrompt: SYSTEM_PROMPT,
     responseKey: "propertyTests",
     mockResponse,
+    responseFormat: propertyTestsSchema,
   });
 }

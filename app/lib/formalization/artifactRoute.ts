@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import type { ResponseFormat } from "@/app/lib/llm/callLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
@@ -38,6 +39,8 @@ type ArtifactRouteConfig = {
   maxTokens?: number;
   /** How to parse the LLM response. Default: "json" (parse as JSON). "text" returns raw text. */
   parseResponse?: "json" | "text";
+  /** When provided, enforces structured JSON output via OpenRouter's response_format. */
+  responseFormat?: ResponseFormat;
   /** Optional: transform the request body before building the user message (e.g. legacy field mapping). */
   transformBody?: (body: Record<string, unknown>) => ArtifactGenerationRequest;
 };
@@ -82,6 +85,7 @@ export async function handleArtifactRoute(
       userContent: userMessage,
       maxTokens: config.maxTokens ?? 8192,
       openRouterModel: OPENROUTER_MODEL,
+      responseFormat: config.responseFormat,
     });
 
     if (usage.provider === "mock") {
