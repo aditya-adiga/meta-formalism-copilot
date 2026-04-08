@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
-import { fetchApi } from "@/app/lib/formalization/api";
+import { fetchStreamingApi } from "@/app/lib/formalization/api";
+import { parse as parsePartialJson } from "partial-json";
+import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
+import { throttle } from "@/app/lib/utils/throttle";
 
 const INITIAL_STATE: DecompositionState = {
   nodes: [],
@@ -12,8 +15,30 @@ const INITIAL_STATE: DecompositionState = {
   extractionStatus: "idle",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toPropositionNodes(raw: any[], labelMap: Map<string, string>): PropositionNode[] {
+  return raw.map((p) => ({
+    id: p.id ?? "",
+    label: p.label ?? "",
+    kind: p.kind ?? "claim",
+    statement: p.statement ?? "",
+    proofText: p.proofText ?? "",
+    dependsOn: p.dependsOn ?? [],
+    sourceId: p.sourceId ?? "",
+    sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
+    semiformalProof: "",
+    leanCode: "",
+    verificationStatus: "unverified" as const,
+    verificationErrors: "",
+    context: "",
+    selectedArtifactTypes: [],
+    artifacts: [],
+  }));
+}
+
 export function useDecomposition() {
   const [state, setState] = useState<DecompositionState>(INITIAL_STATE);
+  const [streamingNodes, setStreamingNodes] = useState<PropositionNode[] | null>(null);
 
   const selectedNode = useMemo<PropositionNode | null>(
     () => state.nodes.find((n) => n.id === state.selectedNodeId) ?? null,
@@ -23,6 +48,7 @@ export function useDecomposition() {
   const extractPropositions = useCallback(async (documents: SourceDocument[], pdfFile?: File | null) => {
     const combinedText = documents.map((d) => d.text).join("\n\n");
     setState((prev) => ({ ...prev, paperText: combinedText, sources: documents, extractionStatus: "extracting", nodes: [], selectedNodeId: null }));
+    setStreamingNodes(null);
 
     // Fast path 1: deterministic LaTeX source parsing (no LLM call)
     try {
@@ -61,36 +87,40 @@ export function useDecomposition() {
       }
     }
 
+    // LLM path: stream with partial-JSON rendering
+    const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
+
     try {
-      const data = await fetchApi<{ propositions: Array<Record<string, unknown>> }>("/api/decomposition/extract", { documents });
+      const onToken = throttle((accumulated: string) => {
+        try {
+          const partial = parsePartialJson(stripLeadingCodeFence(accumulated));
+          // Support both bare array and wrapped { propositions: [...] } formats
+          const items = Array.isArray(partial) ? partial : partial?.propositions;
+          if (Array.isArray(items) && items.length > 0) {
+            setStreamingNodes(toPropositionNodes(items, labelMap));
+          }
+        } catch {
+          // partial-json parse failed — wait for more tokens
+        }
+      }, 50);
 
-      // Build a lookup from sourceId → sourceLabel for filling in node fields
-      const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
+      const { text: finalText } = await fetchStreamingApi(
+        "/api/decomposition/extract",
+        { documents },
+        { onToken },
+      );
 
-      // API returns partial nodes without client-side fields; fill defaults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nodes: PropositionNode[] = data.propositions.map((p: any) => ({
-        id: p.id,
-        label: p.label,
-        kind: p.kind,
-        statement: p.statement,
-        proofText: p.proofText ?? "",
-        dependsOn: p.dependsOn ?? [],
-        sourceId: p.sourceId ?? "",
-        sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
-        semiformalProof: "",
-        leanCode: "",
-        verificationStatus: "unverified" as const,
-        verificationErrors: "",
-        context: "",
-        selectedArtifactTypes: [],
-        artifacts: [],
-      }));
+      // Parse the final complete JSON — support both bare array and wrapped { propositions: [...] }
+      const parsed = JSON.parse(stripCodeFences(finalText));
+      const propositions = Array.isArray(parsed) ? parsed : parsed.propositions;
+      const nodes = toPropositionNodes(propositions, labelMap);
 
       setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
+      setStreamingNodes(null);
     } catch (err) {
       console.error("[decomposition]", err);
       setState((prev) => ({ ...prev, extractionStatus: "error" }));
+      setStreamingNodes(null);
     }
   }, []);
 
@@ -119,5 +149,5 @@ export function useDecomposition() {
     [],
   );
 
-  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState };
+  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState, streamingNodes };
 }

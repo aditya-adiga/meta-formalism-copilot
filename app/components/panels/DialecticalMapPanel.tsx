@@ -1,43 +1,56 @@
 "use client";
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type DialecticalMapPanelProps = {
   dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
+  /** Partial map data from streaming (partial-JSON parsed) */
+  streamingPreview?: DialecticalMapResponse["dialecticalMap"] | null;
   loading?: boolean;
 };
 
-export default function DialecticalMapPanel({ dialecticalMap, loading }: DialecticalMapPanelProps) {
+export default function DialecticalMapPanel({ dialecticalMap, streamingPreview, loading }: DialecticalMapPanelProps) {
+  const { displayData: displayMap, hasDisplayData } = useStreamingMerge(
+    dialecticalMap, streamingPreview,
+    (d) => (d.perspectives?.length ?? 0) > 0 || !!d.topic,
+  );
+
   return (
     <ArtifactPanelShell
       title="Dialectical Map"
-      loading={loading}
-      hasData={dialecticalMap !== null}
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
       emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
       loadingMessage="Generating dialectical map..."
     >
-      {dialecticalMap && (
+      {hasDisplayData && displayMap && (
         <>
           {/* Topic */}
+          {displayMap.topic && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Topic</h3>
-            <p className="text-sm font-medium text-[var(--ink-black)]">{dialecticalMap.topic}</p>
+            <p className="text-sm font-medium text-[var(--ink-black)]">{displayMap.topic}</p>
           </section>
+          )}
 
           {/* Summary */}
+          {displayMap.summary && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{dialecticalMap.summary}</p>
+            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{displayMap.summary}</p>
           </section>
+          )}
 
           {/* Perspectives */}
+          {(displayMap.perspectives?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Perspectives ({dialecticalMap.perspectives.length})
+              Perspectives ({displayMap.perspectives.length})
             </h3>
             <div className="space-y-3">
-              {dialecticalMap.perspectives.map((p) => (
+              {displayMap.perspectives.map((p) => (
                 <div key={p.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-[#9A9590]">{p.id}</span>
@@ -45,7 +58,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
                   </div>
                   <p className="text-xs text-[#6B6560]">{p.coreClaim}</p>
 
-                  {p.supportingArguments.length > 0 && (
+                  {(p.supportingArguments?.length ?? 0) > 0 && (
                     <div>
                       <span className="text-xs font-semibold text-[#6B6560]">Supporting:</span>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5">
@@ -56,7 +69,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
                     </div>
                   )}
 
-                  {p.vulnerabilities.length > 0 && (
+                  {(p.vulnerabilities?.length ?? 0) > 0 && (
                     <div>
                       <span className="text-xs font-semibold text-amber-700">Vulnerabilities:</span>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5">
@@ -70,15 +83,16 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
               ))}
             </div>
           </section>
+          )}
 
           {/* Tensions */}
-          {dialecticalMap.tensions.length > 0 && (
+          {(displayMap.tensions?.length ?? 0) > 0 && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Tensions ({dialecticalMap.tensions.length})
+                Tensions ({displayMap.tensions.length})
               </h3>
               <div className="space-y-2">
-                {dialecticalMap.tensions.map((t, i) => (
+                {displayMap.tensions.map((t, i) => (
                   <div key={i} className="rounded border border-red-200 bg-red-50 px-3 py-2">
                     <div className="flex items-center gap-1 text-xs font-mono text-red-700">
                       <span>{t.between[0]}</span>
@@ -93,13 +107,14 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
           )}
 
           {/* Synthesis */}
+          {displayMap.synthesis && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Synthesis</h3>
             <div className="rounded border border-green-200 bg-green-50 px-3 py-2 space-y-2">
-              <p className="text-sm text-green-900">{dialecticalMap.synthesis.equilibrium}</p>
-              {dialecticalMap.synthesis.howAddressed.length > 0 && (
+              <p className="text-sm text-green-900">{displayMap.synthesis.equilibrium}</p>
+              {(displayMap.synthesis.howAddressed?.length ?? 0) > 0 && (
                 <div className="space-y-1">
-                  {dialecticalMap.synthesis.howAddressed.map((h) => (
+                  {displayMap.synthesis.howAddressed.map((h) => (
                     <div key={h.perspectiveId} className="text-xs text-green-800">
                       <span className="font-mono font-semibold">{h.perspectiveId}:</span>{" "}
                       {h.resolution}
@@ -109,6 +124,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
               )}
             </div>
           </section>
+          )}
         </>
       )}
     </ArtifactPanelShell>
