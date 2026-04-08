@@ -96,8 +96,9 @@ export function useDecomposition() {
         { onToken },
       );
 
-      // Parse the final complete JSON
-      const propositions = JSON.parse(stripCodeFences(finalText));
+      // Parse the final complete JSON — support both bare array and wrapped { propositions: [...] }
+      const parsed = JSON.parse(stripCodeFences(finalText));
+      const propositions = Array.isArray(parsed) ? parsed : parsed.propositions;
       const nodes = toPropositionNodes(propositions, labelMap);
 
       setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
