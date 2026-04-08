@@ -19,7 +19,8 @@ import type { PersistedDecomposition, PersistedWorkspace } from "@/app/lib/types
 import type { ArtifactKey, ArtifactVersion, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { MAX_VERSIONS } from "@/app/lib/types/artifactStore";
 import type { GenerationProvenance } from "@/app/lib/utils/provenance";
-import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject } from "@/app/lib/utils/workspacePersistence";
+import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject, isValidCustomTypeDef } from "@/app/lib/utils/workspacePersistence";
+import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 
@@ -145,6 +146,18 @@ function coercePersistedState(persisted: Record<string, unknown>): Partial<Works
     result.decomposition = coerceDecomposition(persisted.decomposition);
   }
 
+  // Custom artifact types
+  if (Array.isArray(persisted.customArtifactTypes)) {
+    result.customArtifactTypes = (persisted.customArtifactTypes as unknown[]).filter(isValidCustomTypeDef);
+  }
+  if (isObject(persisted.customArtifactData)) {
+    const data: Record<string, string> = {};
+    for (const [k, v] of Object.entries(persisted.customArtifactData as Record<string, unknown>)) {
+      if (k.startsWith("custom-") && typeof v === "string") data[k] = v;
+    }
+    result.customArtifactData = data;
+  }
+
   return result;
 }
 
@@ -203,6 +216,10 @@ export interface WorkspaceState {
   // --- Structured artifacts (with versioning) ---
   artifacts: Partial<Record<ArtifactKey, ArtifactRecord>>;
 
+  // --- Custom artifact types ---
+  customArtifactTypes: CustomArtifactTypeDefinition[];
+  customArtifactData: Record<string, string>;
+
   // --- Decomposition ---
   decomposition: PersistedDecomposition;
 }
@@ -231,6 +248,13 @@ export interface WorkspaceActions {
   canUndo: (key: ArtifactKey) => boolean;
   canRedo: (key: ArtifactKey) => boolean;
 
+  // Custom artifact types
+  setCustomArtifactTypes: (v: CustomArtifactTypeDefinition[]) => void;
+  addCustomArtifactType: (def: CustomArtifactTypeDefinition) => void;
+  updateCustomArtifactType: (id: CustomArtifactTypeId, def: CustomArtifactTypeDefinition) => void;
+  removeCustomArtifactType: (id: CustomArtifactTypeId) => void;
+  setCustomArtifactContent: (id: CustomArtifactTypeId, content: string) => void;
+
   // Decomposition
   setDecomposition: (d: PersistedDecomposition) => void;
 
@@ -255,6 +279,8 @@ const DEFAULT_STATE: WorkspaceState = {
   verificationStatus: "none",
   verificationErrors: "",
   artifacts: {},
+  customArtifactTypes: [],
+  customArtifactData: {},
   decomposition: {
     nodes: [],
     selectedNodeId: null,
@@ -467,6 +493,28 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
         return !!rec && rec.currentVersionIndex < rec.versions.length - 1;
       },
 
+      // --- Custom artifact types ---
+      setCustomArtifactTypes: (v) => set({ customArtifactTypes: v }),
+      addCustomArtifactType: (def) =>
+        set((s) => ({ customArtifactTypes: [...s.customArtifactTypes, def] })),
+      updateCustomArtifactType: (id, def) =>
+        set((s) => ({
+          customArtifactTypes: s.customArtifactTypes.map((t) => (t.id === id ? def : t)),
+        })),
+      removeCustomArtifactType: (id) =>
+        set((s) => {
+          const { [id]: _, ...rest } = s.customArtifactData;
+          return {
+            customArtifactTypes: s.customArtifactTypes.filter((t) => t.id !== id),
+            customArtifactData: rest,
+          };
+        }),
+      setCustomArtifactContent: (id, content) =>
+        set((s) => {
+          if (s.customArtifactData[id] === content) return s;
+          return { customArtifactData: { ...s.customArtifactData, [id]: content } };
+        }),
+
       // --- Decomposition ---
       setDecomposition: (d) => set({ decomposition: d }),
 
@@ -484,6 +532,8 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
           verificationStatus: sanitizeVerificationStatus(s.verificationStatus),
           verificationErrors: s.verificationErrors,
           artifacts: structuredClone(s.artifacts),
+          customArtifactTypes: structuredClone(s.customArtifactTypes),
+          customArtifactData: { ...s.customArtifactData },
           decomposition: structuredClone(s.decomposition),
         };
       },
@@ -519,6 +569,8 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
         verificationStatus: sanitizeVerificationStatus(state.verificationStatus),
         verificationErrors: state.verificationErrors,
         artifacts: state.artifacts,
+        customArtifactTypes: state.customArtifactTypes,
+        customArtifactData: state.customArtifactData,
         decomposition: sanitizeDecomposition(state.decomposition),
       }),
       // On rehydrate, check if we need to migrate from workspace-v2

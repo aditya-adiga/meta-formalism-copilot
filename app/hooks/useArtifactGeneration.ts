@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import type { ArtifactType } from "@/app/lib/types/session";
+import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
+import { isCustomType } from "@/app/lib/types/customArtifact";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import { generateSemiformalStreaming, fetchStreamingApi } from "@/app/lib/formalization/api";
 import { throttle } from "@/app/lib/utils/throttle";
 import { parse as parsePartialJson } from "partial-json";
@@ -46,10 +48,16 @@ export function useArtifactGeneration() {
   const generateArtifacts = useCallback(async (
     selectedTypes: ArtifactType[],
     request: ArtifactGenerationRequest,
+    customTypeDefs?: CustomArtifactTypeDefinition[],
   ): Promise<Partial<Record<ArtifactType, unknown>>> => {
     // Filter out "lean" — it's never directly generated via this hook
     const types = selectedTypes.filter((t) => t !== "lean");
     if (types.length === 0) return {};
+
+    // Index custom definitions by ID for fast lookup
+    const customDefsMap = new Map(
+      (customTypeDefs ?? []).map((d) => [d.id, d]),
+    );
 
     // Increment generation IDs and capture this call's snapshot
     const myGenIds: Partial<Record<ArtifactType, number>> = {};
@@ -79,11 +87,39 @@ export function useArtifactGeneration() {
           return [type, proof];
         }
 
-        const route = ARTIFACT_ROUTE[type];
+        // Custom artifact types use the generic custom route
+        if (isCustomType(type)) {
+          const def = customDefsMap.get(type);
+          if (!def) return [type, null];
+
+          const onPartial = throttle((accumulated: string) => {
+            if (!isCurrent(type)) return;
+            setStreamingPreview((prev) => ({ ...prev, [type]: accumulated }));
+          }, 50);
+
+          const { text: finalText } = await fetchStreamingApi(
+            "/api/formalization/custom",
+            { ...request, customSystemPrompt: def.systemPrompt, customOutputFormat: def.outputFormat },
+            { onToken: onPartial },
+          );
+
+          // Try to parse as JSON if output format is json
+          if (def.outputFormat === "json") {
+            try {
+              return [type, JSON.parse(stripCodeFences(finalText))];
+            } catch {
+              return [type, finalText];
+            }
+          }
+          return [type, finalText];
+        }
+
+        // Built-in artifact types
+        const route = ARTIFACT_ROUTE[type as BuiltinArtifactType];
         if (!route) return [type, null];
 
         // Stream JSON artifacts with partial-JSON parsing for progressive rendering
-        const responseKey = ARTIFACT_RESPONSE_KEY[type];
+        const responseKey = ARTIFACT_RESPONSE_KEY[type as BuiltinArtifactType];
         const onPartial = throttle((accumulated: string) => {
           if (!isCurrent(type)) return;
           try {
@@ -108,7 +144,7 @@ export function useArtifactGeneration() {
         // Parse the final complete JSON
         try {
           const parsed = JSON.parse(stripCodeFences(finalText));
-          const responseKey = ARTIFACT_RESPONSE_KEY[type];
+          const responseKey = ARTIFACT_RESPONSE_KEY[type as BuiltinArtifactType];
           // Guard against field name collision (e.g. counterexamples): if the
           // extracted value is an Array, it's an inner field, not an API envelope.
           const candidate = parsed[responseKey];

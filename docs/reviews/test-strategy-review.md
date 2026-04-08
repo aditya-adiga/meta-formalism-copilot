@@ -1,217 +1,257 @@
-# Test Strategy Review: feat/graph-persistence-editing vs feat/zustand-wire-page
+# Test Strategy Review: `feat/custom-artifact-types`
 
-**Date:** 2026-04-03
-**Branch:** `feat/graph-persistence-editing` relative to `feat/zustand-wire-page`
-**Scope:** Graph editing operations, layout persistence, ProofGraph component editing UI, useDecomposition graph-editing wiring
-
----
-
-## Test Conventions
-
-- **Framework:** Vitest with React Testing Library, jsdom environment
-- **Config:** `vitest.config.ts` at repo root, setup in `vitest.setup.ts`
-- **Location pattern:** Co-located test files (`Foo.test.tsx` next to `Foo.tsx`) for components and utils; `__tests__/` subdirectory for store tests
-- **Naming:** `describe`/`it` blocks, descriptive test names
-- **Mocking:** `vi.mock()` for module-level mocks, `vi.fn()` for individual functions
-- **Helper pattern:** `makeNode()` factory function for `PropositionNode` test data (established in `graphOperations.test.ts`)
-- **Run:** `npm test` (all), `npm run test:watch` (watch mode)
+**Branch:** `feat/custom-artifact-types`  
+**Date:** 2026-04-07  
+**Files changed:** 23 (1434 additions, 193 deletions)  
+**Existing tests passing:** 173/173
 
 ---
 
-## Classification of Changes by Risk
+## Risk Profile
 
-### Critical (data integrity, core logic)
+### What can go wrong?
 
-| File | What changed | Existing tests |
-|------|-------------|----------------|
-| `app/lib/utils/graphOperations.ts` | **New file.** Pure functions: cycle detection, add/remove node, rename, update statement, add/remove edge. All graph mutations flow through these. | `graphOperations.test.ts` -- **comprehensive coverage** (7 describe blocks, 16 tests covering all exported functions, cycle detection, edge cases) |
-| `app/lib/utils/workspacePersistence.ts` | Added `coerceDecomposition` validation for `graphLayout` field (positions + viewport). Migration path for `dialecticalMap` -> `balancedPerspectives`. | **No tests for the new graphLayout coercion.** Existing `loadWorkspace` tests are in the same file pattern but don't cover layout. |
-| `app/lib/types/decomposition.ts` | Added `GraphLayout` type and `graphLayout?: GraphLayout` to `DecompositionState`. | N/A (types only) |
+1. **Persistence corruption / data loss** — Custom type definitions and their generated data are stored alongside existing workspace state in localStorage. Malformed data on load could crash the app or silently lose custom types.
+2. **Type system widening breaks existing flows** — `ArtifactType` was widened from a fixed union (`BuiltinArtifactType`) to include `CustomArtifactTypeId`. Any code that exhaustively switches on artifact types or indexes `ARTIFACT_ROUTE`/`ARTIFACT_RESPONSE_KEY` with the wider type could fail at runtime.
+3. **Custom system prompt injection** — User-provided system prompts are passed directly to the LLM. The `MAX_SYSTEM_PROMPT_LENGTH` guard (10,000 chars) exists, but there are no sanitization checks beyond length.
+4. **Stale panel/selection state** — When a custom type is deleted, its ID must be removed from `selectedArtifactTypes` and the active panel must fall back. The cleanup in `handleDeleteCustomType` could miss edge cases (e.g., node-level selections).
+5. **JSON parsing in CustomArtifactPanel** — The panel tries `JSON.parse` on content for JSON-format custom types. Malformed LLM output falls back to text display, but deeply nested or very large JSON could cause rendering issues.
 
-### High (user-facing feature wiring)
+### Blast radius
 
-| File | What changed | Existing tests |
-|------|-------------|----------------|
-| `app/hooks/useDecomposition.ts` | Added 7 graph editing callbacks (`addGraphNode`, `removeGraphNode`, `renameGraphNode`, `updateNodeStatement`, `addGraphEdge`, `removeGraphEdge`, `updateGraphLayout`) plus `graphLayout` in state and `resetState`. | **No tests.** |
-| `app/components/features/proof-graph/useGraphLayout.ts` | Rewritten from simple Dagre-on-every-render to incremental layout with `positionsRef`, `initialPositions` seeding, position pruning, `updateNodePosition`, and `getPositions` export. | **No tests.** |
-| `app/components/features/proof-graph/ProofGraph.tsx` | Added: drag persistence (`handleNodeDragStop`), viewport persistence (debounced `handleMoveEnd`), edge connect/delete handlers, context menu (delete/rename), inline rename dialog. | **No tests.** |
+Custom artifact types touch the root orchestrator (`page.tsx`), persistence layer, artifact generation hook, panel definitions, and two new API routes. A bug in persistence could affect all workspace data, not just custom types.
 
-### Medium (peripheral changes)
+### Change frequency
 
-| File | What changed |
-|------|-------------|
-| `app/lib/stores/workspaceStore.ts` | `dialecticalMap` -> `balancedPerspectives` rename in valid keys and migration map |
-| `app/components/panels/GraphPanel.tsx` | Wires new editing callbacks from `useDecomposition` to `ProofGraph` |
-| `app/lib/types/persistence.ts` | Minor type update |
+This is a new feature with active iteration (8 commits on the branch). The type system changes and persistence additions are likely stable; the UI components (CustomTypeDesigner) may continue to evolve.
 
-### Low (docs, config, renames)
+---
 
-| File | What changed |
-|------|-------------|
-| Various panel components | Prop threading, UI text changes |
-| `docs/*`, `CLAUDE.md`, `README.md` | Documentation updates |
-| `package.json` / `package-lock.json` | Dependency updates |
+## Existing Coverage Survey
+
+### Tests already on this branch
+
+| File | What it tests | Coverage |
+|------|--------------|----------|
+| `app/lib/types/customArtifact.test.ts` | `isCustomType` type guard — valid IDs, built-in types, edge cases | Good: 6 cases |
+| `app/components/panels/CustomArtifactPanel.test.ts` | `formatLabel` utility — camelCase, snake_case, kebab-case, edge cases | Good: 6 cases |
+| `app/lib/utils/workspacePersistence.test.ts` (additions) | `isValidCustomTypeDef` validation + save/load round-trip + backward compat + filtering invalid defs | Good: 7 cases |
+
+### What is NOT tested
+
+- API routes (`custom-type/design`, `formalization/custom`) — no unit tests
+- `useWorkspacePersistence` hook — no tests for the new custom type CRUD methods (`addCustomArtifactType`, `updateCustomArtifactType`, `removeCustomArtifactType`, `setCustomArtifactContent`)
+- `useArtifactGeneration` — no tests for the new custom type branching logic
+- `usePanelDefinitions` — no tests for dynamic custom panel entries
+- `CustomTypeDesigner` component — no tests (complex multi-step wizard with API calls)
+- `ArtifactChipSelector` / `ArtifactTypeModal` — existing tests not updated for custom type props
+- `page.tsx` orchestration — no tests for custom type wiring (stale ID cleanup, delete handler, panel rendering)
+- `formalizeNode.ts` — no tests for the `isCustomType` early-return guard
+
+### Project test patterns
+
+- **Framework:** Vitest + jsdom + React Testing Library + `@testing-library/jest-dom`
+- **File location:** Co-located with source (`.test.ts` / `.test.tsx` next to the file being tested)
+- **Naming:** `describe("functionName")` or `describe("ComponentName")` with `it("description")`
+- **Mocking:** `vi.mock()` for modules; `localStorage.clear()` in `beforeEach` for persistence tests
+- **Hook testing:** `renderHook` + `act` from `@testing-library/react`
+- **No API route tests exist in the project** — routes are tested manually or via integration
+
+---
+
+## Fact-Check Findings
+
+### CONFIRMED INCORRECT: `persistence.ts:32` comment says "added in v2" but version wasn't bumped
+
+The comment on line 32 of `persistence.ts` reads `// Custom artifact types and their generated data (added in v2)`. `WORKSPACE_VERSION` remains `2` (line 4) and `WORKSPACE_KEY` remains `"workspace-v2"` (line 5). These custom fields are optional (`?`) so they are backward-compatible within v2 — no migration is needed and no version bump occurred. The comment is technically accurate (these fields were added to the v2 schema) but misleading — it suggests a version change happened. A clearer comment would be: "Custom artifact types (optional extension to v2 schema)."
+
+**Risk:** Low. Since the fields are optional and `loadWorkspace` defaults missing fields to `[]`/`{}`, no data loss occurs. But the comment could confuse future developers.
+
+### CONFIRMED UNVERIFIABLE: `customArtifact.ts:7` mentions cross-session library
+
+Line 7-8 of `customArtifact.ts` reads: "Definitions are stored in the workspace persistence layer and optionally saved to a cross-session library." No cross-session library feature exists in this branch or the codebase. The `customArtifactTypes` array is stored per-workspace in localStorage — there is no shared library across workspaces or sessions.
+
+**Risk:** Low (documentation inaccuracy). But it could lead someone to look for library functionality that doesn't exist.
 
 ---
 
 ## Recommended Tests
 
-### 1. `coerceDecomposition` -- graphLayout validation
+### 1. useWorkspacePersistence custom type CRUD
 
-**Type:** Unit
-**Priority:** P0 (Critical)
-**File:** `app/lib/utils/workspacePersistence.test.ts` (new file, co-located)
-**What it verifies:** The `coerceDecomposition` function correctly validates and coerces persisted `graphLayout` data, preventing corrupt positions from crashing the app on load.
+**Type:** Unit (hook test)  
+**Priority:** High  
+**File:** `app/hooks/useWorkspacePersistence.test.ts`  
+**What it verifies:** The new CRUD operations for custom artifact types correctly update state and trigger persistence.  
 **Key cases:**
-- Valid `graphLayout` with positions `{ "node-1": { x: 100, y: 200 } }` is preserved
-- Valid `graphLayout` with viewport `{ x: 0, y: 0, zoom: 1 }` is preserved
-- `graphLayout` with non-numeric position values (e.g., `{ x: "bad", y: 200 }`) drops that entry
-- `graphLayout` with missing `positions` key results in `undefined` graphLayout
-- `graphLayout` with empty positions object (after filtering invalid entries) results in `undefined` graphLayout
-- `graphLayout` with invalid viewport (missing `zoom`) omits viewport but keeps valid positions
-- `graphLayout` absent entirely: `coerceDecomposition` returns `undefined` for graphLayout
-- Full round-trip: `coerceDecomposition` output feeds cleanly into `resetState`
-- Backward compat: `dialecticalMap` field in persisted data is read as `balancedPerspectives`
-**Setup needed:** None -- pure function, import directly. Can reuse `isObject` helper already in the module.
-**Effort:** Low. ~30 minutes.
+- `addCustomArtifactType` adds a definition and it appears in `customArtifactTypes`
+- `updateCustomArtifactType` with a new `systemPrompt` clears the corresponding entry in `customArtifactData` (stale data cleanup)
+- `updateCustomArtifactType` without changing `systemPrompt` preserves `customArtifactData`
+- `removeCustomArtifactType` removes the definition AND its entry from `customArtifactData`
+- `setCustomArtifactContent` stores content keyed by custom type ID
+- `setCustomArtifactContent` with same value returns same state reference (no-op optimization)
+- Round-trip: add type, set content, save (via debounce timer), reload hook — data survives
+
+**Setup needed:** `localStorage.clear()` in `beforeEach`; `vi.useFakeTimers()` for debounce; `renderHook` + `act` pattern matching existing tests in this file.
 
 ---
 
-### 2. `useGraphLayout` -- incremental positioning logic
+### 2. useArtifactGeneration custom type routing
 
-**Type:** Unit (hook test)
-**Priority:** P0 (Critical)
-**File:** `app/components/features/proof-graph/useGraphLayout.test.ts` (new file)
-**What it verifies:** The core layout algorithm: incremental Dagre only for new nodes, position persistence across re-renders, pruning of removed nodes.
+**Type:** Unit (hook test)  
+**Priority:** High  
+**File:** `app/hooks/useArtifactGeneration.test.ts` (new file)  
+**What it verifies:** Custom artifact types are routed to `/api/formalization/custom` with the correct body; built-in types still use their standard routes.  
 **Key cases:**
-- Empty propositions returns `{ nodes: [], edges: [] }`
-- Single node gets a Dagre-computed position (not `{ x: 0, y: 0 }`)
-- Two nodes with a dependency edge: nodes get positions and edge is created with correct `source`/`target`
-- Adding a new node to an existing graph: existing node positions are unchanged, new node gets a Dagre position
-- Removing a node: its position is pruned from the internal map
-- `initialPositions` are used on first render (seeded positions match what was passed in)
-- `initialPositions` are only seeded once (subsequent re-renders with different `initialPositions` are ignored)
-- `updateNodePosition` updates the cached position (simulating drag)
-- `getPositions` returns a plain object snapshot of all current positions
-- After `updateNodePosition`, `getPositions` reflects the new position
-- Clearing all propositions (empty array) resets the internal position map, so new propositions get fresh Dagre layout
-**Setup needed:** `renderHook` from `@testing-library/react`. Mock `dagre` module or use it directly (it's a pure layout library, safe to use unmocked). The hook uses `useRef`, `useMemo`, `useCallback` -- all work in `renderHook`.
-**Effort:** Medium. ~60 minutes (hook testing with re-render scenarios).
+- Custom type ID (`custom-xyz`) calls `/api/formalization/custom` with `customSystemPrompt` and `customOutputFormat` in the body
+- Custom type with no matching definition in `customTypeDefs` returns `[type, null]`
+- Built-in type (`causal-graph`) still calls its standard route
+- `"lean"` type is filtered out (existing behavior preserved)
+- Mixed array of custom + built-in types generates all in parallel
+
+**Setup needed:** Mock `fetchApi` and `generateSemiformal` via `vi.mock("@/app/lib/formalization/api")`; provide `CustomArtifactTypeDefinition[]` fixtures.
 
 ---
 
-### 3. `useDecomposition` -- graph editing operations
+### 3. Custom artifact API route validation
 
-**Type:** Unit (hook test)
-**Priority:** P1 (High)
-**File:** `app/hooks/useDecomposition.test.ts` (new file)
-**What it verifies:** The hook correctly delegates to `graphOperations` functions, manages state transitions, and handles edge cases like deleting the selected node.
+**Type:** Unit  
+**Priority:** High  
+**File:** `app/api/formalization/custom/route.test.ts` (new file)  
+**What it verifies:** The `/api/formalization/custom` route correctly validates input and delegates to `handleArtifactRoute`.  
 **Key cases:**
-- `addGraphNode({ label: "Test" })` adds a node to `state.nodes` and returns its ID
-- `removeGraphNode(id)` removes the node and cleans up `dependsOn` references
-- `removeGraphNode(selectedNodeId)` also clears `selectedNodeId` to `null`
-- `removeGraphNode(otherId)` preserves `selectedNodeId`
-- `renameGraphNode(id, "New Label")` updates only that node's label
-- `updateNodeStatement(id, "New statement")` updates only that node's statement
-- `addGraphEdge(fromId, toId)` returns `true` and updates state when valid
-- `addGraphEdge` returns `false` and does not modify state when cycle would be created
-- `removeGraphEdge(fromId, toId)` removes the dependency
-- `updateGraphLayout(layout)` stores the layout in state
-- `resetState` with `graphLayout` restores layout into state
-- `resetState` without `graphLayout` sets it to `undefined`
-**Setup needed:** `renderHook` from `@testing-library/react`. Mock `fetchApi` via `vi.mock("@/app/lib/formalization/api")` to prevent network calls from `extractPropositions`. Use `act()` for state updates.
-**Effort:** Medium. ~45 minutes. The graph operations themselves are already tested in `graphOperations.test.ts`; these tests verify the hook's state management wrapping.
+- Returns 400 when `customSystemPrompt` is missing
+- Returns 400 when `customSystemPrompt` is not a string
+- Returns 400 when `customSystemPrompt` exceeds `MAX_SYSTEM_PROMPT_LENGTH` (10,000 chars)
+- Valid request calls `handleArtifactRoute` with correct config (systemPrompt, responseKey, parseResponse)
+- `transformBody` strips `customSystemPrompt` and `customOutputFormat` from the body before passing to `buildUserMessage`
+- `customOutputFormat: "text"` sets `parseResponse: "text"`; default/json sets `parseResponse: "json"`
+
+**Setup needed:** Mock `handleArtifactRoute` via `vi.mock("@/app/lib/formalization/artifactRoute")`; construct `NextRequest` objects with JSON bodies.
 
 ---
 
-### 4. `graphOperations` -- additional edge cases
+### 4. Design API route validation and response handling
 
-**Type:** Unit
-**Priority:** P1 (High)
-**File:** `app/lib/utils/graphOperations.test.ts` (extend existing)
-**What it verifies:** Edge cases not covered by the existing 16 tests.
+**Type:** Unit  
+**Priority:** Medium  
+**File:** `app/api/custom-type/design/route.test.ts` (new file)  
+**What it verifies:** The design route validates input, constructs the user message correctly, and handles LLM response parsing.  
 **Key cases:**
-- `addEdge` with both `fromId` and `toId` non-existent returns `null`
-- `addEdge` with only `fromId` non-existent returns `null`
-- `removeEdge` when the edge doesn't exist: returns nodes unchanged (no crash)
-- `removeNode` on a node that other nodes depend on via multiple paths: all references cleaned
-- `renameNode` with non-existent `nodeId`: returns nodes unchanged
-- `updateNodeStatement` with non-existent `nodeId`: returns nodes unchanged
-- `addNode` correctly copies `sourceId` and `sourceLabel` from input
-- `wouldCreateCycle` on a diamond graph (A->B, A->C, B->D, C->D): adding D->A detects cycle
-- Large-ish graph (10+ nodes) cycle detection terminates correctly
-- Immutability: original array is not modified by any operation
-**Setup needed:** None -- uses existing `makeNode` helper.
-**Effort:** Low. ~30 minutes (extending existing test file).
+- Returns 400 when neither `userDescription` nor `refinementInstruction` is provided
+- Constructs user message with all three parts when all provided (`userDescription`, `currentDraft`, `refinementInstruction`)
+- Returns mock definition when `usage.provider === "mock"`
+- Returns 502 when LLM response is missing `name` field
+- Returns 502 when LLM response is missing `systemPrompt` field
+- Defaults `outputFormat` to `"json"` when missing or invalid in LLM response
+- Returns 502 when LLM response is not valid JSON
+
+**Setup needed:** Mock `callLlm` via `vi.mock("@/app/lib/llm/callLlm")`; mock `stripCodeFences`.
 
 ---
 
-### 5. ProofGraph component -- context menu and edge handling
+### 5. usePanelDefinitions with custom types
 
-**Type:** Integration (component test)
-**Priority:** P2 (Medium)
-**File:** `app/components/features/proof-graph/ProofGraph.test.tsx` (new file)
-**What it verifies:** The ProofGraph component correctly wires editing callbacks and manages UI state (context menu, rename dialog).
+**Type:** Unit (hook test)  
+**Priority:** Medium  
+**File:** `app/hooks/usePanelDefinitions.test.ts` (new file)  
+**What it verifies:** Custom artifact types generate dynamic panel entries in the correct position (after built-in artifacts, before meta).  
 **Key cases:**
-- Rendering with editing callbacks enabled shows interactive controls
-- `onConnect` callback is invoked with correct `(source, target)` when ReactFlow fires `onConnect`
-- `onEdgesDelete` callback receives `[{ source, target }]` when edges are deleted
-- Context menu appears on node right-click with Rename and Delete options
-- Delete from context menu calls `onNodeDelete(nodeId)`
-- Rename from context menu opens rename dialog; submitting calls `onNodeRename(nodeId, newLabel)`
-- Rename dialog closes on Escape without calling `onNodeRename`
-- Clicking the pane closes the context menu
-- Node drag stop calls `onLayoutChange` with positions and viewport
-- Viewport pan/zoom debounces `onLayoutChange` calls (does not fire immediately)
-**Setup needed:** Mock `reactflow` module (ReactFlow, Background, Controls). The component renders ReactFlow which needs DOM measurement APIs -- full mock or `react-flow-renderer` test utilities. This is the highest-effort test in this plan.
-**Effort:** High. ~90 minutes. ReactFlow component testing requires careful mocking of the ReactFlow internals (viewport, node positions, events).
+- No custom types: panel list matches existing built-in set
+- One custom type with data: panel appears in artifacts group with "Ready" status
+- One custom type without data and not loading: panel is hidden
+- One custom type currently loading: panel appears with "Generating..." status
+- Custom type panel uses `CustomArtifactIcon` and the type's `name` as label
+
+**Setup needed:** Minimal `PanelDefsInput` fixture; `renderHook`.
+
+---
+
+### 6. CustomArtifactPanel rendering
+
+**Type:** Unit (component test)  
+**Priority:** Medium  
+**File:** `app/components/panels/CustomArtifactPanel.test.tsx` (extend existing `.test.ts`)  
+**What it verifies:** The panel correctly renders JSON and text content, handles malformed JSON gracefully.  
+**Key cases:**
+- JSON outputFormat with valid JSON string: renders sections with formatted labels
+- JSON outputFormat with malformed JSON: falls back to text display
+- Text outputFormat: renders as prose paragraph
+- Null content: renders empty message
+- Loading state: renders loading message
+- Nested JSON objects: renders recursively
+- Array JSON values: renders list with count
+
+**Setup needed:** Mock `ArtifactPanelShell` or render full component tree; provide `CustomArtifactTypeDefinition` and content fixtures.
+
+---
+
+### 7. Stale custom type cleanup in page.tsx
+
+**Type:** Integration  
+**Priority:** Medium  
+**File:** `app/page.test.tsx` (new file, or skip — see "What NOT to Test")  
+**What it verifies:** When a custom type is removed, its ID is removed from `selectedArtifactTypes` and the active panel falls back to "source".  
+**Key cases:**
+- Removing a custom type that is in `selectedArtifactTypes` filters it out
+- Removing a custom type that is the active panel resets to "source"
+- Removing a custom type that is NOT selected or active is a no-op
+
+**Setup needed:** This tests `handleDeleteCustomType` and the `useEffect` cleanup. Given the complexity of `page.tsx` dependencies, this may be better tested as part of e2e tests rather than unit tests. See "What NOT to Test" section.
+
+---
+
+### 8. formalizeNode custom type guard
+
+**Type:** Unit  
+**Priority:** Low  
+**File:** `app/lib/formalization/formalizeNode.test.ts` (new file)  
+**What it verifies:** `generateNonDeductiveArtifacts` returns null for custom type IDs (they should only be generated via `useArtifactGeneration`).  
+**Key cases:**
+- Custom type ID in the types array is skipped (returns null)
+- Built-in types still generate normally
+
+**Setup needed:** Mock `fetchApi`; this function is not exported directly, so may need to test via the exported `formalizeNode` or refactor for testability.
 
 ---
 
 ## What NOT to Test
 
-### `GraphPanel.tsx` changes
-Thin wiring layer that passes callbacks from `useDecomposition` to `ProofGraph`. The interesting logic is in the hook (test #3) and the component (test #5). Testing `GraphPanel` would duplicate coverage.
+### `page.tsx` orchestration (recommended: skip unit tests)
+The root orchestrator wires together 15+ hooks and renders 10+ panel types. Unit-testing it requires mocking the entire hook surface. The wiring logic (storing custom artifact results, passing props through) is better verified through integration/e2e tests or manual testing. The individual pieces (hooks, components) should be tested in isolation.
 
-### `ProofGraphNode.tsx`
-Not changed in this diff. Pure presentational component.
+### `CustomTypeDesigner` component (recommended: defer)
+This is a complex multi-step wizard with async API calls, controlled form state, and modal behavior. It has no pure logic worth unit-testing separately (the interesting behavior is the API interaction). If it stabilizes, snapshot tests of each step's rendered state could be valuable.
 
-### `useCausalGraphLayout.ts` changes
-Layout algorithm changes are best validated visually. The incremental positioning pattern is tested via `useGraphLayout` (test #2), which uses the same pattern.
+### `ArtifactChipSelector` / `ArtifactTypeModal` custom type rendering (recommended: low priority)
+These are presentational components. The custom type integration adds props and renders them in the same pattern as built-in types. Visual regression or e2e tests are more appropriate than unit tests.
 
-### Panel components (`CausalGraphPanel`, etc.)
-Changes are `dialecticalMap` -> `balancedPerspectives` renames and minor UI adjustments. Not worth testing -- a typo here is caught by TypeScript, and the visual result is caught by manual testing.
-
-### `workspaceStore.ts` valid-key rename
-The `dialecticalMap` -> `balancedPerspectives` rename in `coercePersistedState` is a one-liner change to an array literal. The existing `workspaceStore-hydration.test.ts` tests rehydration, and the rename is protected by the TypeScript `ArtifactKey` type.
-
-### `throttle.ts`
-New utility but not changed in this diff (it was introduced in `feat/zustand-wire-page`). Already covered in the prior test strategy review.
+### `PanelIcons` (recommended: never)
+`CustomArtifactIcon` is a static SVG component. Testing it provides no value.
 
 ---
 
 ## Coverage Gaps Beyond Current Scope
 
-These are pre-existing untested areas surfaced by analyzing the graph editing feature's integration points:
+1. **No existing API route tests anywhere in the project.** The two new routes follow the same pattern as existing routes (e.g., `formalization/causal-graph`), none of which are tested. This is a systemic gap, not specific to this branch.
 
-1. **`useDecomposition` -> `extractPropositions`** -- The LLM-based extraction path, LaTeX fast path, and PDF fast path are all untested. The graph editing operations compose on top of extraction results.
+2. **`useArtifactGeneration` has zero tests** (not just for custom types — the entire hook is untested). This is the central artifact generation dispatcher. Adding tests for the custom type branch would also cover the existing built-in logic.
 
-2. **Persistence round-trip for `decomposition.graphLayout`** -- The Zustand store persists `decomposition` (including `graphLayout`) via its `partialize` function. There is no end-to-end test verifying that graph positions survive a full persist -> rehydrate cycle through the Zustand middleware. Test #1 covers `coerceDecomposition` in isolation, but the Zustand persist path is not covered.
+3. **`useWorkspacePersistence` hook tests do not cover artifact data** (existing tests only check basic scalar fields). The `customArtifactData` round-trip tests in `workspacePersistence.test.ts` (the utility, not the hook) partially cover this.
 
-3. **`addGraphEdge` stale closure risk** -- The `useDecomposition.addGraphEdge` callback reads `state.nodes` directly (not via setState updater) to return a synchronous boolean. If React batches a state update between the read and the setState, the edge could be applied to stale state. The code has a comment acknowledging this. A concurrent-mode integration test would be needed to verify this, but is impractical with current tooling.
-
-4. **`page.tsx` orchestration** -- The root component wires `useDecomposition` graph editing methods to `ProofGraph` via `GraphPanel`. No integration test covers this wiring path end-to-end.
+4. **No e2e tests exist in the project.** The custom type workflow (describe -> design -> review -> test -> save -> generate -> view) is a multi-step flow that would benefit from a Playwright or Cypress test.
 
 ---
 
-## Implementation Order
+## Priority Summary
 
-| Order | Tests | Estimated time | Cumulative risk reduced |
-|-------|-------|---------------|------------------------|
-| 1 | #4 `graphOperations` edge cases | ~30 min | Extends already-good coverage of the core graph mutation layer |
-| 2 | #1 `coerceDecomposition` graphLayout validation | ~30 min | Protects against corrupt persisted layout data crashing on load |
-| 3 | #2 `useGraphLayout` incremental positioning | ~60 min | Covers the key new abstraction: position persistence + incremental Dagre |
-| 4 | #3 `useDecomposition` graph editing hooks | ~45 min | Verifies state management wiring for all graph editing operations |
-| 5 | #5 ProofGraph component integration | ~90 min | UI-level integration; lower priority because underlying logic is covered by #1-#4 |
-
-**Total estimated time: ~4 hours** for all recommended tests. Tests 1-3 (the first ~2 hours) cover the highest-value gaps: data integrity on load, core graph operations, and the incremental layout algorithm. Test #4 adds hook-level confidence. Test #5 is optional for this PR -- the underlying logic is well-covered by unit tests, and the component is best verified by manual testing with the ReactFlow canvas.
+| Priority | Test | Effort | Risk Reduced |
+|----------|------|--------|-------------|
+| **High** | useWorkspacePersistence custom CRUD | Low | Persistence correctness for custom types |
+| **High** | useArtifactGeneration custom routing | Medium | Correct API dispatch for custom vs built-in |
+| **High** | Custom artifact API route validation | Medium | Input validation and security boundary |
+| **Medium** | Design API route validation | Medium | LLM response handling robustness |
+| **Medium** | usePanelDefinitions with custom types | Low | Dynamic panel generation correctness |
+| **Medium** | CustomArtifactPanel rendering | Low | JSON/text display and error handling |
+| **Medium** | Stale type cleanup | High | State consistency on delete |
+| **Low** | formalizeNode guard | Low | Prevents accidental custom type in node flow |

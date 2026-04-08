@@ -1,6 +1,6 @@
 # Code Review Rubric
 
-**Scope:** `feat/graph-persistence-editing` vs `feat/zustand-wire-page` (PR #109, 87 files, +6376/-1827) | **Reviewed:** 2026-04-03 (Loop 2) | **Status: ✅ PASSES REVIEW**
+**Scope:** `feat/custom-artifact-types` vs `main` — 23 files, +1434/-193 | **Reviewed:** 2026-04-07 | **Status: ✅ PASSES REVIEW**
 
 ---
 
@@ -20,9 +20,12 @@ Issues that must be fixed or acknowledged by the author with justification for w
 
 | # | Finding | Domain | Source | Status | Author note |
 |---|---|---|---|---|---|
-| A1 | `addGraphEdge` reads `state.nodes` from closure instead of `setState` updater — stale state risk for cycle detection on rapid successive calls | Correctness / API consistency | Security + Performance + API Consistency + Tech Debt (4-way convergence, escalated from 🟢) | ✅ Fixed | Uses `nodesRef` pattern; verified by all 3 core critics in Loop 2 |
-| A2 | Streaming path in `handleArtifactRoute` calls `streamLlm()` without `responseFormat`, bypassing JSON schema constraint that non-streaming path enforces | API Consistency | API Consistency | ✅ Acknowledged | Documented with comment explaining design tradeoff (streaming relies on system prompt for JSON shape; batch path uses responseFormat as extra safety net) |
-| A3 | No request body size limits on API routes — potential for memory exhaustion via large POST bodies | Security | Security (pre-existing, carried over from prior review) | 🟡 Acknowledged | Pre-existing cross-cutting concern affecting all routes; not in scope for this graph-editing PR. Tracked for future middleware-level fix. |
+| A1 | `usePanelDefinitions` invalidated on every loading state change — passing unstable `artifactLoadingState` object breaks granular memo deps | Performance | Performance reviewer | ✅ Fixed | Derived stable `customLoadingKey` string instead of passing whole object |
+| A2 | `renderPanel` useCallback has excessive dependency array — `customArtifactData` and `customArtifactTypes` are unstable refs that cause re-render cascade | Performance | Performance reviewer | ✅ Fixed | Moved to refs (`customArtifactTypesRef`, `customArtifactDataRef`) |
+| A3 | CustomTypeDesigner action buttons trapped inside scroll container — buttons scroll out of view at 1366x768 on review step | UI Layout | UI visual reviewer | ✅ Fixed | Split modal into pinned header + scrollable body + pinned footer |
+| A4 | `persistence.ts:32` comment says "added in v2" but `WORKSPACE_VERSION` was already 2 and wasn't bumped — misleading version history | Fact-check + API Consistency | Fact-check (Incorrect, high confidence) + API consistency | ✅ Fixed | Changed to "optional, backward-compatible addition to v2" |
+| A5 | `customArtifact.ts:7` references "cross-session library" that doesn't exist — sets incorrect expectations | Fact-check + API Consistency | Fact-check (Unverifiable) + API consistency | ✅ Fixed | Removed cross-session library reference |
+| A6 | Design route (`/api/custom-type/design`) duplicates `handleArtifactRoute` patterns instead of reusing shared infrastructure | API Consistency | API consistency reviewer | ✅ Fixed | Added comment documenting why it diverges (different semantics) |
 
 ---
 
@@ -32,25 +35,26 @@ Advisory findings from contextual critics, single-critic suggestions, and improv
 
 | # | Finding | Source |
 |---|---|---|
-| C1 | `useGraphLayout` incremental positioning has zero tests — highest-risk untested new abstraction | Test Strategy |
-| C2 | `coerceDecomposition` graphLayout validation untested — protects against corrupt persisted data | Test Strategy |
-| C3 | Auto-save dirty check does full `structuredClone` + `JSON.stringify` every 5s even when nothing changed — a generation counter would make this O(1) | Performance |
-| C4 | `useCausalGraphLayout` rebuilds all node/edge arrays on every streaming tick (~20/sec) even when graph structure hasn't changed | Performance |
-| C5 | `addEdge` JSDoc documents 2 of 3 rejection conditions — missing "non-existent nodes" case | API Consistency / Fact-check |
-| C6 | `wouldCreateCycle` comment reverses DFS direction description — logic correct, English misleading | Fact-check |
-| C7 | `page.tsx` now 860 lines with 28-item dep array in `renderPanel` — continued growth of orchestrator | Tech Debt |
-| C8 | `GraphPanel` at 17 props (7 new) — prop threading strain | Tech Debt |
-| C9 | `streamLlm`/`callLlm` duplicate provider chain logic | Tech Debt |
-| C10 | Two near-identical incremental Dagre layout hooks (`useCausalGraphLayout`, `useGraphLayout`) | Tech Debt |
-| C11 | Incomplete dialectical-map → balanced-perspectives rename (string literals in onboarding + API prompt) | Tech Debt |
-| C12 | Dead `useAllArtifactEditing` export (~45 lines) | Tech Debt |
-| C13 | Dead `saveWorkspace` function (replaced by Zustand persistence) | API Consistency / Tech Debt |
-| C14 | `docs/decisions/006-zustand-state-management.md` heading says "005" instead of "006" | Fact-check |
-| C15 | `docs/decisions/005-streaming-api-responses.md` claims wait-time code "can be removed" but it's still used in 11 files | Fact-check |
-| C16 | Full artifact JSON sent to DeepSeek for section edits — implicit data flow to third-party provider | Security |
-| C17 | LLM response content (up to 500 chars) leaked in 502 error responses | Security |
-| C18 | `data/analytics.jsonl` committed to branch history | Security |
-| C19 | Lean route lacks input validation (pre-existing, widened by streaming addition) | API Consistency |
+| C1 | User-controlled system prompt becomes a prompt injection vector if workspace sharing is ever added — document the trust assumption | Security |
+| C2 | LLM-generated type definitions pass through a two-hop chain without content validation — user review step mitigates | Security |
+| C3 | No rate limiting on LLM-calling API routes (pre-existing gap, not introduced by this PR) | Security |
+| C4 | Double JSON parse in custom route via `request.clone()` — unnecessary serialization cost (cold path) | Performance |
+| C5 | Orphaned `customArtifactData` keys accumulate in localStorage when types are deleted then snapshots restored | Performance |
+| C6 | Custom route uses generic `"result"` response key, breaking naming symmetry with built-in routes | API Consistency |
+| C7 | `isCustomType("custom-")` matches empty suffix — minor robustness gap | API Consistency |
+| C8 | `customArtifactData` split across `artifacts` and top-level in persistence — asymmetric structure | API Consistency |
+| C9 | `ARTIFACT_RESPONSE_KEY` comment says "kebab-case -> camelCase" but `semiformal->proof` and `lean->leanCode` aren't case conversions | Fact-check (Mostly Accurate) |
+| C10 | `formatLabel` docstring says "camelCase or snake_case" but also handles kebab-case | Fact-check (Mostly Accurate) |
+| C11 | ArtifactTypeModal header scrolls away with many custom types (pre-existing, worsened) | UI Visual |
+| C12 | `CustomArtifactIcon` SVG paths exceed 20x20 viewBox — may clip | UI Visual |
+| C13 | Recursive `JsonSection` has no depth guard for deeply nested LLM output | UI Visual |
+| C14 | `page.tsx` god component (780 lines, 57+ memo deps) — highest carrying-cost tech debt item, approaching tipping point | Tech Debt Triage |
+| C15 | `useWorkspacePersistence` monolith (327 lines, 25+ exports) — related to C14, should be split alongside | Tech Debt Triage |
+| C16 | Custom types silently skip node-level formalization with no UI indication | Tech Debt Triage |
+| C17 | No system prompt sanitization beyond length check — acceptable for single-user tool, flag when sharing is added | Tech Debt Triage |
+| C18 | High-priority test gaps: `useWorkspacePersistence` CRUD, `useArtifactGeneration` custom routing, custom API route validation | Test Strategy |
+| C19 | Medium-priority test gaps: design API route, `usePanelDefinitions` with custom types, `CustomArtifactPanel` rendering | Test Strategy |
+| C20 | Systemic gap: no API route tests exist anywhere in the project | Test Strategy |
 
 ---
 
@@ -60,15 +64,22 @@ Patterns, implementations, or claims confirmed correct by fact-check and/or crit
 
 | Item | Verdict | Source |
 |---|---|---|
-| Pure graph operations in `graphOperations.ts` — immutable, testable, with cycle detection | ✅ Confirmed | Fact-check + Security + API Consistency |
-| Incremental Dagre layout — only new nodes trigger re-layout | ✅ Confirmed | Fact-check + Performance |
-| Debounced viewport persistence (300ms) avoids excessive writes | ✅ Confirmed | Performance |
-| `coerceDecomposition` graphLayout validation follows established patterns | ✅ Confirmed | Security |
-| Zustand persist middleware with SSR safety (`skipHydration: true`) | ✅ Confirmed | Fact-check (5 verified claims) |
-| Throttle utility trailing-edge delivery works correctly | ✅ Confirmed | Fact-check + Performance (prior false positive corrected) |
-| `partialize` excludes action functions from persistence | ✅ Confirmed | Fact-check |
-| Verification status sanitized on persistence to prevent stuck loading state | ✅ Confirmed | Fact-check |
-| All dependency upgrades are safe patch/minor bumps | ✅ Confirmed | Dependency Upgrade |
+| Type system extension (`BuiltinArtifactType \| CustomArtifactTypeId`) is clean and well-designed | ✅ Confirmed | API Consistency, Performance |
+| `custom-` prefix convention with `isCustomType` guard prevents type confusion | ✅ Confirmed | Fact-check, Security |
+| Custom formalization route correctly reuses `handleArtifactRoute` | ✅ Confirmed | API Consistency |
+| Persistence is backward-compatible — optional fields with `?? []`/`?? {}` defaults | ✅ Confirmed | Fact-check, API Consistency |
+| `isValidCustomTypeDef` defensive validation on localStorage load | ✅ Confirmed | Security, Performance |
+| No XSS vectors — React auto-escaping, no `dangerouslySetInnerHTML` | ✅ Confirmed | Security |
+| `MAX_SYSTEM_PROMPT_LENGTH` guard (10,000 chars) on custom route | ✅ Confirmed | Security, Performance |
+| `transformBody` strips custom fields before `buildUserMessage` | ✅ Confirmed | Security |
+| Parallel generation via `Promise.allSettled` — no sequential bottleneck | ✅ Confirmed | Performance |
+| Stale selection cleanup via `useEffect` on `customArtifactTypes` | ✅ Confirmed | API Consistency, Performance |
+| `updateCustomArtifactType` clears stale data when system prompt changes | ✅ Confirmed | Performance |
+| `ARTIFACT_META` keyed by `BuiltinArtifactType` with entry for every member | ✅ Confirmed | Fact-check |
+| `SELECTABLE_ARTIFACT_TYPES` correctly excludes `lean` (deductive pipeline only) | ✅ Confirmed | Fact-check |
+| `ARTIFACT_ROUTE` is `Partial<Record>` — semiformal and lean correctly absent | ✅ Confirmed | Fact-check |
+| Request cloning in custom route handles body stream correctly | ✅ Confirmed | Security, Fact-check |
+| Custom types return `null` from `formalizeNode` (intentional scope boundary) | ✅ Confirmed | Fact-check |
 
 ---
 

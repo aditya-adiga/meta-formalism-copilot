@@ -1,9 +1,10 @@
 "use client";
 
 import type { PropositionNode, NodeVerificationStatus, NodeArtifact } from "@/app/lib/types/decomposition";
-import type { ArtifactType } from "@/app/lib/types/session";
+import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import { ARTIFACT_META } from "@/app/lib/types/artifacts";
+import { isCustomType } from "@/app/lib/types/customArtifact";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
 
 type NodeDetailPanelProps = {
@@ -29,7 +30,7 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
 
 /** Renders a single non-deductive artifact stored on a node */
 function NodeArtifactSection({ artifact }: { artifact: NodeArtifact }) {
-  const meta = ARTIFACT_META[artifact.type];
+  const meta = isCustomType(artifact.type) ? null : ARTIFACT_META[artifact.type as BuiltinArtifactType];
   // Try to pretty-print JSON content; fall back to raw string
   let display: string;
   try {
@@ -43,7 +44,7 @@ function NodeArtifactSection({ artifact }: { artifact: NodeArtifact }) {
     <section>
       <div className="mb-1 flex items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-          {meta.label}
+          {meta?.label ?? artifact.type}
         </h3>
         {artifact.verificationStatus !== "unverified" && (
           <span

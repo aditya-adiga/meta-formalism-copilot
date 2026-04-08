@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import type { PanelDef, PanelId } from "@/app/lib/types/panels";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
+import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import {
   SourceIcon,
   SemiformalIcon,
@@ -14,6 +16,7 @@ import {
   BalancedPerspectivesIcon,
   AnalyticsIcon,
   CounterexamplesIcon,
+  CustomArtifactIcon,
 } from "@/app/components/ui/icons/PanelIcons";
 
 type PanelDefsInput = {
@@ -37,6 +40,9 @@ type PanelDefsInput = {
   balancedPerspectivesLoading?: boolean;
   hasCounterexamples?: boolean;
   counterexamplesLoading?: boolean;
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  customArtifactData?: Record<string, string>;
+  artifactLoadingState?: ArtifactLoadingState;
 };
 
 export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
@@ -50,6 +56,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     hasPropertyTests, propertyTestsLoading,
     hasBalancedPerspectives, balancedPerspectivesLoading,
     hasCounterexamples, counterexamplesLoading,
+    customArtifactTypes, customArtifactData, artifactLoadingState,
   } = opts;
 
   const hasDecomp = nodes.length > 0;
@@ -156,6 +163,19 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       statusSummary: counterexamplesLoading ? "Generating..." : hasCounterexamples ? "Counterexamples ready" : "No counterexamples yet",
       hidden: !hasCounterexamples && !counterexamplesLoading,
     },
+    // --- Custom artifact types ---
+    ...(customArtifactTypes ?? []).map((ct): PanelDef => {
+      const hasContent = !!(customArtifactData?.[ct.id]);
+      const isLoading = artifactLoadingState?.[ct.id] === "generating";
+      return {
+        id: ct.id as PanelId,
+        label: ct.name,
+        icon: <CustomArtifactIcon />,
+        group: "artifacts" as const,
+        statusSummary: isLoading ? "Generating..." : hasContent ? "Ready" : "Not generated",
+        hidden: !hasContent && !isLoading,
+      };
+    }),
     // --- Meta group ---
     {
       id: "analytics" as PanelId,
@@ -170,5 +190,6 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,
       hasBalancedPerspectives, balancedPerspectivesLoading,
-      hasCounterexamples, counterexamplesLoading]);
+      hasCounterexamples, counterexamplesLoading,
+      customArtifactTypes, customArtifactData, artifactLoadingState]);
 }

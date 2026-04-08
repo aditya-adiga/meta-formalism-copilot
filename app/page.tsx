@@ -19,6 +19,7 @@ import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
+import CustomArtifactPanel from "@/app/components/panels/CustomArtifactPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
@@ -37,6 +38,8 @@ import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
+import { isCustomType } from "@/app/lib/types/customArtifact";
+import type { CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 
 // Stable selectors for artifact content — read from the state snapshot `s`
 // (not `get()`) so Zustand can track dependencies and skip re-renders when
@@ -109,6 +112,14 @@ export default function Home() {
   const setSemiformalDirty = useWorkspaceStore((s) => s.setSemiformalDirty);
   const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
   const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
+
+  // Custom artifact types
+  const customArtifactTypes = useWorkspaceStore((s) => s.customArtifactTypes);
+  const customArtifactData = useWorkspaceStore((s) => s.customArtifactData);
+  const addCustomArtifactType = useWorkspaceStore((s) => s.addCustomArtifactType);
+  const updateCustomArtifactType = useWorkspaceStore((s) => s.updateCustomArtifactType);
+  const removeCustomArtifactType = useWorkspaceStore((s) => s.removeCustomArtifactType);
+  const setCustomArtifactContent = useWorkspaceStore((s) => s.setCustomArtifactContent);
 
   // Decomposition persistence bridge
   const persistDecompState = useCallback((d: PersistedDecomposition) => {
@@ -223,6 +234,22 @@ export default function Home() {
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
 
+  // Filter out stale custom type IDs when custom types are removed
+  useEffect(() => {
+    setSelectedArtifactTypes((prev) => {
+      const filtered = prev.filter(
+        (t) => !isCustomType(t) || customArtifactTypes.some((ct) => ct.id === t),
+      );
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [customArtifactTypes]);
+
+  /** Delete a custom type and clean up related state */
+  const handleDeleteCustomType = useCallback((id: string) => {
+    removeCustomArtifactType(id as CustomArtifactTypeId);
+    if (activePanelId === id) setActivePanelIdRaw("source");
+  }, [removeCustomArtifactType, activePanelId]);
+
   // --- Analytics ---
   const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
 
@@ -320,17 +347,21 @@ export default function Home() {
 
     // Restore artifact data from session's artifacts[]
     for (const artifact of session.artifacts) {
-      switch (artifact.type) {
-        case "causal-graph":
-        case "statistical-model":
-        case "property-tests":
-        case "balanced-perspectives":
-        case "counterexamples":
-          useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
-          break;
+      if (isCustomType(artifact.type)) {
+        setCustomArtifactContent(artifact.type as CustomArtifactTypeId, artifact.content);
+      } else {
+        switch (artifact.type) {
+          case "causal-graph":
+          case "statistical-model":
+          case "property-tests":
+          case "balanced-perspectives":
+          case "counterexamples":
+            useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
+            break;
+        }
       }
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setCustomArtifactContent]);
 
   const {
     activeSession,
@@ -389,7 +420,15 @@ export default function Home() {
     if (entries.length > 0) {
       useWorkspaceStore.getState().setArtifactsBatchGenerated(entries, provenance);
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes]);
+
+    // Custom artifact types
+    for (const [type, value] of Object.entries(results)) {
+      if (isCustomType(type) && value != null) {
+        const content = typeof value === "string" ? value : JSON.stringify(value);
+        setCustomArtifactContent(type as CustomArtifactTypeId, content);
+      }
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setCustomArtifactContent]);
 
   // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
   const {
@@ -584,14 +623,14 @@ export default function Home() {
           })
         : Promise.resolve(),
       nonSemiformalTypes.length > 0
-        ? generateArtifacts(nonSemiformalTypes, request)
+        ? generateArtifacts(nonSemiformalTypes, request, customArtifactTypes)
         : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
     ]);
 
     if (artifactResults) {
       storeArtifactResults(artifactResults, nodeId, provenance);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId, setSemiformalProvenance]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId, setSemiformalProvenance, customArtifactTypes]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -693,6 +732,9 @@ export default function Home() {
     balancedPerspectivesLoading,
     hasCounterexamples: counterexamples !== null,
     counterexamplesLoading,
+    customArtifactTypes,
+    customArtifactData,
+    artifactLoadingState,
   });
 
   // --- Export All handler ---
@@ -756,6 +798,10 @@ export default function Home() {
             onArtifactTypesChange={setSelectedArtifactTypes}
             loadingState={artifactLoadingState}
             waitEstimate={waitEstimate}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={addCustomArtifactType}
+            onEditCustomType={(def) => updateCustomArtifactType(def.id, def)}
+            onDeleteCustomType={handleDeleteCustomType}
           />
         );
       case "semiformal":
@@ -882,8 +928,18 @@ export default function Home() {
         );
       case "analytics":
         return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
-      default:
+      default: {
+        // Custom artifact type panels
+        if (isCustomType(panelId)) {
+          const def = customArtifactTypes.find((ct) => ct.id === panelId);
+          const content = customArtifactData[panelId] ?? null;
+          const isLoading = artifactLoadingState[panelId] === "generating";
+          if (def) {
+            return <CustomArtifactPanel definition={def} content={content} loading={isLoading} />;
+          }
+        }
         return undefined;
+      }
     }
   }, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
@@ -908,6 +964,8 @@ export default function Home() {
     waitEstimate,
     addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
     streamingNodes,
+    customArtifactTypes, customArtifactData,
+    addCustomArtifactType, updateCustomArtifactType, handleDeleteCustomType,
   ]);
 
   return (

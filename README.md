@@ -31,6 +31,7 @@ The interface is a **multi-panel workspace** with sidebar navigation. You move b
 - **Statistical Model** — Variables with roles, hypotheses, assumptions, and sample requirements.
 - **Property Tests** — Invariants with preconditions, postconditions, and pseudocode generators.
 - **Balanced Perspectives** — Competing perspectives, tensions, and proposed synthesis.
+- **Custom Artifact Types** — Define your own artifact types with custom system prompts. An LLM-assisted designer helps you create the prompt, and the result is generated through a generic formalization route.
 
 **Meta:**
 - **Analytics Panel** — Logs of all API calls and summary statistics.

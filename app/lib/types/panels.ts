@@ -1,3 +1,5 @@
+import type { CustomArtifactTypeId } from "./customArtifact";
+
 export type PanelId =
   | "source"
   | "context"
@@ -10,7 +12,8 @@ export type PanelId =
   | "property-tests"
   | "balanced-perspectives"
   | "counterexamples"
-  | "analytics";
+  | "analytics"
+  | CustomArtifactTypeId;
 
 export type PanelGroup = "navigation" | "artifacts" | "meta";
 

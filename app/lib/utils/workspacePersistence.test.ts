@@ -5,6 +5,7 @@ import {
   saveWorkspace,
   loadWorkspace,
   migrateV1Workspace,
+  isValidCustomTypeDef,
 } from "./workspacePersistence";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
@@ -276,5 +277,123 @@ describe("migrateV1Workspace", () => {
     expect(result.sourceText).toBe("from-v1");
     expect(result.contextText).toBe("ctx");
     expect(localStorage.getItem(LEGACY_WORKSPACE_KEY)).toBeNull();
+  });
+});
+
+// --- isValidCustomTypeDef ---
+
+describe("isValidCustomTypeDef", () => {
+  const validDef = {
+    id: "custom-abc123",
+    name: "Test Type",
+    chipLabel: "Test",
+    description: "A test type",
+    whenToUse: "When testing",
+    systemPrompt: "You are a test analyzer.",
+    outputFormat: "json",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  };
+
+  it("returns true for a valid definition", () => {
+    expect(isValidCustomTypeDef(validDef)).toBe(true);
+  });
+
+  it("returns true for text outputFormat", () => {
+    expect(isValidCustomTypeDef({ ...validDef, outputFormat: "text" })).toBe(true);
+  });
+
+  it("returns false for non-objects", () => {
+    expect(isValidCustomTypeDef(null)).toBe(false);
+    expect(isValidCustomTypeDef("string")).toBe(false);
+    expect(isValidCustomTypeDef(42)).toBe(false);
+    expect(isValidCustomTypeDef([])).toBe(false);
+  });
+
+  it("returns false when id does not start with 'custom-'", () => {
+    expect(isValidCustomTypeDef({ ...validDef, id: "not-custom" })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, id: "" })).toBe(false);
+  });
+
+  it("returns false when name is missing or empty", () => {
+    expect(isValidCustomTypeDef({ ...validDef, name: "" })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, name: 123 })).toBe(false);
+  });
+
+  it("returns false when chipLabel is missing or empty", () => {
+    expect(isValidCustomTypeDef({ ...validDef, chipLabel: "" })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, chipLabel: undefined })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, chipLabel: 42 })).toBe(false);
+  });
+
+  it("returns false when systemPrompt is missing or empty", () => {
+    expect(isValidCustomTypeDef({ ...validDef, systemPrompt: "" })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, systemPrompt: undefined })).toBe(false);
+  });
+
+  it("returns false when outputFormat is invalid", () => {
+    expect(isValidCustomTypeDef({ ...validDef, outputFormat: "xml" })).toBe(false);
+    expect(isValidCustomTypeDef({ ...validDef, outputFormat: undefined })).toBe(false);
+  });
+});
+
+// --- Custom artifact data persistence ---
+
+describe("custom artifact type persistence", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("round-trips custom type definitions through save/load", () => {
+    const customType = {
+      id: "custom-test1" as const,
+      name: "Test Type",
+      chipLabel: "Test",
+      description: "desc",
+      whenToUse: "when",
+      systemPrompt: "prompt",
+      outputFormat: "json" as const,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+
+    saveWorkspace({
+      sourceText: "", extractedFiles: [], contextText: "",
+      semiformalText: "", leanCode: "", semiformalDirty: false,
+      verificationStatus: "none", verificationErrors: "",
+      decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
+      customArtifactTypes: [customType],
+      artifacts: { causalGraph: null, statisticalModel: null, propertyTests: null, balancedPerspectives: null, counterexamples: null, customArtifactData: { "custom-test1": '{"result":"ok"}' } },
+    });
+
+    const result = loadWorkspace()!;
+    expect(result).not.toBeNull();
+    expect(result.customArtifactTypes).toHaveLength(1);
+    expect(result.customArtifactTypes![0].id).toBe("custom-test1");
+    expect(result.customArtifactTypes![0].name).toBe("Test Type");
+    expect(result.customArtifactData!["custom-test1"]).toBe('{"result":"ok"}');
+  });
+
+  it("loads correctly when custom fields are missing (backward compat)", () => {
+    localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ version: 2 }));
+    const result = loadWorkspace()!;
+    expect(result.customArtifactTypes).toEqual([]);
+    expect(result.customArtifactData).toEqual({});
+  });
+
+  it("filters out invalid custom type definitions on load", () => {
+    const data = {
+      version: 2,
+      customArtifactTypes: [
+        { id: "custom-good", name: "Good", chipLabel: "Good", systemPrompt: "prompt", outputFormat: "json" },
+        { id: "bad-id", name: "Bad", systemPrompt: "prompt", outputFormat: "json" },
+        { id: "custom-noname", name: "", systemPrompt: "prompt", outputFormat: "json" },
+        "not-an-object",
+      ],
+    };
+    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(data));
+    const result = loadWorkspace()!;
+    expect(result.customArtifactTypes).toHaveLength(1);
+    expect(result.customArtifactTypes![0].id).toBe("custom-good");
   });
 });
