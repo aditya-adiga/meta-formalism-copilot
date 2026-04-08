@@ -94,8 +94,10 @@ export function useDecomposition() {
       const onToken = throttle((accumulated: string) => {
         try {
           const partial = parsePartialJson(stripLeadingCodeFence(accumulated));
-          if (Array.isArray(partial) && partial.length > 0) {
-            setStreamingNodes(toPropositionNodes(partial, labelMap));
+          // Support both bare array and wrapped { propositions: [...] } formats
+          const items = Array.isArray(partial) ? partial : partial?.propositions;
+          if (Array.isArray(items) && items.length > 0) {
+            setStreamingNodes(toPropositionNodes(items, labelMap));
           }
         } catch {
           // partial-json parse failed — wait for more tokens
@@ -108,8 +110,9 @@ export function useDecomposition() {
         { onToken },
       );
 
-      // Parse the final complete JSON
-      const propositions = JSON.parse(stripCodeFences(finalText));
+      // Parse the final complete JSON — support both bare array and wrapped { propositions: [...] }
+      const parsed = JSON.parse(stripCodeFences(finalText));
+      const propositions = Array.isArray(parsed) ? parsed : parsed.propositions;
       const nodes = toPropositionNodes(propositions, labelMap);
 
       setState((prev) => ({ ...prev, nodes, extractionStatus: "done" }));
