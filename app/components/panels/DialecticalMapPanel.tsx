@@ -11,11 +11,11 @@ type DialecticalMapPanelProps = {
 export default function DialecticalMapPanel({ dialecticalMap, loading }: DialecticalMapPanelProps) {
   return (
     <ArtifactPanelShell
-      title="Dialectical Map"
+      title="Balanced Perspectives"
       loading={loading}
       hasData={dialecticalMap !== null}
-      emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
-      loadingMessage="Generating dialectical map..."
+      emptyMessage="No balanced perspectives yet. Generate them from the Source panel or component detail."
+      loadingMessage="Generating balanced perspectives..."
     >
       {dialecticalMap && (
         <>
@@ -58,7 +58,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
 
                   {p.vulnerabilities.length > 0 && (
                     <div>
-                      <span className="text-xs font-semibold text-amber-700">Vulnerabilities:</span>
+                      <span className="text-xs font-semibold text-amber-700">Weaknesses:</span>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5">
                         {p.vulnerabilities.map((v, i) => (
                           <li key={i} className="text-xs text-amber-700">{v}</li>
@@ -94,7 +94,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
 
           {/* Synthesis */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Synthesis</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Proposed Resolution</h3>
             <div className="rounded border border-green-200 bg-green-50 px-3 py-2 space-y-2">
               <p className="text-sm text-green-900">{dialecticalMap.synthesis.equilibrium}</p>
               {dialecticalMap.synthesis.howAddressed.length > 0 && (

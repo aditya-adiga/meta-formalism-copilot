@@ -67,13 +67,13 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
       {/* Scrollable content */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-auto p-6">
         <p className="text-sm text-[#6B6560]">
-          Describe the theoretical direction, domain, or framework for formalizing your insight
+          Describe the angle, topic area, or approach you want the AI to use when analyzing your input
         </p>
         <textarea
           id="context-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g., Explore this in the context of decision theory within game-theoretic settings..."
+          placeholder="e.g., Analyze this from a decision-making perspective, considering strategic interactions between actors..."
           rows={10}
           className="min-h-0 flex-1 resize-none rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-md transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-lg"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
@@ -103,9 +103,9 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
           <span className="relative">
             {loading
               ? waitEstimate
-                ? `Formalising... ${waitEstimate.remainingLabel}`
-                : "Formalising..."
-              : "Formalise"}
+                ? `Generating... ${waitEstimate.remainingLabel}`
+                : "Generating..."
+              : "Generate"}
           </span>
         </button>
       </div>
