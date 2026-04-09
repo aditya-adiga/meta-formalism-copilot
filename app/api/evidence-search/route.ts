@@ -91,8 +91,11 @@ async function searchOpenAlex(query: string): Promise<OpenAlexWork[]> {
   const timeout = setTimeout(() => controller.abort(), OPENALEX_TIMEOUT_MS);
 
   try {
+    // Use title_and_abstract.search instead of the general search= parameter.
+    // The general search does full-text matching which returns highly-cited but
+    // irrelevant papers that happen to mention common words in their body text.
     const url = new URL(OPENALEX_API_URL);
-    url.searchParams.set("search", query);
+    url.searchParams.set("filter", `title_and_abstract.search:${query}`);
     url.searchParams.set("per_page", String(PER_QUERY_RESULTS));
     url.searchParams.set("mailto", OPENALEX_MAILTO);
 
