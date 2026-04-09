@@ -11,11 +11,11 @@ type PropertyTestsPanelProps = {
 export default function PropertyTestsPanel({ propertyTests, loading }: PropertyTestsPanelProps) {
   return (
     <ArtifactPanelShell
-      title="Property Tests"
+      title="Consistency Checks"
       loading={loading}
       hasData={propertyTests !== null}
-      emptyMessage="No property tests yet. Generate them from the source panel or node detail."
-      loadingMessage="Generating property tests..."
+      emptyMessage="No consistency checks yet. Generate them from the Source panel or component detail."
+      loadingMessage="Generating consistency checks..."
     >
       {propertyTests && (
         <>
@@ -28,7 +28,7 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
           {/* Properties */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Properties ({propertyTests.properties.length})
+              Rules ({propertyTests.properties.length})
             </h3>
             <div className="space-y-3">
               {propertyTests.properties.map((p) => (
@@ -39,10 +39,10 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
                   </div>
                   <p className="text-xs text-[#6B6560]">{p.description}</p>
                   <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Pre:</span> {p.preconditions}
+                    <span className="font-semibold">Requires:</span> {p.preconditions}
                   </div>
                   <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Post:</span> {p.postcondition}
+                    <span className="font-semibold">Guarantees:</span> {p.postcondition}
                   </div>
                   <pre className="rounded bg-[#F5F1ED] px-3 py-2 text-xs font-mono text-[var(--ink-black)] overflow-x-auto whitespace-pre-wrap">
                     {p.pseudocode}
@@ -56,7 +56,7 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
           {propertyTests.dataGenerators.length > 0 && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Data Generators ({propertyTests.dataGenerators.length})
+                Test Data ({propertyTests.dataGenerators.length})
               </h3>
               <div className="space-y-2">
                 {propertyTests.dataGenerators.map((g, i) => (

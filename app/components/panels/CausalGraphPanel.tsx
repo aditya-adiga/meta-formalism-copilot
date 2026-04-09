@@ -37,7 +37,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {/* Variables */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Variables ({causalGraph.variables.length})
+          Factors ({causalGraph.variables.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.variables.map((v) => (
@@ -55,7 +55,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {/* Edges */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Causal Edges ({causalGraph.edges.length})
+          Relationships ({causalGraph.edges.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
@@ -76,7 +76,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {causalGraph.confounders.length > 0 && (
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-            Confounders ({causalGraph.confounders.length})
+            Hidden Factors ({causalGraph.confounders.length})
           </h3>
           <div className="space-y-2">
             {causalGraph.confounders.map((c) => (
@@ -99,11 +99,11 @@ export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }:
 
   return (
     <ArtifactPanelShell
-      title="Causal Graph"
+      title="Cause & Effect Map"
       loading={loading}
       hasData={causalGraph !== null}
-      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      emptyMessage="No cause & effect map yet. Generate one from the Source panel or component detail."
+      loadingMessage={`Generating cause & effect map...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
     >
       {causalGraph && (
         <div className="flex flex-col h-full">
