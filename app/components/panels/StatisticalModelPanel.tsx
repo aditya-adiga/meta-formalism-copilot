@@ -46,7 +46,7 @@ export default function StatisticalModelPanel({
       title="Statistical Model"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No statistical model yet. Generate one from the source panel or node detail."
+      emptyMessage="No statistical model yet. Generate one from the Source panel or component detail."
       loadingMessage="Generating statistical model..."
       onAiEdit={onAiEdit}
       editing={editing}
@@ -68,7 +68,7 @@ export default function StatisticalModelPanel({
           {(displayModel.variables?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Variables ({displayModel.variables.length})
+              Factors ({displayModel.variables.length})
             </h3>
             <div className="space-y-2">
               {displayModel.variables.map((v, i) => (
@@ -93,7 +93,7 @@ export default function StatisticalModelPanel({
           {(displayModel.hypotheses?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Hypotheses ({displayModel.hypotheses.length})
+              Predictions ({displayModel.hypotheses.length})
             </h3>
             <div className="space-y-2">
               {displayModel.hypotheses.map((h, i) => (
@@ -101,10 +101,10 @@ export default function StatisticalModelPanel({
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <p className="text-sm font-medium text-[var(--ink-black)]">{h.statement}</p>
                     <p className="mt-1 text-xs text-[#6B6560]">
-                      <span className="font-semibold">H₀:</span> {h.nullHypothesis}
+                      <span className="font-semibold">Baseline assumption:</span> {h.nullHypothesis}
                     </p>
                     <p className="mt-1 text-xs text-[#9A9590]">
-                      <span className="font-semibold">Test:</span> {h.testSuggestion}
+                      <span className="font-semibold">Suggested test:</span> {h.testSuggestion}
                     </p>
                   </div>
                 </EditableSection>
@@ -133,7 +133,7 @@ export default function StatisticalModelPanel({
           {displayModel.sampleRequirements && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Sample Requirements
+                Data Needed
               </h3>
               <EditableSection value={displayModel.sampleRequirements} onChange={(v) => updateField("sampleRequirements", v)}>
                 <p className="text-sm text-[var(--ink-black)] leading-relaxed">
