@@ -144,7 +144,7 @@ export default function NodeDetailPanel({
             {node.verificationErrors && (
               <section>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-800">
-                  Checking Errors
+                  Errors Found
                 </h3>
                 <pre className="rounded-md border border-red-300 bg-red-50 px-4 py-3 font-mono text-xs leading-relaxed text-red-700 whitespace-pre-wrap">
                   {node.verificationErrors}
