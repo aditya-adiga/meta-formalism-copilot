@@ -53,7 +53,7 @@ export default function ProofGraph({
   onNodeDelete,
   onNodeRename,
 }: ProofGraphProps) {
-  const { nodes, edges, updateNodePosition, getPositions } = useGraphLayout(
+  const { nodes, edges, onNodesChange, updateNodePosition, getPositions } = useGraphLayout(
     propositions,
     initialPositions,
   );
@@ -173,6 +173,7 @@ export default function ProofGraph({
 
   const editable = !!(onConnectProp || onEdgesDeleteProp || onNodeDelete);
 
+  // Inject selection state and source colors into node data
   const finalNodes = useMemo(
     () => nodes.map((n) => ({
       ...n,
@@ -192,6 +193,7 @@ export default function ProofGraph({
         nodes={finalNodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
         onNodeClick={handleNodeClick}
         onNodeDragStop={handleNodeDragStop}
         onMoveEnd={handleMoveEnd}
