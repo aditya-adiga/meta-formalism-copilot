@@ -5,6 +5,7 @@ import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
+import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -82,6 +83,11 @@ export default function StatisticalModelPanel({
                     {v.distribution && (
                       <p className="mt-1 text-xs text-[#6B6560]">Distribution: {v.distribution}</p>
                     )}
+                    <FindEvidenceButton
+                      artifactType="statistical-model"
+                      elementId={v.id}
+                      elementContent={`${v.label} (${v.role})${v.distribution ? ` — ${v.distribution}` : ""}`}
+                    />
                   </div>
                 </EditableSection>
               ))}
@@ -106,6 +112,11 @@ export default function StatisticalModelPanel({
                     <p className="mt-1 text-xs text-[#9A9590]">
                       <span className="font-semibold">Test:</span> {h.testSuggestion}
                     </p>
+                    <FindEvidenceButton
+                      artifactType="statistical-model"
+                      elementId={h.id}
+                      elementContent={`${h.statement} Null hypothesis: ${h.nullHypothesis} Suggested test: ${h.testSuggestion}`}
+                    />
                   </div>
                 </EditableSection>
               ))}
