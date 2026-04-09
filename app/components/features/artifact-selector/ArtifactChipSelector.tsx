@@ -102,6 +102,14 @@ export default function ArtifactChipSelector({
   return (
     <>
       <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="self-start text-sm text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer"
+        >
+          Learn about each type
+        </button>
+
         <div className="flex flex-wrap gap-2">
           {SELECTABLE_ARTIFACT_TYPES.map((type) => (
             <ArtifactChip
@@ -142,14 +150,6 @@ export default function ArtifactChipSelector({
             </button>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="self-start text-xs text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer"
-        >
-          Browse types
-        </button>
 
         {selectedDescriptions.length > 0 && (
           <ul className="flex flex-col gap-0.5 mt-0.5">
