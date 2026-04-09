@@ -85,9 +85,9 @@ export type PropertyTestsResponse = {
   };
 };
 
-/** Dialectical Map response shape (003 §3) */
-export type DialecticalMapResponse = {
-  dialecticalMap: {
+/** Balanced Perspectives response shape (003 §3) */
+export type BalancedPerspectivesResponse = {
+  balancedPerspectives: {
     topic: string;
     perspectives: Array<{
       id: string;
@@ -136,9 +136,9 @@ export const ARTIFACT_META: Record<ArtifactType, {
 }> = {
   semiformal: {
     label: "Semiformal Proof",
-    chipLabel: "Deductive (Lean)",
-    description: "Structured deductive argument with mathematical notation, logical steps, and a machine-verifiable Lean 4 proof.",
-    whenToUse: "Claims that can be stated as precise propositions needing formal verification.",
+    chipLabel: "Mathematical Proof",
+    description: "Creates a formally structured proof with mathematical notation. Spells out many individual logical steps appropriate for machine-checked proof verification via Lean4 theorem proving code.",
+    whenToUse: "Claims that already have a precise statement, where the accuracy of specific equations and applications of supporting theorems need precise validation",
   },
   lean: {
     label: "Lean4 Code",
@@ -149,32 +149,32 @@ export const ARTIFACT_META: Record<ArtifactType, {
   "causal-graph": {
     label: "Causal Graph",
     chipLabel: "Causal Graph",
-    description: "Directed graph of variables, causal relationships, confounders, and mechanisms.",
-    whenToUse: "Reasoning about cause-and-effect, interventions, or counterfactual questions.",
+    description: "Directed graph of variables. Nodes will be component ideas or effects, edges will be positively or negatively weighted relationships between nodes.",
+    whenToUse: "Reasoning about cause-and-effect, interventions, or counterfactual questions. Text with multiple inter-related ideas that should be considered simultaneously.",
   },
   "statistical-model": {
     label: "Statistical Model",
     chipLabel: "Statistical Model",
-    description: "Variables with roles, testable hypotheses with null hypotheses, and suggested statistical tests.",
-    whenToUse: "Claims involving quantities, correlations, or empirical evidence testable with data.",
+    description: "Extracts variables with roles and testable hypotheses with null hypotheses.  Suggests statistical tests appropriate to the structure of the hypotheses and data to be collected.",
+    whenToUse: "Claims involving quantities, correlations, or empirical evidence testable with data. When designing a study, to pre-register hypotheses and ensure data collection matches specific tests. When multiple sources of evidence need to be weighed against one another. When level of statistical confidence in a hypothesis is important.",
   },
   "property-tests": {
     label: "Property Tests",
     chipLabel: "Property Tests",
-    description: "Invariants, preconditions, postconditions, and data generators as executable test specs.",
-    whenToUse: "Rules that should always hold, especially for computational or algorithmic claims.",
+    description: "Isolates features or variables that are required or expected to remain consistent. States them in terms of invariants, preconditions, postconditions, and data generators. Generates pseudo-code to adapt into executable test specs for a project.",
+    whenToUse: "Rules that should always hold, especially for computational or algorithmic claims. Test-driven software development.",
   },
-  "dialectical-map": {
-    label: "Dialectical Map",
-    chipLabel: "Dialectical Map",
-    description: "Map of distinct viewpoints, tensions between them, and a proposed synthesis.",
-    whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain.",
+  "balanced-perspectives": {
+    label: "Balanced Perspectives",
+    chipLabel: "Balanced Perspectives",
+    description: "Identifies distinct perspectives present in the source text. Hypothesizes tensions between those perspectives. Proposes a synthesis perspective attempting to resolve all tensions.",
+    whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain. Decisions with many stakeholders who may have different values. When you have an established opinion and want to understand disagreements or reduce bias.",
   },
   counterexamples: {
     label: "Counterexamples",
     chipLabel: "Counterexamples",
     description: "Adversarial analysis identifying specific scenarios that could falsify the claim, with plausibility ratings.",
-    whenToUse: "Testing the robustness of a claim by finding edge cases, exceptions, or conditions under which it breaks down.",
+    whenToUse: "Testing the robustness of a claim by finding edge cases, exceptions, or conditions under which it breaks down. When a proof fails and you don’t understand why. When statistical evidence is strong but doesn’t create certainty or agreement. When you need to challenge a specific perspective.",
   },
 };
 
@@ -184,7 +184,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "balanced-perspectives",
   "counterexamples",
 ];
 
@@ -193,7 +193,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
-  "dialectical-map": "/api/formalization/dialectical-map",
+  "balanced-perspectives": "/api/formalization/balanced-perspectives",
   counterexamples: "/api/formalization/counterexamples",
 };
 
@@ -204,6 +204,6 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "causal-graph": "causalGraph",
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
-  "dialectical-map": "dialecticalMap",
+  "balanced-perspectives": "balancedPerspectives",
   counterexamples: "counterexamples",
 };

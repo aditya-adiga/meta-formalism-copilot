@@ -11,7 +11,7 @@ import {
   CausalGraphIcon,
   StatisticalModelIcon,
   PropertyTestsIcon,
-  DialecticalMapIcon,
+  BalancedPerspectivesIcon,
   AnalyticsIcon,
   CounterexamplesIcon,
 } from "@/app/components/ui/icons/PanelIcons";
@@ -33,8 +33,8 @@ type PanelDefsInput = {
   statisticalModelLoading?: boolean;
   hasPropertyTests?: boolean;
   propertyTestsLoading?: boolean;
-  hasDialecticalMap?: boolean;
-  dialecticalMapLoading?: boolean;
+  hasBalancedPerspectives?: boolean;
+  balancedPerspectivesLoading?: boolean;
   hasCounterexamples?: boolean;
   counterexamplesLoading?: boolean;
 };
@@ -48,7 +48,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     hasCausalGraph, causalGraphLoading,
     hasStatisticalModel, statisticalModelLoading,
     hasPropertyTests, propertyTestsLoading,
-    hasDialecticalMap, dialecticalMapLoading,
+    hasBalancedPerspectives, balancedPerspectivesLoading,
     hasCounterexamples, counterexamplesLoading,
   } = opts;
 
@@ -141,12 +141,12 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hidden: !hasPropertyTests && !propertyTestsLoading,
     },
     {
-      id: "dialectical-map" as PanelId,
-      label: "Dialectical Map",
-      icon: <DialecticalMapIcon />,
+      id: "balanced-perspectives" as PanelId,
+      label: "Balanced Perspectives",
+      icon: <BalancedPerspectivesIcon />,
       group: "artifacts" as const,
-      statusSummary: dialecticalMapLoading ? "Generating..." : hasDialecticalMap ? "Map ready" : "No map yet",
-      hidden: !hasDialecticalMap && !dialecticalMapLoading,
+      statusSummary: balancedPerspectivesLoading ? "Generating..." : hasBalancedPerspectives ? "Perspectives ready" : "No perspectives yet",
+      hidden: !hasBalancedPerspectives && !balancedPerspectivesLoading,
     },
     {
       id: "counterexamples" as PanelId,
@@ -169,6 +169,6 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hasCausalGraph, causalGraphLoading,
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,
-      hasDialecticalMap, dialecticalMapLoading,
+      hasBalancedPerspectives, balancedPerspectivesLoading,
       hasCounterexamples, counterexamplesLoading]);
 }

@@ -93,10 +93,10 @@ export const causalGraphSchema: ResponseFormat = {
   },
 };
 
-export const dialecticalMapSchema: ResponseFormat = {
+export const balancedPerspectivesSchema: ResponseFormat = {
   type: "json_schema",
   json_schema: {
-    name: "dialectical_map",
+    name: "balanced_perspectives",
     strict: true,
     schema: {
       type: "object",

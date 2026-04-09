@@ -104,8 +104,10 @@ const KIND_LABEL: Record<MathKind, string> = {
 
 // Header pattern: "Theorem 1.2", "Lemma 3", "Def. 4", etc.
 // Captures: [full match, kind word, number]
+// Uses a lookahead so multi-level numbers like "1.2.1" are fully captured
+// (a consuming [.:(] terminator causes backtracking that truncates the number).
 const HEADER_PATTERN =
-  /^(Theorem|Lemma|Definition|Proposition|Corollary|Axiom|Thm|Lem|Def|Defn|Prop|Cor|Ax)\.?\s+(\d+(?:\.\d+)*)\s*[.:(]/i;
+  /^(Theorem|Lemma|Definition|Proposition|Corollary|Axiom|Thm|Lem|Def|Defn|Prop|Cor|Ax)\.?\s+(\d+(?:\.\d+)*)(?=[.:\s(])/i;
 
 // Reference pattern in body text: "by Theorem 1", "from Lemma 2.3", "Thm. 1", etc.
 const REFERENCE_PATTERN =
@@ -421,12 +423,13 @@ export function extractDependencies(
 
 /**
  * Returns true if the PDF appears to be TeX-compiled with structured propositions.
- * Requires ≥2 bold-confirmed proposition headers.
+ * Accepts ≥2 bold-confirmed headers, or falls back to ≥3 pattern-matched headers
+ * when font metadata is opaque (some PDFs report all fonts as generic "sans-serif").
  */
 export function isPdfTexCompiled(lines: Line[]): boolean {
   const headers = identifyPropositionHeaders(lines);
   const boldHeaders = headers.filter((h) => h.boldConfirmed);
-  return boldHeaders.length >= 2;
+  return boldHeaders.length >= 2 || headers.length >= 3;
 }
 
 // ── Structured extraction from pdfjs ───────────────────────────────────────
@@ -503,10 +506,10 @@ export async function parsePdfPropositions(
     allAnnotations.push(...page.annotations);
   }
 
-  // Identify headers — also used as the TeX-compiled detection heuristic
+  // Check if the PDF appears to be TeX-compiled with structured propositions
   const headers = identifyPropositionHeaders(allLines);
   const boldHeaders = headers.filter((h) => h.boldConfirmed);
-  if (boldHeaders.length < 2) {
+  if (boldHeaders.length < 2 && headers.length < 3) {
     return null;
   }
   const segments = segmentDocument(allLines, headers);

@@ -9,7 +9,7 @@
  * - Semiformal/lean kept as flat strings for pipeline compatibility
  * - Streaming preview state stays outside this store (keep transient state local)
  *
- * See docs/decisions/005-zustand-state-management.md for rationale.
+ * See docs/decisions/006-zustand-state-management.md for rationale.
  */
 
 import { create } from "zustand";
@@ -117,7 +117,7 @@ function coercePersistedState(persisted: Record<string, unknown>): Partial<Works
   // Validate artifact records
   if (isObject(persisted.artifacts)) {
     const artifacts: Partial<Record<ArtifactKey, ArtifactRecord>> = {};
-    const validKeys: ArtifactKey[] = ["causal-graph", "statistical-model", "property-tests", "dialectical-map", "counterexamples"];
+    const validKeys: ArtifactKey[] = ["causal-graph", "statistical-model", "property-tests", "balanced-perspectives", "counterexamples"];
     for (const key of validKeys) {
       const rec = coerceArtifactRecord((persisted.artifacts as Record<string, unknown>)[key], key);
       if (rec) artifacts[key] = rec;
@@ -242,7 +242,7 @@ export const PERSISTED_ARTIFACT_FIELDS: Record<string, ArtifactKey> = {
   causalGraph: "causal-graph",
   statisticalModel: "statistical-model",
   propertyTests: "property-tests",
-  dialecticalMap: "dialectical-map",
+  balancedPerspectives: "balanced-perspectives",
   counterexamples: "counterexamples",
 };
 

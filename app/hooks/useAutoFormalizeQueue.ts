@@ -162,5 +162,13 @@ export function useAutoFormalizeQueue(
     setProgress((p) => ({ ...p, status: "done", currentNodeId: null }));
   }, []);
 
-  return { progress, start, pause, resume, cancel };
+  /** Reset progress to initial idle state (used when switching workspace sessions) */
+  const reset = useCallback(() => {
+    cancelSignalRef.current.cancelled = true;
+    pauseRef.current = false;
+    runningRef.current = false;
+    setProgress(INITIAL_PROGRESS);
+  }, []);
+
+  return { progress, start, pause, resume, cancel, reset };
 }

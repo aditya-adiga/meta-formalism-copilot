@@ -14,7 +14,7 @@ import LeanPanel from "@/app/components/panels/LeanPanel";
 import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
 import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
-import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
+import BalancedPerspectivesPanel from "@/app/components/panels/BalancedPerspectivesPanel";
 import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
@@ -47,7 +47,7 @@ function artifactSelector(key: ArtifactKey): (s: StoreState) => string | null {
 const selectCausalGraph = artifactSelector("causal-graph");
 const selectStatisticalModel = artifactSelector("statistical-model");
 const selectPropertyTests = artifactSelector("property-tests");
-const selectDialecticalMap = artifactSelector("dialectical-map");
+const selectBalancedPerspectives = artifactSelector("balanced-perspectives");
 const selectCounterexamples = artifactSelector("counterexamples");
 
 function phaseToEndpoint(phase: LoadingPhase): string | null {
@@ -121,7 +121,7 @@ export default function Home() {
       causalGraph: s.getArtifactContent("causal-graph"),
       statisticalModel: s.getArtifactContent("statistical-model"),
       propertyTests: s.getArtifactContent("property-tests"),
-      dialecticalMap: s.getArtifactContent("dialectical-map"),
+      balancedPerspectives: s.getArtifactContent("balanced-perspectives"),
       counterexamples: s.getArtifactContent("counterexamples"),
     };
   }, []);
@@ -165,7 +165,7 @@ export default function Home() {
   const persistedCausalGraph = useWorkspaceStore(selectCausalGraph);
   const persistedStatisticalModel = useWorkspaceStore(selectStatisticalModel);
   const persistedPropertyTests = useWorkspaceStore(selectPropertyTests);
-  const persistedDialecticalMap = useWorkspaceStore(selectDialecticalMap);
+  const persistedBalancedPerspectives = useWorkspaceStore(selectBalancedPerspectives);
   const persistedCounterexamples = useWorkspaceStore(selectCounterexamples);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
@@ -187,11 +187,11 @@ export default function Home() {
     catch { return null; }
   }, [persistedPropertyTests]);
 
-  const dialecticalMap = useMemo(() => {
-    if (!persistedDialecticalMap) return null;
-    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+  const balancedPerspectives = useMemo(() => {
+    if (!persistedBalancedPerspectives) return null;
+    try { return JSON.parse(persistedBalancedPerspectives) as import("@/app/lib/types/artifacts").BalancedPerspectivesResponse["balancedPerspectives"]; }
     catch { return null; }
-  }, [persistedDialecticalMap]);
+  }, [persistedBalancedPerspectives]);
 
   const counterexamples = useMemo(() => {
     if (!persistedCounterexamples) return null;
@@ -215,15 +215,43 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const balancedPerspectivesLoading = artifactLoadingState["balanced-perspectives"] === "generating";
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
+  const {
+    state: decomp,
+    selectedNode,
+    extractPropositions,
+    selectNode,
+    updateNode,
+    addGraphNode,
+    removeGraphNode,
+    renameGraphNode,
+    addGraphEdge,
+    removeGraphEdge,
+    updateGraphLayout,
+    resetState: resetDecomp,
+  } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
 
+  // --- Graph editing handlers ---
+  const handleAddNode = useCallback(() => {
+    const id = addGraphNode({ label: "New Node" });
+    selectNode(id);
+  }, [addGraphNode, selectNode]);
+
+  const handleDeleteEdges = useCallback(
+    (edges: Array<{ source: string; target: string }>) => {
+      for (const e of edges) {
+        removeGraphEdge(e.source, e.target);
+      }
+    },
+    [removeGraphEdge],
+  );
+
   // --- Auto-formalize queue ---
-  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue, reset: resetQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
   const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from persisted store once on mount (one-time read, no subscription)
@@ -245,8 +273,9 @@ export default function Home() {
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
       sources: decomp.sources ?? [],
+      graphLayout: decomp.graphLayout,
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, decomp.graphLayout, persistDecompState]);
 
   // --- Session state ---
   // Restore callback: applies a session's data to global or per-node state
@@ -274,7 +303,7 @@ export default function Home() {
         case "causal-graph":
         case "statistical-model":
         case "property-tests":
-        case "dialectical-map":
+        case "balanced-perspectives":
         case "counterexamples":
           useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
           break;
@@ -356,6 +385,8 @@ export default function Home() {
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
+    cancelQueue,
+    resetQueue,
   });
 
   // --- Combined paper text for single-proof formalization ---
@@ -619,8 +650,8 @@ export default function Home() {
     statisticalModelLoading,
     hasPropertyTests: propertyTests !== null,
     propertyTestsLoading,
-    hasDialecticalMap: dialecticalMap !== null,
-    dialecticalMapLoading,
+    hasBalancedPerspectives: balancedPerspectives !== null,
+    balancedPerspectivesLoading,
     hasCounterexamples: counterexamples !== null,
     counterexamplesLoading,
   });
@@ -628,7 +659,7 @@ export default function Home() {
   // --- Export All handler ---
   const hasExportableContent = Boolean(
     semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
-    || causalGraph || statisticalModel || propertyTests || dialecticalMap || counterexamples
+    || causalGraph || statisticalModel || propertyTests || balancedPerspectives || counterexamples
   );
 
   const handleExportAll = useCallback(async () => {
@@ -641,10 +672,10 @@ export default function Home() {
       causalGraph,
       statisticalModel,
       propertyTests,
-      dialecticalMap,
+      balancedPerspectives,
       counterexamples,
     });
-  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, balancedPerspectives, counterexamples]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
@@ -721,6 +752,13 @@ export default function Home() {
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
+            graphLayout={decomp.graphLayout}
+            onLayoutChange={updateGraphLayout}
+            onAddNode={handleAddNode}
+            onDeleteNode={removeGraphNode}
+            onRenameNode={renameGraphNode}
+            onConnectNodes={addGraphEdge}
+            onDeleteEdges={handleDeleteEdges}
           />
         );
       case "node-detail":
@@ -759,11 +797,11 @@ export default function Home() {
             loading={propertyTestsLoading}
           />
         );
-      case "dialectical-map":
+      case "balanced-perspectives":
         return (
-          <DialecticalMapPanel
-            dialecticalMap={dialecticalMap}
-            loading={dialecticalMapLoading}
+          <BalancedPerspectivesPanel
+            balancedPerspectives={balancedPerspectives}
+            loading={balancedPerspectivesLoading}
           />
         );
       case "counterexamples":
@@ -793,10 +831,11 @@ export default function Home() {
     causalGraph, causalGraphLoading, causalGraphWaitEstimate,
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
-    dialecticalMap, dialecticalMapLoading,
+    balancedPerspectives, balancedPerspectivesLoading,
     counterexamples, counterexamplesLoading,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
+    addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
   ]);
 
   return (

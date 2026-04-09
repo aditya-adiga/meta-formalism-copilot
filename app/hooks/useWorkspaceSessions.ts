@@ -18,6 +18,8 @@ type WorkspaceSnapshotFns = {
   clearWorkspace: () => PersistedDecomposition;
   clearAllSessions: () => void;
   resetDecomp: (data: PersistedDecomposition) => void;
+  cancelQueue: () => void;
+  resetQueue: () => void;
 };
 
 const DEBOUNCE_MS = 500;
@@ -50,6 +52,9 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
 
   const fnsRef = useRef(fns);
   useEffect(() => { fnsRef.current = fns; }, [fns]);
+
+  // Dirty flag: skip auto-save when workspace hasn't changed since last save
+  const lastSavedSnapshotRef = useRef<string | null>(null);
 
   // Debounced persist
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,13 +109,20 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     setState({ sessions: [session], activeSessionId: session.id });
   }, []);
 
-  /** Snapshot the current workspace into the active workspace session */
+  /** Snapshot the current workspace into the active workspace session.
+   *  Skips the save if the workspace hasn't changed since the last save
+   *  (avoids structuredClone + JSON.stringify overhead when idle). */
   const saveCurrentSession = useCallback(() => {
     const activeId = stateRef.current.activeSessionId;
     if (!activeId) return;
 
     const ws = fnsRef.current.getWorkspaceSnapshot();
     const sessions = fnsRef.current.getSessionsSnapshot();
+
+    // Dirty check: skip if snapshot is identical to last save
+    const snapshotKey = JSON.stringify(ws);
+    if (snapshotKey === lastSavedSnapshotRef.current) return;
+    lastSavedSnapshotRef.current = snapshotKey;
 
     setState((prev) => ({
       ...prev,
@@ -135,6 +147,8 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     // Save current session before clearing
     saveCurrentSession();
 
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.clearWorkspace();
     fnsRef.current.clearAllSessions();
     fnsRef.current.resetDecomp(decompData);
@@ -165,7 +179,9 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     // Save current session
     saveCurrentSession();
 
-    // Load the target session's data
+    // Cancel any running queue and reset progress before loading new session's data
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.resetWorkspaceToSnapshot(target.workspace);
     fnsRef.current.resetSessionsToSnapshot(target.formalizationSessions);
     fnsRef.current.resetDecomp(decompData);
@@ -189,8 +205,10 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
         ? (remaining.length > 0 ? remaining[remaining.length - 1].id : null)
         : prev.activeSessionId;
 
-      // If we're deleting the active session, load the new active one (or clear)
+      // If we're deleting the active session, cancel queue and load the new active one (or clear)
       if (prev.activeSessionId === id) {
+        fnsRef.current.cancelQueue();
+        fnsRef.current.resetQueue();
         const newActive = remaining.find((s) => s.id === newActiveId);
         if (newActive) {
           const decompData = fnsRef.current.resetWorkspaceToSnapshot(newActive.workspace);

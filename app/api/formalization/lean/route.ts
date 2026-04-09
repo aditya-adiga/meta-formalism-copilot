@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
@@ -48,6 +49,15 @@ Guidelines:
 - Return only the corrected Lean4 code with no additional commentary`;
 
 
+/** Strip `import ...` lines — used when dependency context already provides them. */
+function stripImports(code: string): string {
+  return code
+    .split("\n")
+    .filter((line) => !/^import\s+/.test(line.trim()))
+    .join("\n")
+    .replace(/^\n+/, "");
+}
+
 function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
@@ -62,7 +72,8 @@ theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
 }
 
 export async function POST(request: NextRequest) {
-  const { informalProof, previousAttempt, errors, instruction, contextLeanCode } = await request.json();
+  const body = await request.json();
+  const { informalProof, previousAttempt, errors, instruction, contextLeanCode, stream: wantStream } = body;
 
   const isRetry = Boolean(previousAttempt && errors);
   const hasContext = Boolean(contextLeanCode);
@@ -82,6 +93,23 @@ export async function POST(request: NextRequest) {
     userContent += `\n\nAdditional instruction: ${instruction}`;
   }
 
+  // Streaming path: use transformFinalText to post-process the done event
+  if (wantStream) {
+    const stream = streamLlm({
+      endpoint: "formalization/lean",
+      systemPrompt,
+      userContent,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
+      transformFinalText: (text) => {
+        const cleaned = stripCodeFences(text);
+        return hasContext ? stripImports(cleaned) : cleaned;
+      },
+    });
+
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
+  }
+
   try {
     const { text: responseText, usage } = await callLlm({
       endpoint: "formalization/lean",
@@ -98,11 +126,7 @@ export async function POST(request: NextRequest) {
     // Safety net: strip import lines when context already provides them.
     // LLMs sometimes include `import Mathlib` despite being told not to.
     if (hasContext) {
-      leanCode = leanCode
-        .split("\n")
-        .filter((line) => !/^import\s+/.test(line.trim()))
-        .join("\n")
-        .replace(/^\n+/, "");
+      leanCode = stripImports(leanCode);
     }
 
     return NextResponse.json({ leanCode });
