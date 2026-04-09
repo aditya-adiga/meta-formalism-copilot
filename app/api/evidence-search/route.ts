@@ -15,22 +15,24 @@ const PER_QUERY_RESULTS = 5;
 // LLM query generation
 // ---------------------------------------------------------------------------
 
-const QUERY_SYSTEM_PROMPT = `You generate targeted academic search queries for the OpenAlex paper database.
+const QUERY_SYSTEM_PROMPT = `You generate short academic search queries for the OpenAlex paper database.
 
-Given a specific hypothesis or claim, produce 2-3 search queries that would find empirical studies directly testing or measuring the same relationship described.
+Given a specific hypothesis or claim, produce 2-3 search queries that would find empirical studies about the same topic.
 
 Critical rules:
-- Every query MUST include the core subject matter (e.g., "remote work", "caffeine", "sleep deprivation") — never generate a query that omits the topic
-- Use the specific variables and relationship from the claim, not generic methodology terms
-- Queries should find papers that measured the SAME outcome, not just papers that used the same statistical method
-- Do NOT generate queries about research methods, study design, or statistical techniques in isolation
-- Each query should be 3-8 words of topic-specific keywords
+- Each query MUST be exactly 3-5 words. No more. Longer queries dilute relevance.
+- Every query MUST include the core subject (e.g., "remote work", "caffeine", "sleep deprivation")
+- Add only 1-2 specific terms beyond the core subject to narrow the search
+- Do NOT include generic academic words like "comparison", "output", "performance", "analysis", "study", "effect", "impact" — these match everything
+- Do NOT include methodology terms like "t-test", "regression", "sample"
+- Each query should approach the topic from a different angle (e.g., different terminology, different aspect)
 
 Example — if the claim is "remote work does not reduce productivity":
-  GOOD: "remote work productivity output comparison"
-  GOOD: "telecommuting firm performance empirical"
-  BAD: "two-sample t-test company output" (method-focused, no topic)
-  BAD: "measurable decline output levels" (too generic, could match anything)
+  GOOD: "remote work productivity" (3 words, topic-focused)
+  GOOD: "telecommuting firm performance" (3 words, alternate terminology)
+  GOOD: "work from home employee output" (5 words, different framing)
+  BAD: "remote work productivity output performance comparison" (too many words, diluted)
+  BAD: "measurable decline output levels" (no core subject)
 
 Return a JSON object with this exact shape:
 {
