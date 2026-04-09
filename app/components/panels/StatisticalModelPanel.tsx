@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
@@ -26,6 +27,16 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function StatisticalModelPanel({ statisticalModel, loading }: StatisticalModelPanelProps) {
+  // Build a concise search description from the artifact for evidence search
+  const evidenceSearchContent = useMemo(() => {
+    if (!statisticalModel) return "";
+    const parts = [statisticalModel.summary];
+    for (const h of statisticalModel.hypotheses.slice(0, 3)) {
+      parts.push(h.statement);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [statisticalModel]);
+
   return (
     <ArtifactPanelShell
       title="Statistical Model"
@@ -58,11 +69,6 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
                   {v.distribution && (
                     <p className="mt-1 text-xs text-[#6B6560]">Distribution: {v.distribution}</p>
                   )}
-                  <FindEvidenceButton
-                    artifactType="statistical-model"
-                    elementId={v.id}
-                    elementContent={`${v.label} (${v.role})${v.distribution ? ` — ${v.distribution}` : ""}`}
-                  />
                 </div>
               ))}
             </div>
@@ -83,11 +89,6 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
                   <p className="mt-1 text-xs text-[#9A9590]">
                     <span className="font-semibold">Test:</span> {h.testSuggestion}
                   </p>
-                  <FindEvidenceButton
-                    artifactType="statistical-model"
-                    elementId={h.id}
-                    elementContent={`${h.statement} Null hypothesis: ${h.nullHypothesis} Suggested test: ${h.testSuggestion}`}
-                  />
                 </div>
               ))}
             </div>
@@ -116,6 +117,20 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">
                 {statisticalModel.sampleRequirements}
               </p>
+            </section>
+          )}
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="statistical-model"
+                elementId="artifact"
+                elementContent={evidenceSearchContent}
+              />
             </section>
           )}
         </>

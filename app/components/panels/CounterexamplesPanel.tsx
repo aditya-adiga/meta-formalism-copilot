@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
@@ -16,6 +17,16 @@ type CounterexamplesPanelProps = {
 };
 
 export default function CounterexamplesPanel({ counterexamples, loading }: CounterexamplesPanelProps) {
+  // Build search description from claim + top counterexample scenarios
+  const evidenceSearchContent = useMemo(() => {
+    if (!counterexamples) return "";
+    const parts = [counterexamples.claim];
+    for (const cx of counterexamples.counterexamples.slice(0, 3)) {
+      parts.push(cx.scenario);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [counterexamples]);
+
   return (
     <ArtifactPanelShell
       title="Counterexamples"
@@ -59,11 +70,6 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
                   <div className="text-xs text-[#6B6560]">
                     <span className="font-semibold">Why it works:</span> {cx.explanation}
                   </div>
-                  <FindEvidenceButton
-                    artifactType="counterexamples"
-                    elementId={cx.id}
-                    elementContent={`${cx.scenario} Targets assumption: ${cx.targetAssumption} ${cx.explanation}`}
-                  />
                 </div>
               ))}
             </div>
@@ -74,6 +80,20 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Robustness Assessment</h3>
             <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
           </section>
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="counterexamples"
+                elementId="artifact"
+                elementContent={evidenceSearchContent}
+              />
+            </section>
+          )}
         </>
       )}
     </ArtifactPanelShell>
