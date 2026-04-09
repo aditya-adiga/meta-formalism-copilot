@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
@@ -24,6 +25,16 @@ export default function CounterexamplesPanel({
   isStale, onRegenerate,
 }: CounterexamplesPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
+
+  // Build search description from claim + top counterexample scenarios
+  const evidenceSearchContent = useMemo(() => {
+    if (!counterexamples) return "";
+    const parts = [counterexamples.claim];
+    for (const cx of counterexamples.counterexamples.slice(0, 3)) {
+      parts.push(cx.scenario);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [counterexamples]);
 
   return (
     <ArtifactPanelShell
@@ -78,11 +89,6 @@ export default function CounterexamplesPanel({
                     <div className="text-xs text-[#6B6560]">
                       <span className="font-semibold">Why it works:</span> {cx.explanation}
                     </div>
-                    <FindEvidenceButton
-                      artifactType="counterexamples"
-                      elementId={cx.id}
-                      elementContent={`${cx.scenario} Targets assumption: ${cx.targetAssumption} ${cx.explanation}`}
-                    />
                   </div>
                 </EditableSection>
               ))}
@@ -96,6 +102,20 @@ export default function CounterexamplesPanel({
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
             </EditableSection>
           </section>
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="counterexamples"
+                elementId="artifact"
+                elementContent={evidenceSearchContent}
+              />
+            </section>
+          )}
         </>
       )}
     </ArtifactPanelShell>
