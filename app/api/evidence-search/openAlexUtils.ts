@@ -58,6 +58,7 @@ export type OpenAlexWork = {
   primary_location?: OpenAlexLocation | null;
   open_access?: OpenAlexOpenAccess | null;
   doi?: string | null;
+  relevance_score?: number | null;
 };
 
 /** Map a raw OpenAlex work object to our EvidencePaper type. */

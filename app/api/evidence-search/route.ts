@@ -8,22 +8,29 @@ import type { EvidenceSearchRequest, EvidenceSearchResponse } from "@/app/lib/ty
 const OPENALEX_API_URL = "https://api.openalex.org/works";
 const OPENALEX_TIMEOUT_MS = 10_000;
 const OPENALEX_MAILTO = "metaformalism-copilot@example.com";
-const MAX_RESULTS = 10;
+const MAX_RESULTS = 8;
 const PER_QUERY_RESULTS = 5;
 
 // ---------------------------------------------------------------------------
 // LLM query generation
 // ---------------------------------------------------------------------------
 
-const QUERY_SYSTEM_PROMPT = `You generate targeted academic search queries for finding published research papers.
+const QUERY_SYSTEM_PROMPT = `You generate targeted academic search queries for the OpenAlex paper database.
 
-Given a claim, hypothesis, or scenario from a research artifact, produce 2-4 concise keyword-style search queries suitable for an academic paper database (OpenAlex).
+Given a specific hypothesis or claim, produce 2-3 search queries that would find empirical studies directly testing or measuring the same relationship described.
 
-Guidelines:
-- Use specific technical terms, not natural language questions
-- Include key variables, methods, or phenomena mentioned
-- Vary queries to cover different angles (e.g., one for the specific claim, one broader)
-- Keep each query under 10 words
+Critical rules:
+- Every query MUST include the core subject matter (e.g., "remote work", "caffeine", "sleep deprivation") — never generate a query that omits the topic
+- Use the specific variables and relationship from the claim, not generic methodology terms
+- Queries should find papers that measured the SAME outcome, not just papers that used the same statistical method
+- Do NOT generate queries about research methods, study design, or statistical techniques in isolation
+- Each query should be 3-8 words of topic-specific keywords
+
+Example — if the claim is "remote work does not reduce productivity":
+  GOOD: "remote work productivity output comparison"
+  GOOD: "telecommuting firm performance empirical"
+  BAD: "two-sample t-test company output" (method-focused, no topic)
+  BAD: "measurable decline output levels" (too generic, could match anything)
 
 Return a JSON object with this exact shape:
 {
@@ -72,7 +79,7 @@ async function generateSearchQueries(
   if (!Array.isArray(parsed.queries) || parsed.queries.length === 0) {
     return [elementContent.slice(0, 100)];
   }
-  return parsed.queries.slice(0, 4);
+  return parsed.queries.slice(0, 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,8 +142,15 @@ export async function POST(request: NextRequest) {
       allWorks.push(...works);
     }
 
-    // Step 3: Map, deduplicate, cap results
-    const papers = deduplicatePapers(allWorks.map(mapOpenAlexWork)).slice(0, MAX_RESULTS);
+    // Step 3: Filter by relevance score, map, deduplicate, cap results
+    // OpenAlex returns relevance_score when using search=; drop results with
+    // very low scores (typically < 50% of the top result's score)
+    const topScore = Math.max(...allWorks.map((w) => w.relevance_score ?? 0), 1);
+    const relevanceThreshold = topScore * 0.4;
+    const relevantWorks = allWorks.filter(
+      (w) => (w.relevance_score ?? 0) >= relevanceThreshold,
+    );
+    const papers = deduplicatePapers(relevantWorks.map(mapOpenAlexWork)).slice(0, MAX_RESULTS);
 
     const response: EvidenceSearchResponse = { queries, papers };
     return NextResponse.json(response);
