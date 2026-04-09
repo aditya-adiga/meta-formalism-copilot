@@ -61,7 +61,7 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
         <div className="mb-6 grid grid-cols-4 gap-3">
           <SummaryCard label="AI Calls" value={String(summary.totalCalls)} />
           <SummaryCard
-            label="Total Words Processed"
+            label="Total Processed"
             value={formatTokens(summary.totalInputTokens + summary.totalOutputTokens)}
           />
           <SummaryCard label="Est. Cost" value={formatCost(summary.totalCostUsd)} />
@@ -84,7 +84,7 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
                   <th className="px-3 py-2 text-right">In</th>
                   <th className="px-3 py-2 text-right">Out</th>
                   <th className="px-3 py-2 text-right">Cost</th>
-                  <th className="px-3 py-2 text-right">Time</th>
+                  <th className="px-3 py-2 text-right">Response</th>
                 </tr>
               </thead>
               <tbody>

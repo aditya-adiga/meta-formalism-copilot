@@ -108,7 +108,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       icon: <LeanIcon />,
       group: "artifacts" as const,
       statusSummary: activeVerificationStatus === "valid"
-        ? "Checked"
+        ? "Passed"
         : activeVerificationStatus === "invalid"
           ? "Failed"
           : activeLeanCode
