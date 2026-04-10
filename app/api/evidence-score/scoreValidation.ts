@@ -12,7 +12,7 @@ import {
 
 /** Clamp a score to [0, 1] */
 export function clampScore(score: unknown): number {
-  const n = typeof score === "number" ? score : 0;
+  const n = typeof score === "number" && isFinite(score) ? score : 0;
   return Math.max(0, Math.min(1, n));
 }
 

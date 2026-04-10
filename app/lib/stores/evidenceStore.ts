@@ -128,13 +128,15 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
               relatedness: score.relatedness,
             };
           });
+          // Only mark as fully scored if every paper received a score
+          const allScored = updatedPapers.every((p) => p.reliability !== null);
           return {
             slots: {
               ...state.slots,
               [key]: {
                 ...slot,
                 papers: updatedPapers,
-                scored: true,
+                scored: allScored,
                 scoredAt: new Date().toISOString(),
               },
             },
