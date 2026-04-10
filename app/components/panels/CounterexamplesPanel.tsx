@@ -51,7 +51,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
                       {cx.plausibility}
                     </span>
                     {cx.isEmpirical && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700" aria-label="Empirical counterexample — shown as hypothetical">
                         Hypothetical
                       </span>
                     )}

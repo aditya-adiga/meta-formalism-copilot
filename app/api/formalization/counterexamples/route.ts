@@ -13,7 +13,7 @@ Return a JSON object with this exact shape:
       "targetAssumption": "string (which assumption or condition this challenges)",
       "explanation": "string (why this counterexample is effective — what breaks)",
       "plausibility": "high | medium | low",
-      "isEmpirical": "boolean (true if this counterexample relies on empirical data, statistics, or studies)"
+      "isEmpirical": true | false
     }
   ],
   "robustnessAssessment": "string (overall assessment of how robust the claim is given these counterexamples)",
@@ -27,12 +27,10 @@ Important:
 - Target different assumptions where possible
 - The robustness assessment should be balanced and constructive
 - Return ONLY the JSON object, no commentary or markdown fences
-
-Critical rule for empirical counterexamples:
-- Set isEmpirical to true when a counterexample involves empirical claims (data, statistics, studies, experimental results)
-- For empirical counterexamples, frame the scenario as HYPOTHETICAL: describe what kind of evidence *would* contradict the thesis, not that such evidence exists. Use language like "If data showed X, it would contradict Y" or "Evidence of X would undermine Y"
-- NEVER fabricate specific citations, study names, author names, statistics, or data points
-- Focus on describing the *type* of evidence that would be contradicting, not claiming it exists`;
+- isEmpirical must be a JSON boolean (true or false, not a string). Set it to true when a counterexample relies on empirical claims — that is, data from studies, statistics, experimental results, or real-world observations. Set it to false for purely logical, mathematical, or definitional counterexamples
+- If a counterexample is primarily logical but depends on an empirical premise (e.g., "if utility diminishes logarithmically — as behavioral economics suggests — then the claim fails"), set isEmpirical to true and hedge only the empirical premise
+- For empirical counterexamples, frame the scenario as HYPOTHETICAL: describe what kind of evidence *would* contradict the thesis, not that such evidence exists. Examples: "If data showed X, it would contradict Y", "Evidence of X would undermine Y", "Studies finding X would call Y into question"
+- NEVER fabricate specific citations, study names, author names, statistics, or data points. Focus on describing the *type* of evidence that would be contradicting, not claiming it exists`;
 
 function mockResponse(sourceText: string) {
   const snippet = sourceText.slice(0, 60).replace(/\n/g, " ");
@@ -46,6 +44,14 @@ function mockResponse(sourceText: string) {
         explanation: "The claim implicitly assumes no boundary effects, but in finite domains this breaks down.",
         plausibility: "medium" as const,
         isEmpirical: false,
+      },
+      {
+        id: "cx-2",
+        scenario: "If longitudinal studies showed that the proposed mechanism reverses direction under sustained exposure, it would undermine the core causal claim.",
+        targetAssumption: "Assumption that the effect is monotonic over time",
+        explanation: "The claim assumes a stable directional effect, but time-dependent reversal would invalidate the generalization.",
+        plausibility: "low" as const,
+        isEmpirical: true,
       },
     ],
     robustnessAssessment: "Mock assessment: the claim appears moderately robust but has at least one exploitable assumption.",
