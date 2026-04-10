@@ -28,6 +28,12 @@ describe("clampScore", () => {
     expect(clampScore(undefined)).toBe(0);
     expect(clampScore({})).toBe(0);
   });
+
+  it("returns 0 for NaN and Infinity", () => {
+    expect(clampScore(NaN)).toBe(0);
+    expect(clampScore(Infinity)).toBe(0);
+    expect(clampScore(-Infinity)).toBe(0);
+  });
 });
 
 describe("normalizeStudyType", () => {

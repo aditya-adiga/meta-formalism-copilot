@@ -33,7 +33,8 @@ For each paper, you must provide:
    - Classify the study type from this hierarchy (ordered from most to least reliable):
      meta-analysis, systematic-review, rct, cohort, case-control, cross-sectional, case-study, expert-opinion, unknown
    - Score from 0.0 to 1.0 based on study type AND methodology quality
-   - Identify red flags: p-hacking indicators (many variables tested, p-values barely below 0.05), inadequate sample sizes, conflicts of interest, retraction concerns
+   - Identify red flags detectable from title/abstract: stated small sample sizes (e.g. n < 20), self-described "exploratory" or "pilot" studies, disclosed conflicts of interest, retraction notices. Do NOT flag p-hacking or variable counts unless explicitly stated in the abstract.
+   - Look for positive methodology markers: pre-registration, blinding, control groups, large stated sample sizes
    - Provide a brief rationale (1-2 sentences)
 
 2. **Relatedness assessment:**
@@ -52,10 +53,10 @@ Scoring guidelines for reliability:
 - cross-sectional: 0.30-0.50
 - case-study: 0.15-0.30
 - expert-opinion: 0.05-0.20
-- unknown: 0.10-0.30
-Adjust within these ranges based on methodology quality and red flags.
+- unknown: 0.05-0.20 (use when the study type cannot be determined from the available metadata)
+Adjust within these ranges based on methodology quality and red flags. For computational models, surveys, or philosophical arguments that don't fit the hierarchy, use the closest match or "unknown".
 
-If a paper's abstract is missing, score conservatively (lower reliability, note limited information).
+If a paper's abstract is missing, score conservatively (lower reliability, note limited information). When you cannot confidently determine the study type, use "unknown" rather than guessing.
 
 Return a JSON object with this exact shape:
 {
@@ -99,7 +100,7 @@ const SCORING_SCHEMA = {
                 required: ["score", "studyType", "rationale", "redFlags"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number" },
+                  score: { type: "number", minimum: 0, maximum: 1 },
                   studyType: {
                     type: "string",
                     enum: [...STUDY_TYPES],
@@ -116,7 +117,7 @@ const SCORING_SCHEMA = {
                 required: ["score", "rationale"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number" },
+                  score: { type: "number", minimum: 0, maximum: 1 },
                   rationale: { type: "string" },
                 },
               },
@@ -152,14 +153,26 @@ export async function POST(request: NextRequest) {
 
     const claimContent = body.claimContent.slice(0, MAX_CLAIM_LENGTH);
 
+    // Validate individual papers
+    for (let i = 0; i < body.papers.length; i++) {
+      const p = body.papers[i];
+      if (!p || typeof p.openAlexId !== "string" || typeof p.title !== "string") {
+        return NextResponse.json(
+          { error: `Paper at index ${i} is missing required fields (openAlexId, title)` },
+          { status: 400 },
+        );
+      }
+    }
+
     // Build user message with claim and paper summaries
     const paperSummaries = body.papers.map((p, i) => {
       const parts = [`Paper ${i + 1} (ID: ${p.openAlexId}):`];
       parts.push(`  Title: ${p.title}`);
-      if (p.authors.length > 0) parts.push(`  Authors: ${p.authors.slice(0, 5).join(", ")}`);
+      const authors = Array.isArray(p.authors) ? p.authors : [];
+      if (authors.length > 0) parts.push(`  Authors: ${authors.slice(0, 5).join(", ")}`);
       if (p.year) parts.push(`  Year: ${p.year}`);
       if (p.journal) parts.push(`  Journal: ${p.journal}`);
-      if (p.abstract) parts.push(`  Abstract: ${p.abstract.slice(0, 500)}`);
+      if (p.abstract) parts.push(`  Abstract: ${String(p.abstract).slice(0, 500)}`);
       else parts.push("  Abstract: (not available)");
       return parts.join("\n");
     });
@@ -180,7 +193,7 @@ ${paperSummaries.join("\n\n")}`;
     });
 
     if (!text) {
-      // Mock fallback — return neutral scores
+      // Mock fallback — return neutral scores with mock flag
       const scores: PaperScore[] = body.papers.map((p) => ({
         openAlexId: p.openAlexId,
         reliability: {
@@ -194,7 +207,7 @@ ${paperSummaries.join("\n\n")}`;
           rationale: "Scoring unavailable (no API key configured).",
         },
       }));
-      return NextResponse.json({ scores } satisfies EvidenceScoreResponse);
+      return NextResponse.json({ scores, mock: true } satisfies EvidenceScoreResponse & { mock: boolean });
     }
 
     // Parse and validate LLM response

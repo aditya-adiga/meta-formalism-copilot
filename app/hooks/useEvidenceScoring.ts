@@ -35,6 +35,8 @@ export function useEvidenceScoring(
       const { setScoring, applyScores, setError } = useEvidenceStore.getState();
       const currentSlot = useEvidenceStore.getState().slots[key];
       if (!currentSlot || currentSlot.papers.length === 0) return;
+      // Guard against concurrent scoring calls (e.g. double-click)
+      if (useEvidenceStore.getState().scoring[key]) return;
 
       setScoring(key, true);
       setError(key, null);
