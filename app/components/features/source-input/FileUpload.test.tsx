@@ -21,7 +21,7 @@ function createFile(name: string, content = ""): File {
 describe("FileUpload", () => {
   it("renders the upload button with accepted file types", () => {
     render(<FileUpload />);
-    expect(screen.getByText(".txt, .md, .tex, .docx, .pdf")).toBeInTheDocument();
+    expect(screen.getByText("Upload documents (.txt, .md, .tex, .docx, .pdf)")).toBeInTheDocument();
   });
 
   it("does not show a file list when no files are uploaded", () => {

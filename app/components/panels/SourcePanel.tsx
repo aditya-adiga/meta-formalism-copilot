@@ -12,7 +12,7 @@ export default function SourcePanel({ sourceText, onSourceTextChange, onFilesCha
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Source Inputs
+          Source Material
         </h2>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-6">

@@ -52,7 +52,7 @@ export default function InputPanel({
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
-      {/* Top Section: Source Inputs */}
+      {/* Top Section: Source Material */}
       <div className="flex max-h-[50%] min-h-0 flex-col overflow-hidden border-b border-[#DDD9D5]">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">

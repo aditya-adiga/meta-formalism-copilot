@@ -26,9 +26,9 @@ describe('InputPanel', () => {
     onArtifactTypesChange: vi.fn(),
   }
 
-  it('renders the Source Inputs heading', () => {
+  it('renders the Source Material heading', () => {
     render(<InputPanel {...defaultProps} />)
-    expect(screen.getByText('Source Inputs')).toBeInTheDocument()
+    expect(screen.getByText('Source Material')).toBeInTheDocument()
   })
 
   it('renders the Generate Analysis heading', () => {
