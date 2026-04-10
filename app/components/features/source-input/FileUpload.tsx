@@ -111,7 +111,7 @@ export default function FileUpload({ onFilesChanged, existingFiles }: FileUpload
         className="inline-flex w-fit items-center gap-2 rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-2 text-sm font-medium text-[var(--ink-black)] shadow-md transition-shadow duration-200 hover:shadow-lg active:shadow-xl focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)]"
       >
         <PaperClipIcon />
-        <span>.txt, .md, .tex, .docx, .pdf</span>
+        <span>Upload documents (.txt, .md, .tex, .docx, .pdf)</span>
       </button>
       {trackedFiles.length > 0 && (
         <ul className="mt-2 space-y-1">

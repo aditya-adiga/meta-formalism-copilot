@@ -46,7 +46,7 @@ export default function InputPanel({
       <div className="flex max-h-[50%] min-h-0 flex-col overflow-hidden border-b border-[#DDD9D5]">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Source Inputs
+            Source Material
           </h2>
         </div>
         <div className="flex min-h-0 flex-col gap-3 overflow-auto p-4">
