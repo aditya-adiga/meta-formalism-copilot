@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { fetchApi } from "@/app/lib/formalization/api";
 import {
@@ -20,13 +21,19 @@ export function useEvidenceSearch(
   elementId: string,
 ) {
   const key = serializeTargetKey({ artifactType, elementId });
-  const slot = useEvidenceStore((s) => s.slots[key]);
-  const isLoading = useEvidenceStore((s) => s.loading[key] ?? false);
+  const { slot, isLoading, error } = useEvidenceStore(
+    useShallow((s) => ({
+      slot: s.slots[key],
+      isLoading: s.loading[key] ?? false,
+      error: s.errors[key] ?? null,
+    })),
+  );
 
   const search = useCallback(
     async (elementContent: string, contextSummary?: string) => {
-      const { setLoading, setEvidence } = useEvidenceStore.getState();
+      const { setLoading, setEvidence, setError } = useEvidenceStore.getState();
       setLoading(key, true);
+      setError(key, null);
       try {
         const result = await fetchApi<EvidenceSearchResponse>(
           "/api/evidence-search",
@@ -42,6 +49,8 @@ export function useEvidenceSearch(
         });
       } catch (err) {
         console.error("[useEvidenceSearch]", err);
+        const message = err instanceof Error ? err.message : "Evidence search failed";
+        setError(key, message);
       } finally {
         useEvidenceStore.getState().setLoading(key, false);
       }
@@ -49,5 +58,5 @@ export function useEvidenceSearch(
     [artifactType, elementId, key],
   );
 
-  return { slot, isLoading, search };
+  return { slot, isLoading, error, search };
 }

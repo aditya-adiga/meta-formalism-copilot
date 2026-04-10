@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -128,7 +129,7 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               </h3>
               <FindEvidenceButton
                 artifactType="statistical-model"
-                elementId="artifact"
+                elementId={WHOLE_ARTIFACT_ELEMENT_ID}
                 elementContent={evidenceSearchContent}
               />
             </section>

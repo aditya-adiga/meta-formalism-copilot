@@ -24,7 +24,6 @@ export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
 
   return (
     <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-1">
-      {/* Title */}
       <div className="text-sm font-medium text-[var(--ink-black)]">
         {url ? (
           <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -35,7 +34,6 @@ export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
         )}
       </div>
 
-      {/* Authors + meta */}
       <div className="flex flex-wrap items-center gap-x-2 text-xs text-[#6B6560]">
         <span>{formatAuthors(paper.authors)}</span>
         {paper.year && <span>({paper.year})</span>}
@@ -47,7 +45,6 @@ export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
         )}
       </div>
 
-      {/* Abstract */}
       {paper.abstract && (
         <div className="text-xs text-[#6B6560] leading-relaxed mt-1">
           {expanded || !needsTruncation

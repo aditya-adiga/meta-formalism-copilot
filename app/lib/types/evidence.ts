@@ -15,6 +15,9 @@ export type EvidenceTargetKey = {
   elementId: string;
 };
 
+/** Element ID used when evidence applies to the whole artifact (not a sub-element) */
+export const WHOLE_ARTIFACT_ELEMENT_ID = "artifact";
+
 /** Serializes a target key for use as a Record key */
 export function serializeTargetKey(target: EvidenceTargetKey): string {
   return `${target.artifactType}::${target.elementId}`;

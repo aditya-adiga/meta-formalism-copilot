@@ -140,16 +140,18 @@ export async function POST(request: NextRequest) {
     // Step 1: Generate search queries via LLM
     const queries = await generateSearchQueries(body.elementContent, body.contextSummary);
 
-    // Step 2: Search OpenAlex for each query
+    // Step 2: Search OpenAlex for all queries in parallel
+    const queryResults = await Promise.allSettled(queries.map(searchOpenAlex));
     const allWorks: OpenAlexWork[] = [];
-    for (const query of queries) {
-      const works = await searchOpenAlex(query);
-      allWorks.push(...works);
+    for (const result of queryResults) {
+      if (result.status === "fulfilled") {
+        allWorks.push(...result.value);
+      }
     }
 
     // Step 3: Filter by relevance score, map, deduplicate, cap results
-    // OpenAlex returns relevance_score when using search=; drop results with
-    // very low scores (typically < 50% of the top result's score)
+    // OpenAlex returns relevance_score with title_and_abstract.search filter;
+    // drop results with very low scores (< 40% of the top result's score)
     const topScore = Math.max(...allWorks.map((w) => w.relevance_score ?? 0), 1);
     const relevanceThreshold = topScore * 0.4;
     const relevantWorks = allWorks.filter(

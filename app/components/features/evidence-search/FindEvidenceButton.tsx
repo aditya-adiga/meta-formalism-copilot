@@ -17,7 +17,7 @@ export default function FindEvidenceButton({
   elementContent,
   contextSummary,
 }: FindEvidenceButtonProps) {
-  const { slot, isLoading, search } = useEvidenceSearch(artifactType, elementId);
+  const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
 
   return (
     <div className="mt-1.5">
@@ -33,6 +33,10 @@ export default function FindEvidenceButton({
             ? "Refresh evidence"
             : "Find evidence"}
       </button>
+
+      {error && (
+        <p className="text-xs text-red-600 mt-1">{error}</p>
+      )}
 
       {slot && <EvidenceResultsSection slot={slot} />}
     </div>

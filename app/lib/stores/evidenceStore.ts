@@ -40,6 +40,9 @@ function createDebouncedStorage() {
   };
 }
 
+// Hoist so the persist middleware always uses the same adapter instance
+const debouncedStorage = createDebouncedStorage();
+
 // ---------------------------------------------------------------------------
 // Store shape
 // ---------------------------------------------------------------------------
@@ -49,11 +52,14 @@ interface EvidenceState {
   slots: Record<string, EvidenceSlot>;
   /** Per-element loading state */
   loading: Record<string, boolean>;
+  /** Per-element error messages */
+  errors: Record<string, string>;
 }
 
 interface EvidenceActions {
   setEvidence: (key: string, slot: EvidenceSlot) => void;
   setLoading: (key: string, loading: boolean) => void;
+  setError: (key: string, error: string | null) => void;
   clearEvidence: (key: string) => void;
   clearAll: () => void;
 }
@@ -61,6 +67,7 @@ interface EvidenceActions {
 const DEFAULT_STATE: EvidenceState = {
   slots: {},
   loading: {},
+  errors: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -82,6 +89,16 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           loading: { ...state.loading, [key]: loading },
         })),
 
+      setError: (key, error) =>
+        set((state) => {
+          if (error === null) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { [key]: _removed, ...rest } = state.errors;
+            return { errors: rest };
+          }
+          return { errors: { ...state.errors, [key]: error } };
+        }),
+
       clearEvidence: (key) =>
         set((state) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -89,12 +106,12 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           return { slots: rest };
         }),
 
-      clearAll: () => set({ slots: {}, loading: {} }),
+      clearAll: () => set({ slots: {}, loading: {}, errors: {} }),
     }),
     {
       name: "evidence-store-v1",
       storage: typeof window !== "undefined"
-        ? createJSONStorage(() => createDebouncedStorage())
+        ? createJSONStorage(() => debouncedStorage)
         : undefined,
       // Only persist slots, not transient loading state
       partialize: (state) => ({ slots: state.slots }),
