@@ -1,7 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
+import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -25,6 +28,16 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function StatisticalModelPanel({ statisticalModel, loading }: StatisticalModelPanelProps) {
+  // Build a concise search description from the artifact for evidence search
+  const evidenceSearchContent = useMemo(() => {
+    if (!statisticalModel) return "";
+    const parts = [statisticalModel.summary];
+    for (const h of statisticalModel.hypotheses.slice(0, 3)) {
+      parts.push(h.statement);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [statisticalModel]);
+
   return (
     <ArtifactPanelShell
       title="Statistical Model"
@@ -105,6 +118,20 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">
                 {statisticalModel.sampleRequirements}
               </p>
+            </section>
+          )}
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="statistical-model"
+                elementId={WHOLE_ARTIFACT_ELEMENT_ID}
+                elementContent={evidenceSearchContent}
+              />
             </section>
           )}
         </>
