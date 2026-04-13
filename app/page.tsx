@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import type { PanelId } from "@/app/lib/types/panels";
+import type { PanelId, SplitOrientation } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
@@ -62,6 +62,8 @@ function phaseToEndpoint(phase: LoadingPhase): string | null {
 export default function Home() {
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
+  const [secondaryPanelId, setSecondaryPanelIdRaw] = useState<PanelId | null>(null);
+  const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>("horizontal");
 
   // --- Persisted state (survives page refresh) ---
   const {
@@ -121,7 +123,23 @@ export default function Home() {
   const setActivePanelId = useCallback((id: PanelId) => {
     if (id === "analytics") refreshAnalytics();
     setActivePanelIdRaw(id);
+    // Clear secondary if it now matches the new primary
+    setSecondaryPanelIdRaw((prev) => prev === id ? null : prev);
   }, [refreshAnalytics]);
+
+  const setSecondaryPanelId = useCallback((id: PanelId) => {
+    if (id === activePanelId) return;
+    if (id === "analytics") refreshAnalytics();
+    setSecondaryPanelIdRaw(id);
+  }, [activePanelId, refreshAnalytics]);
+
+  const closeSecondaryPanel = useCallback(() => {
+    setSecondaryPanelIdRaw(null);
+  }, []);
+
+  const toggleSplitOrientation = useCallback(() => {
+    setSplitOrientation((prev) => prev === "horizontal" ? "vertical" : "horizontal");
+  }, []);
 
   // Derive per-type loading booleans from artifactLoadingState
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
@@ -765,6 +783,13 @@ export default function Home() {
         renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
+        split={{
+          secondaryPanelId,
+          onSelectSecondaryPanel: setSecondaryPanelId,
+          onCloseSecondary: closeSecondaryPanel,
+          orientation: splitOrientation,
+          onToggleOrientation: toggleSplitOrientation,
+        }}
       />
     </main>
   );
