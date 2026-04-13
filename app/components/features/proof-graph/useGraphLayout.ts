@@ -16,6 +16,8 @@ function buildLayout(
     return { nodes: [], edges: [] };
   }
 
+  const nodeIds = new Set(propositions.map((p) => p.id));
+
   // Find nodes that don't have a position yet
   const newNodeIds = propositions
     .filter((p) => !positionMap.has(p.id))
@@ -32,7 +34,7 @@ function buildLayout(
     }
     for (const prop of propositions) {
       for (const depId of prop.dependsOn) {
-        g.setEdge(depId, prop.id);
+        if (nodeIds.has(depId)) g.setEdge(depId, prop.id);
       }
     }
 
@@ -48,20 +50,23 @@ function buildLayout(
   }
 
   // Prune positions for nodes that no longer exist
-  const propIds = new Set(propositions.map((p) => p.id));
   for (const id of positionMap.keys()) {
-    if (!propIds.has(id)) positionMap.delete(id);
+    if (!nodeIds.has(id)) positionMap.delete(id);
   }
 
+  // Only create edges to nodes that exist — during streaming, partial-JSON
+  // may produce truncated dependency IDs that reference non-existent nodes.
   const edges: Edge[] = [];
   for (const prop of propositions) {
     for (const depId of prop.dependsOn) {
-      edges.push({
-        id: `${depId}->${prop.id}`,
-        source: depId,
-        target: prop.id,
-        style: { stroke: "#9A9590", strokeWidth: 1.5 },
-      });
+      if (nodeIds.has(depId)) {
+        edges.push({
+          id: `${depId}->${prop.id}`,
+          source: depId,
+          target: prop.id,
+          style: { stroke: "#9A9590", strokeWidth: 1.5 },
+        });
+      }
     }
   }
 

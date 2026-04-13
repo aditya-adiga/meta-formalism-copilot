@@ -39,7 +39,10 @@ export function useCausalGraphLayout(
       return { nodes: [], edges: [] };
     }
 
-    const variables = causalGraph.variables ?? [];
+    // Streaming partial-JSON can produce objects with truncated/missing id fields
+    const variables = (causalGraph.variables ?? []).filter(
+      (v) => typeof v.id === "string" && v.id !== "",
+    );
     const graphEdges = causalGraph.edges ?? [];
     const confounders = causalGraph.confounders ?? [];
 
@@ -48,7 +51,16 @@ export function useCausalGraphLayout(
     const confounderIds = new Set(confounders.map((c) => c.id));
     const knownPositions = positionsRef.current;
 
-    const hasEdgesNow = graphEdges.length > 0;
+    // Filter out incomplete edges from partial-JSON parsing — edges without
+    // from/to cause invalid ReactFlow state, and missing weight causes .toFixed() to throw.
+    const varIds = new Set(variables.map((v) => v.id));
+    const validEdges = graphEdges.filter(
+      (e) => typeof e.from === "string" && e.from !== ""
+        && typeof e.to === "string" && e.to !== ""
+        && varIds.has(e.from) && varIds.has(e.to),
+    );
+
+    const hasEdgesNow = validEdges.length > 0;
     const edgesJustArrived = hasEdgesNow && !hadEdgesRef.current;
     hadEdgesRef.current = hasEdgesNow;
 
@@ -71,7 +83,7 @@ export function useCausalGraphLayout(
       for (const v of variables) {
         g.setNode(v.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
       }
-      for (const e of graphEdges) {
+      for (const e of validEdges) {
         g.setEdge(e.from, e.to);
       }
 
@@ -88,10 +100,11 @@ export function useCausalGraphLayout(
     }
 
     // Build ReactFlow edges with weight-based styling
-    const edges: Edge[] = graphEdges.map((e) => {
+    const edges: Edge[] = validEdges.map((e) => {
       const edgeId = `${e.from}->${e.to}`;
-      const abs = Math.abs(e.weight);
-      const strokeColor = e.weight >= 0 ? "#059669" : "#DC2626";
+      const weight = typeof e.weight === "number" ? e.weight : 0;
+      const abs = Math.abs(weight);
+      const strokeColor = weight >= 0 ? "#059669" : "#DC2626";
       const strokeWidth = abs > 0.7 ? 3 : abs > 0.3 ? 2 : 1;
 
       return {
@@ -99,7 +112,7 @@ export function useCausalGraphLayout(
         source: e.from,
         target: e.to,
         style: { stroke: strokeColor, strokeWidth },
-        label: e.weight.toFixed(2),
+        label: weight.toFixed(2),
         labelStyle: { fontSize: 10, fill: strokeColor },
         animated: abs > 0.7,
       };
