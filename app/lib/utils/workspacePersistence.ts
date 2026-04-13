@@ -59,7 +59,7 @@ export type ArtifactPersistenceData = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  balancedPerspectives: string | null;
   counterexamples: string | null;
 };
 
@@ -77,7 +77,7 @@ export type SaveWorkspaceInput = {
 };
 
 export function saveWorkspace(input: SaveWorkspaceInput): boolean {
-  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null, counterexamples: null };
+  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, balancedPerspectives: null, counterexamples: null };
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
     sourceText: input.sourceText,
@@ -95,7 +95,7 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
     causalGraph: artifacts.causalGraph,
     statisticalModel: artifacts.statisticalModel,
     propertyTests: artifacts.propertyTests,
-    dialecticalMap: artifacts.dialecticalMap,
+    balancedPerspectives: artifacts.balancedPerspectives,
     counterexamples: artifacts.counterexamples,
   };
 
@@ -136,6 +136,30 @@ export function coerceDecomposition(raw: unknown): PersistedDecomposition {
       } as PropositionNode))
     : [];
 
+  // Validate graphLayout: positions must be Record<string, {x: number, y: number}>
+  let graphLayout: import("@/app/lib/types/decomposition").GraphLayout | undefined;
+  if (isObject(raw.graphLayout)) {
+    const rawLayout = raw.graphLayout as Record<string, unknown>;
+    if (isObject(rawLayout.positions)) {
+      const rawPositions = rawLayout.positions as Record<string, unknown>;
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const [key, val] of Object.entries(rawPositions)) {
+        if (isObject(val) && typeof val.x === "number" && typeof val.y === "number") {
+          positions[key] = { x: val.x, y: val.y };
+        }
+      }
+      if (Object.keys(positions).length > 0) {
+        graphLayout = { positions };
+        if (isObject(rawLayout.viewport)) {
+          const vp = rawLayout.viewport as Record<string, unknown>;
+          if (typeof vp.x === "number" && typeof vp.y === "number" && typeof vp.zoom === "number") {
+            graphLayout.viewport = { x: vp.x, y: vp.y, zoom: vp.zoom };
+          }
+        }
+      }
+    }
+  }
+
   return {
     nodes,
     selectedNodeId: typeof raw.selectedNodeId === "string" ? raw.selectedNodeId : null,
@@ -145,6 +169,7 @@ export function coerceDecomposition(raw: unknown): PersistedDecomposition {
       sourceLabel: typeof s.sourceLabel === "string" ? s.sourceLabel : "",
       text: typeof s.text === "string" ? s.text : "",
     })) : [],
+    graphLayout,
   };
 }
 
@@ -187,7 +212,7 @@ export function loadWorkspace(): PersistedWorkspace | null {
       causalGraph: typeof parsed.causalGraph === "string" ? parsed.causalGraph : null,
       statisticalModel: typeof parsed.statisticalModel === "string" ? parsed.statisticalModel : null,
       propertyTests: typeof parsed.propertyTests === "string" ? parsed.propertyTests : null,
-      dialecticalMap: typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null,
+      balancedPerspectives: typeof parsed.balancedPerspectives === "string" ? parsed.balancedPerspectives : (typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null),
       counterexamples: typeof parsed.counterexamples === "string" ? parsed.counterexamples : null,
     };
   } catch {

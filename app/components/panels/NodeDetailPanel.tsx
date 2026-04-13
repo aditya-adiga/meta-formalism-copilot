@@ -1,8 +1,9 @@
 "use client";
 
-import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
+import type { PropositionNode, NodeVerificationStatus, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import { ARTIFACT_META } from "@/app/lib/types/artifacts";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
 
 type NodeDetailPanelProps = {
@@ -25,6 +26,45 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
   verified: { text: "Verified", color: "var(--status-verified)" },
   failed: { text: "Failed", color: "var(--status-failed)" },
 };
+
+/** Renders a single non-deductive artifact stored on a node */
+function NodeArtifactSection({ artifact }: { artifact: NodeArtifact }) {
+  const meta = ARTIFACT_META[artifact.type];
+  // Try to pretty-print JSON content; fall back to raw string
+  let display: string;
+  try {
+    const parsed = JSON.parse(artifact.content);
+    display = JSON.stringify(parsed, null, 2);
+  } catch {
+    display = artifact.content;
+  }
+
+  return (
+    <section>
+      <div className="mb-1 flex items-center gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
+          {meta.label}
+        </h3>
+        {artifact.verificationStatus !== "unverified" && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+            style={{ backgroundColor: STATUS_LABELS[artifact.verificationStatus].color }}
+          >
+            {STATUS_LABELS[artifact.verificationStatus].text}
+          </span>
+        )}
+      </div>
+      <pre className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 font-mono text-sm leading-relaxed text-[var(--ink-black)] whitespace-pre-wrap max-h-80 overflow-auto">
+        {display}
+      </pre>
+      {artifact.verificationErrors && (
+        <pre className="mt-1 rounded-md border border-red-300 bg-red-50 px-4 py-2 font-mono text-xs leading-relaxed text-red-700 whitespace-pre-wrap">
+          {artifact.verificationErrors}
+        </pre>
+      )}
+    </section>
+  );
+}
 
 export default function NodeDetailPanel({
   node, dependencies, onFormalise, onGenerateLean, loading,
@@ -150,6 +190,11 @@ export default function NodeDetailPanel({
               </pre>
             </section>
           )}
+
+          {/* Non-deductive artifacts (property-tests, causal-graph, etc.) */}
+          {node.artifacts.length > 0 && node.artifacts.map((artifact) => (
+            <NodeArtifactSection key={artifact.type} artifact={artifact} />
+          ))}
 
           {/* Separator between node info and formalization controls */}
           <div className="border-t border-[#DDD9D5]" />

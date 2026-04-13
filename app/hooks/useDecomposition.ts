@@ -1,7 +1,16 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import { useState, useCallback, useMemo, useRef } from "react";
+import type { DecompositionState, PropositionNode, SourceDocument, GraphLayout } from "@/app/lib/types/decomposition";
+import type { NewNodeInput } from "@/app/lib/utils/graphOperations";
+import {
+  addNode as addNodeOp,
+  removeNode as removeNodeOp,
+  renameNode as renameNodeOp,
+  updateNodeStatement as updateNodeStatementOp,
+  addEdge as addEdgeOp,
+  removeEdge as removeEdgeOp,
+} from "@/app/lib/utils/graphOperations";
 import { fetchApi } from "@/app/lib/formalization/api";
 
 const INITIAL_STATE: DecompositionState = {
@@ -10,10 +19,15 @@ const INITIAL_STATE: DecompositionState = {
   paperText: "",
   sources: [],
   extractionStatus: "idle",
+  graphLayout: undefined,
 };
 
 export function useDecomposition() {
   const [state, setState] = useState<DecompositionState>(INITIAL_STATE);
+  // Ref tracks latest nodes so addGraphEdge can read fresh state synchronously
+  // without depending on state.nodes in its useCallback deps (which caused stale closures).
+  const nodesRef = useRef(state.nodes);
+  nodesRef.current = state.nodes;
 
   const selectedNode = useMemo<PropositionNode | null>(
     () => state.nodes.find((n) => n.id === state.selectedNodeId) ?? null,
@@ -105,19 +119,83 @@ export function useDecomposition() {
     }));
   }, []);
 
+  // --- Graph editing operations ---
+
+  const addGraphNode = useCallback((input: NewNodeInput): string => {
+    let newId = "";
+    setState((prev) => {
+      const [nodes, id] = addNodeOp(prev.nodes, input);
+      newId = id;
+      return { ...prev, nodes };
+    });
+    return newId;
+  }, []);
+
+  const removeGraphNode = useCallback((nodeId: string) => {
+    setState((prev) => ({
+      ...prev,
+      nodes: removeNodeOp(prev.nodes, nodeId),
+      selectedNodeId: prev.selectedNodeId === nodeId ? null : prev.selectedNodeId,
+    }));
+  }, []);
+
+  const renameGraphNode = useCallback((nodeId: string, label: string) => {
+    setState((prev) => ({ ...prev, nodes: renameNodeOp(prev.nodes, nodeId, label) }));
+  }, []);
+
+  const updateNodeStatement = useCallback((nodeId: string, statement: string) => {
+    setState((prev) => ({ ...prev, nodes: updateNodeStatementOp(prev.nodes, nodeId, statement) }));
+  }, []);
+
+  /** Returns false if the edge would create a cycle, already exists, or references a non-existent node. */
+  const addGraphEdge = useCallback((fromId: string, toId: string): boolean => {
+    // Use nodesRef for fresh state — avoids stale-closure risk when edges are
+    // added in rapid succession (the ref is updated on every render).
+    const result = addEdgeOp(nodesRef.current, fromId, toId);
+    if (result) {
+      setState((prev) => ({ ...prev, nodes: result }));
+      return true;
+    }
+    return false;
+  }, []);
+
+  const removeGraphEdge = useCallback((fromId: string, toId: string) => {
+    setState((prev) => ({ ...prev, nodes: removeEdgeOp(prev.nodes, fromId, toId) }));
+  }, []);
+
+  const updateGraphLayout = useCallback((layout: GraphLayout) => {
+    setState((prev) => ({ ...prev, graphLayout: layout }));
+  }, []);
+
   /** Restore persisted decomposition state (called once on mount) */
   const resetState = useCallback(
-    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources?: SourceDocument[] }) => {
+    (restored: { nodes: PropositionNode[]; selectedNodeId: string | null; paperText: string; sources?: SourceDocument[]; graphLayout?: GraphLayout }) => {
       setState({
         nodes: restored.nodes,
         selectedNodeId: restored.selectedNodeId,
         paperText: restored.paperText,
         sources: restored.sources ?? [],
         extractionStatus: restored.nodes.length > 0 ? "done" : "idle",
+        graphLayout: restored.graphLayout,
       });
     },
     [],
   );
 
-  return { state, selectedNode, extractPropositions, selectNode, updateNode, resetState };
+  return {
+    state,
+    selectedNode,
+    extractPropositions,
+    selectNode,
+    updateNode,
+    // Graph editing
+    addGraphNode,
+    removeGraphNode,
+    renameGraphNode,
+    updateNodeStatement,
+    addGraphEdge,
+    removeGraphEdge,
+    updateGraphLayout,
+    resetState,
+  };
 }
