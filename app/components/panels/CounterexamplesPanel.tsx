@@ -2,6 +2,7 @@
 
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -38,10 +39,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
           </section>
 
           {/* Counterexamples */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Counterexamples ({counterexamples.counterexamples.length})
-            </h3>
+          <CollapsibleSection title="Counterexamples" defaultOpen={false} count={counterexamples.counterexamples.length}>
             <div className="space-y-3">
               {counterexamples.counterexamples.map((cx) => (
                 <div key={cx.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
@@ -61,7 +59,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Robustness Assessment */}
           <section>

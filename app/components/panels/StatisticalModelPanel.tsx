@@ -2,6 +2,7 @@
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -42,10 +43,7 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
           </section>
 
           {/* Variables */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Variables ({statisticalModel.variables.length})
-            </h3>
+          <CollapsibleSection title="Variables" defaultOpen={false} count={statisticalModel.variables.length}>
             <div className="space-y-2">
               {statisticalModel.variables.map((v) => (
                 <div key={v.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
@@ -60,13 +58,10 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Hypotheses */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Hypotheses ({statisticalModel.hypotheses.length})
-            </h3>
+          <CollapsibleSection title="Hypotheses" defaultOpen={false} count={statisticalModel.hypotheses.length}>
             <div className="space-y-2">
               {statisticalModel.hypotheses.map((h) => (
                 <div key={h.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
@@ -80,20 +75,17 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Assumptions */}
           {statisticalModel.assumptions.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Assumptions ({statisticalModel.assumptions.length})
-              </h3>
+            <CollapsibleSection title="Assumptions" defaultOpen={false} count={statisticalModel.assumptions.length}>
               <ul className="list-disc pl-5 space-y-1">
                 {statisticalModel.assumptions.map((a, i) => (
                   <li key={i} className="text-sm text-[var(--ink-black)]">{a}</li>
                 ))}
               </ul>
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* Sample Requirements */}

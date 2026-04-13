@@ -2,6 +2,7 @@
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 type DialecticalMapPanelProps = {
   dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
@@ -32,10 +33,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
           </section>
 
           {/* Perspectives */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Perspectives ({dialecticalMap.perspectives.length})
-            </h3>
+          <CollapsibleSection title="Perspectives" defaultOpen={false} count={dialecticalMap.perspectives.length}>
             <div className="space-y-3">
               {dialecticalMap.perspectives.map((p) => (
                 <div key={p.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
@@ -69,14 +67,11 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Tensions */}
           {dialecticalMap.tensions.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Tensions ({dialecticalMap.tensions.length})
-              </h3>
+            <CollapsibleSection title="Tensions" defaultOpen={false} count={dialecticalMap.tensions.length}>
               <div className="space-y-2">
                 {dialecticalMap.tensions.map((t, i) => (
                   <div key={i} className="rounded border border-red-200 bg-red-50 px-3 py-2">
@@ -89,12 +84,11 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
                   </div>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* Synthesis */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Synthesis</h3>
+          <CollapsibleSection title="Synthesis" defaultOpen={false}>
             <div className="rounded border border-green-200 bg-green-50 px-3 py-2 space-y-2">
               <p className="text-sm text-green-900">{dialecticalMap.synthesis.equilibrium}</p>
               {dialecticalMap.synthesis.howAddressed.length > 0 && (
@@ -108,7 +102,7 @@ export default function DialecticalMapPanel({ dialecticalMap, loading }: Dialect
                 </div>
               )}
             </div>
-          </section>
+          </CollapsibleSection>
         </>
       )}
     </ArtifactPanelShell>

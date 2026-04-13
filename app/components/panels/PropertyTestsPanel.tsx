@@ -2,6 +2,7 @@
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell from "./ArtifactPanelShell";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 type PropertyTestsPanelProps = {
   propertyTests: PropertyTestsResponse["propertyTests"] | null;
@@ -26,10 +27,7 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
           </section>
 
           {/* Properties */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Properties ({propertyTests.properties.length})
-            </h3>
+          <CollapsibleSection title="Properties" defaultOpen={false} count={propertyTests.properties.length}>
             <div className="space-y-3">
               {propertyTests.properties.map((p) => (
                 <div key={p.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
@@ -50,14 +48,11 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Data Generators */}
           {propertyTests.dataGenerators.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Data Generators ({propertyTests.dataGenerators.length})
-              </h3>
+            <CollapsibleSection title="Data Generators" defaultOpen={false} count={propertyTests.dataGenerators.length}>
               <div className="space-y-2">
                 {propertyTests.dataGenerators.map((g, i) => (
                   <div key={i} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
@@ -69,7 +64,7 @@ export default function PropertyTestsPanel({ propertyTests, loading }: PropertyT
                   </div>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
         </>
       )}
