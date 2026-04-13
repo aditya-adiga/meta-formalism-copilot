@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
@@ -42,7 +43,6 @@ function DetailsView({
 
   return (
     <>
-      {/* Summary */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
         <EditableSection value={causalGraph.summary} onChange={(v) => updateField("summary", v)}>
@@ -50,11 +50,7 @@ function DetailsView({
         </EditableSection>
       </section>
 
-      {/* Variables */}
-      <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Factors ({causalGraph.variables.length})
-        </h3>
+      <CollapsibleSection title="Factors" defaultOpen={false} count={causalGraph.variables.length}>
         <div className="space-y-2">
           {causalGraph.variables.map((v, i) => (
             <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
@@ -68,13 +64,9 @@ function DetailsView({
             </EditableSection>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      {/* Edges */}
-      <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Relationships ({causalGraph.edges.length})
-        </h3>
+      <CollapsibleSection title="Relationships" defaultOpen={false} count={causalGraph.edges.length}>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
             <EditableSection key={`${e.from}-${e.to}-${i}`} value={e} onChange={(newE) => updateArrayItem("edges", i, newE)}>
@@ -90,14 +82,10 @@ function DetailsView({
             </EditableSection>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      {/* Confounders */}
       {causalGraph.confounders.length > 0 && (
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-            Hidden Factors ({causalGraph.confounders.length})
-          </h3>
+        <CollapsibleSection title="Hidden Factors" defaultOpen={false} count={causalGraph.confounders.length}>
           <div className="space-y-2">
             {causalGraph.confounders.map((c, i) => (
               <EditableSection key={c.id} value={c} onChange={(newC) => updateArrayItem("confounders", i, newC)}>
@@ -110,7 +98,7 @@ function DetailsView({
               </EditableSection>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
       )}
     </>
   );

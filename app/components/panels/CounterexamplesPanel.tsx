@@ -6,6 +6,7 @@ import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } fr
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -68,10 +69,7 @@ export default function CounterexamplesPanel({
           </section>
 
           {/* Counterexamples */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Counterexamples ({counterexamples.counterexamples.length})
-            </h3>
+          <CollapsibleSection title="Counterexamples" defaultOpen={false} count={counterexamples.counterexamples.length}>
             <div className="space-y-3">
               {counterexamples.counterexamples.map((cx, i) => (
                 <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("counterexamples", i, newCx)}>
@@ -93,7 +91,7 @@ export default function CounterexamplesPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Robustness Assessment */}
           <section>

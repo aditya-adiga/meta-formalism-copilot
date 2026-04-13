@@ -6,6 +6,7 @@ import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import { ARTIFACT_META } from "@/app/lib/types/artifacts";
 import { isCustomType } from "@/app/lib/types/customArtifact";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
 type NodeDetailPanelProps = {
   node: PropositionNode;
@@ -98,8 +99,7 @@ export default function NodeDetailPanel({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Scrollable node info section */}
         <div className="flex-1 min-h-0 overflow-auto">
-          <div className="flex flex-col gap-4 p-6 pb-2">
-            {/* Source Document */}
+          <div className="flex flex-col gap-4 pt-6 px-6 pb-2">
             {node.sourceLabel && (
               <section>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
@@ -111,7 +111,6 @@ export default function NodeDetailPanel({
               </section>
             )}
 
-            {/* Statement */}
             <section>
               <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
                 Statement
@@ -121,24 +120,16 @@ export default function NodeDetailPanel({
               </div>
             </section>
 
-            {/* Proof text */}
             {node.proofText && (
-              <section>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                  Proof
-                </h3>
+              <CollapsibleSection title="Proof" defaultOpen={false}>
                 <div className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)]">
                   {node.proofText}
                 </div>
-              </section>
+              </CollapsibleSection>
             )}
 
-            {/* Dependencies */}
             {dependencies.length > 0 && (
-              <section>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                  Depends On
-                </h3>
+              <CollapsibleSection title="Depends On" count={dependencies.length} defaultOpen={false}>
                 <div className="flex flex-col gap-1">
                   {dependencies.map((dep) => {
                     const depStatus = STATUS_LABELS[dep.verificationStatus];
@@ -154,43 +145,31 @@ export default function NodeDetailPanel({
                     );
                   })}
                 </div>
-              </section>
+              </CollapsibleSection>
             )}
 
-            {/* Semiformal proof (if generated) */}
             {node.semiformalProof && (
-              <section>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                  Step-by-Step Proof
-                </h3>
+              <CollapsibleSection title="Step-by-Step Proof">
                 <pre className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)] whitespace-pre-wrap">
                   {node.semiformalProof}
                 </pre>
-              </section>
+              </CollapsibleSection>
             )}
 
-            {/* Lean code (if generated) */}
             {node.leanCode && (
-              <section>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                  Proof Code
-                </h3>
+              <CollapsibleSection title="Proof Code">
                 <pre className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 font-mono text-sm leading-relaxed text-[var(--ink-black)] whitespace-pre-wrap">
                   {node.leanCode}
                 </pre>
-              </section>
+              </CollapsibleSection>
             )}
 
-            {/* Verification errors */}
             {node.verificationErrors && (
-              <section>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-800">
-                  Errors Found
-                </h3>
+              <CollapsibleSection title="Errors Found" variant="error" defaultOpen={false}>
                 <pre className="rounded-md border border-red-300 bg-red-50 px-4 py-3 font-mono text-xs leading-relaxed text-red-700 whitespace-pre-wrap">
                   {node.verificationErrors}
                 </pre>
-              </section>
+              </CollapsibleSection>
             )}
 
             {/* Non-deductive artifacts (property-tests, causal-graph, etc.) */}
@@ -202,7 +181,6 @@ export default function NodeDetailPanel({
 
         {/* Docked controls — outside scroll container */}
         <div className="shrink-0 border-t border-[#DDD9D5]">
-          {/* Lean generation button (when semiformal exists but lean doesn't) */}
           {showLeanButton && (
             <div className="px-4 py-2">
               <button
