@@ -4,6 +4,7 @@ import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type BalancedPerspectivesPanelProps = {
@@ -63,10 +64,7 @@ export default function BalancedPerspectivesPanel({
 
           {/* Perspectives */}
           {(displayMap.perspectives?.length ?? 0) > 0 && (
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Perspectives ({displayMap.perspectives.length})
-            </h3>
+          <CollapsibleSection title="Perspectives" count={displayMap.perspectives.length} defaultOpen={false}>
             <div className="space-y-3">
               {displayMap.perspectives.map((p, i) => (
                 <EditableSection key={p.id} value={p} onChange={(newP) => updateArrayItem("perspectives", i, newP)}>
@@ -102,15 +100,12 @@ export default function BalancedPerspectivesPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
           )}
 
           {/* Tensions */}
           {(displayMap.tensions?.length ?? 0) > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Tensions ({displayMap.tensions.length})
-              </h3>
+            <CollapsibleSection title="Tensions" count={displayMap.tensions.length} defaultOpen={false}>
               <div className="space-y-2">
                 {displayMap.tensions.map((t, i) => (
                   <EditableSection key={i} value={t} onChange={(newT) => updateArrayItem("tensions", i, newT)}>
@@ -125,13 +120,12 @@ export default function BalancedPerspectivesPanel({
                   </EditableSection>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* Synthesis */}
           {displayMap.synthesis && (
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Proposed Resolution</h3>
+          <CollapsibleSection title="Proposed Resolution" defaultOpen={false}>
             <EditableSection value={displayMap.synthesis} onChange={(v) => updateField("synthesis", v)}>
               <div className="rounded border border-green-200 bg-green-50 px-3 py-2 space-y-2">
                 <p className="text-sm text-green-900">{displayMap.synthesis.equilibrium}</p>
@@ -147,7 +141,7 @@ export default function BalancedPerspectivesPanel({
                 )}
               </div>
             </EditableSection>
-          </section>
+          </CollapsibleSection>
           )}
         </>
       )}
