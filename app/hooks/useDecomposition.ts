@@ -14,23 +14,29 @@ const INITIAL_STATE: DecompositionState = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPropositionNodes(raw: any[], labelMap: Map<string, string>): PropositionNode[] {
-  return raw.map((p) => ({
-    id: p.id ?? "",
-    label: p.label ?? "",
-    kind: p.kind ?? "claim",
-    statement: p.statement ?? "",
-    proofText: p.proofText ?? "",
-    dependsOn: p.dependsOn ?? [],
-    sourceId: p.sourceId ?? "",
-    sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
-    semiformalProof: "",
-    leanCode: "",
-    verificationStatus: "unverified" as const,
-    verificationErrors: "",
-    context: "",
-    selectedArtifactTypes: [],
-    artifacts: [],
-  }));
+  return raw
+    // Filter out incomplete items from partial-JSON parsing — nodes without
+    // a valid id cause duplicate React keys and dagre layout errors.
+    .filter((p) => typeof p === "object" && p !== null && typeof p.id === "string" && p.id !== "")
+    .map((p) => ({
+      id: p.id,
+      label: p.label ?? "",
+      kind: p.kind ?? "claim",
+      statement: p.statement ?? "",
+      proofText: p.proofText ?? "",
+      // Guard against partial-json returning a non-array value (e.g. partial
+      // string) for dependsOn — iterating a string would yield characters.
+      dependsOn: Array.isArray(p.dependsOn) ? p.dependsOn : [],
+      sourceId: p.sourceId ?? "",
+      sourceLabel: p.sourceId ? (labelMap.get(p.sourceId) ?? p.sourceId) : "",
+      semiformalProof: "",
+      leanCode: "",
+      verificationStatus: "unverified" as const,
+      verificationErrors: "",
+      context: "",
+      selectedArtifactTypes: [],
+      artifacts: [],
+    }));
 }
 
 export function useDecomposition() {
