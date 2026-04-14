@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import { fetchApi } from "@/app/lib/formalization/api";
 
 const INITIAL_STATE: DecompositionState = {
   nodes: [],
@@ -61,13 +62,7 @@ export function useDecomposition() {
     }
 
     try {
-      const res = await fetch("/api/decomposition/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documents }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Extraction failed");
+      const data = await fetchApi<{ propositions: Array<Record<string, unknown>> }>("/api/decomposition/extract", { documents });
 
       // Build a lookup from sourceId → sourceLabel for filling in node fields
       const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));

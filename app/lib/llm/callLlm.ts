@@ -4,12 +4,12 @@ import { computeCost } from "./costs";
 import { appendAnalyticsEntry } from "@/app/lib/analytics/persist";
 import { computeHash, getCachedResult, setCachedResult } from "./cache";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
+export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 // Lazy-initialized Anthropic client — reused across calls
 let _anthropicClient: Anthropic | null = null;
-function getAnthropicClient(apiKey: string): Anthropic {
+export function getAnthropicClient(apiKey: string): Anthropic {
   if (!_anthropicClient) {
     _anthropicClient = new Anthropic({ apiKey });
   }
@@ -36,6 +36,17 @@ export type LlmCallUsage = {
   latencyMs: number;
 };
 
+/** OpenRouter-compatible response_format for structured outputs.
+ *  See https://openrouter.ai/docs/guides/features/structured-outputs */
+export type ResponseFormat = {
+  type: "json_schema";
+  json_schema: {
+    name: string;
+    strict: boolean;
+    schema: Record<string, unknown>;
+  };
+};
+
 type CallLlmOptions = {
   endpoint: string;
   systemPrompt: string;
@@ -43,6 +54,9 @@ type CallLlmOptions = {
   maxTokens: number;
   anthropicModel?: string;
   openRouterModel?: string;
+  /** When provided, enforces structured JSON output via OpenRouter's response_format.
+   *  Only used with the OpenRouter provider (Anthropic direct API does not support this). */
+  responseFormat?: ResponseFormat;
 };
 
 export type CacheKey = {
@@ -68,6 +82,7 @@ export async function callLlm({
   maxTokens,
   anthropicModel,
   openRouterModel,
+  responseFormat,
 }: CallLlmOptions): Promise<CallLlmResult> {
   // Resolve effective model for cache key
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -97,6 +112,14 @@ export async function callLlm({
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
+      ...(responseFormat && {
+        output_config: {
+          format: {
+            type: "json_schema" as const,
+            schema: responseFormat.json_schema.schema,
+          },
+        },
+      }),
     });
     const latencyMs = Date.now() - start;
     const text = message.content[0].type === "text" ? message.content[0].text : "";
@@ -140,6 +163,7 @@ export async function callLlm({
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
+        ...(responseFormat && { response_format: responseFormat }),
       }),
     });
     const latencyMs = Date.now() - start;

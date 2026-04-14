@@ -1,12 +1,15 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
+  /** Partial model data from streaming (partial-JSON parsed) */
+  streamingPreview?: StatisticalModelResponse["statisticalModel"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps;
@@ -28,39 +31,47 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function StatisticalModelPanel({
-  statisticalModel, loading,
+  statisticalModel, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
 }: StatisticalModelPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(statisticalModel, onContentChange);
 
+  const { displayData: displayModel, hasDisplayData } = mergeStreamingPreview(
+    statisticalModel, streamingPreview,
+    (d) => (d.variables?.length ?? 0) > 0,
+  );
+
   return (
     <ArtifactPanelShell
       title="Statistical Model"
-      loading={loading}
-      hasData={statisticalModel !== null}
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
       emptyMessage="No statistical model yet. Generate one from the source panel or node detail."
       loadingMessage="Generating statistical model..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
     >
-      {statisticalModel && (
+      {hasDisplayData && displayModel && (
         <>
           {/* Summary */}
+          {displayModel.summary && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-            <EditableSection value={statisticalModel.summary} onChange={(v) => updateField("summary", v)}>
-              <p className="text-sm text-[var(--ink-black)] leading-relaxed">{statisticalModel.summary}</p>
+            <EditableSection value={displayModel.summary} onChange={(v) => updateField("summary", v)}>
+              <p className="text-sm text-[var(--ink-black)] leading-relaxed">{displayModel.summary}</p>
             </EditableSection>
           </section>
+          )}
 
           {/* Variables */}
+          {(displayModel.variables?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Variables ({statisticalModel.variables.length})
+              Variables ({displayModel.variables.length})
             </h3>
             <div className="space-y-2">
-              {statisticalModel.variables.map((v, i) => (
+              {displayModel.variables.map((v, i) => (
                 <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <div className="flex items-center gap-2">
@@ -76,14 +87,16 @@ export default function StatisticalModelPanel({
               ))}
             </div>
           </section>
+          )}
 
           {/* Hypotheses */}
+          {(displayModel.hypotheses?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Hypotheses ({statisticalModel.hypotheses.length})
+              Hypotheses ({displayModel.hypotheses.length})
             </h3>
             <div className="space-y-2">
-              {statisticalModel.hypotheses.map((h, i) => (
+              {displayModel.hypotheses.map((h, i) => (
                 <EditableSection key={h.id} value={h} onChange={(newH) => updateArrayItem("hypotheses", i, newH)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <p className="text-sm font-medium text-[var(--ink-black)]">{h.statement}</p>
@@ -98,15 +111,16 @@ export default function StatisticalModelPanel({
               ))}
             </div>
           </section>
+          )}
 
           {/* Assumptions */}
-          {statisticalModel.assumptions.length > 0 && (
+          {(displayModel.assumptions?.length ?? 0) > 0 && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Assumptions ({statisticalModel.assumptions.length})
+                Assumptions ({displayModel.assumptions.length})
               </h3>
               <div className="space-y-1 pl-5">
-                {statisticalModel.assumptions.map((a, i) => (
+                {displayModel.assumptions.map((a, i) => (
                   <EditableSection key={i} value={a} onChange={(newA) => updateArrayItem("assumptions", i, newA)}>
                     <p className="text-sm text-[var(--ink-black)] before:content-['•'] before:mr-2 before:text-[#9A9590]">{a}</p>
                   </EditableSection>
@@ -116,14 +130,14 @@ export default function StatisticalModelPanel({
           )}
 
           {/* Sample Requirements */}
-          {statisticalModel.sampleRequirements && (
+          {displayModel.sampleRequirements && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
                 Sample Requirements
               </h3>
-              <EditableSection value={statisticalModel.sampleRequirements} onChange={(v) => updateField("sampleRequirements", v)}>
+              <EditableSection value={displayModel.sampleRequirements} onChange={(v) => updateField("sampleRequirements", v)}>
                 <p className="text-sm text-[var(--ink-black)] leading-relaxed">
-                  {statisticalModel.sampleRequirements}
+                  {displayModel.sampleRequirements}
                 </p>
               </EditableSection>
             </section>

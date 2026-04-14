@@ -4,7 +4,10 @@ import { useState, useCallback, useMemo } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
-import { generateSemiformal } from "@/app/lib/formalization/api";
+import { fetchStreamingApi } from "@/app/lib/formalization/api";
+import { throttle } from "@/app/lib/utils/throttle";
+import { parse as parsePartialJson } from "partial-json";
+import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
 
 export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "generating" | "done" | "error">>;
 
@@ -12,12 +15,13 @@ export type ArtifactLoadingState = Partial<Record<ArtifactType, "idle" | "genera
  * Fires parallel artifact generation requests for selected types.
  *
  * Special cases:
- * - "semiformal" calls the existing semiformal route (returns { proof })
  * - "lean" is never generated here — it's step 2 of the deductive pipeline
+ * - "semiformal" is handled by useFormalizationPipeline, not this hook
  * - All other types use ARTIFACT_ROUTE and return JSON keyed by their type
  */
 export function useArtifactGeneration() {
   const [loadingState, setLoadingState] = useState<ArtifactLoadingState>({});
+  const [streamingJsonPreview, setStreamingJsonPreview] = useState<Partial<Record<ArtifactType, unknown>>>({});
 
   const generateArtifacts = useCallback(async (
     selectedTypes: ArtifactType[],
@@ -31,30 +35,39 @@ export function useArtifactGeneration() {
     const initialState: ArtifactLoadingState = {};
     for (const t of types) initialState[t] = "generating";
     setLoadingState(initialState);
+    setStreamingJsonPreview({});
 
     const promises = types.map(async (type): Promise<[ArtifactType, unknown | null]> => {
       try {
-        if (type === "semiformal") {
-          const proof = await generateSemiformal(request.sourceText, request.context);
-          return [type, proof];
-        }
-
         const route = ARTIFACT_ROUTE[type];
         if (!route) return [type, null];
 
-        const res = await fetch(route, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(`[${type}]`, data.error);
+        // Stream JSON artifacts with partial-JSON parsing for progressive rendering
+        const responseKey = ARTIFACT_RESPONSE_KEY[type];
+        const onPartial = throttle((accumulated: string) => {
+          try {
+            const partial = parsePartialJson(stripLeadingCodeFence(accumulated));
+            if (partial && typeof partial === "object") {
+              // Extract inner value by response key (e.g. {"causalGraph": {...}} → {...})
+              // so the preview matches what panels expect.
+              const inner = (partial as Record<string, unknown>)[responseKey] ?? partial;
+              setStreamingJsonPreview((prev) => ({ ...prev, [type]: inner }));
+            }
+          } catch {
+            // partial-json parse failed — keep previous preview
+          }
+        }, 50);
+
+        const { text: finalText } = await fetchStreamingApi(route, request, { onToken: onPartial });
+
+        // Parse the final complete JSON
+        try {
+          const parsed = JSON.parse(stripCodeFences(finalText));
+          return [type, parsed[responseKey] ?? parsed];
+        } catch {
+          console.error(`[${type}] Failed to parse final JSON`);
           return [type, null];
         }
-
-        const responseKey = ARTIFACT_RESPONSE_KEY[type];
-        return [type, data[responseKey] ?? null];
       } catch (err) {
         console.error(`[${type}]`, err);
         return [type, null];
@@ -75,6 +88,7 @@ export function useArtifactGeneration() {
     }
 
     setLoadingState(finalState);
+    setStreamingJsonPreview({});
     return results;
   }, []);
 
@@ -83,5 +97,5 @@ export function useArtifactGeneration() {
     [loadingState],
   );
 
-  return { loadingState, generateArtifacts, isAnyGenerating };
+  return { loadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating };
 }

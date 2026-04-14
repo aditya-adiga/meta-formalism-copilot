@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handleArtifactRoute } from "@/app/lib/formalization/artifactRoute";
+import { causalGraphSchema } from "@/app/lib/llm/schemas";
 
 const SYSTEM_PROMPT = `You are a causal reasoning analyst. Given source text and optional context, extract the causal structure: identify variables, causal relationships (edges), potential confounders, and summarize the causal model.
 
@@ -55,5 +56,6 @@ export async function POST(request: NextRequest) {
     systemPrompt: SYSTEM_PROMPT,
     responseKey: "causalGraph",
     mockResponse,
+    responseFormat: causalGraphSchema,
   });
 }
