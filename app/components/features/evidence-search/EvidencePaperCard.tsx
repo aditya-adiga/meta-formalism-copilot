@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { EvidencePaper } from "@/app/lib/types/evidence";
+import type { EvidencePaper, PaperOverlapStatus } from "@/app/lib/types/evidence";
 import { STUDY_TYPE_LABELS } from "@/app/lib/types/evidence";
 import EvidenceScoreBadge from "./EvidenceScoreBadge";
 
@@ -19,7 +19,21 @@ function paperUrl(paper: EvidencePaper): string | null {
   return null;
 }
 
-export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
+const OVERLAP_BADGE_STYLES: Record<Exclude<PaperOverlapStatus, "no-reviews">, { label: string; className: string }> = {
+  review: { label: "Review paper", className: "text-blue-700 bg-blue-50 border-blue-200" },
+  subsumed: { label: "Included in review", className: "text-amber-700 bg-amber-50 border-amber-200" },
+  novel: { label: "Novel", className: "text-green-700 bg-green-50 border-green-200" },
+};
+
+export default function EvidencePaperCard({
+  paper,
+  overlapStatus,
+  subsumingReviewTitle,
+}: {
+  paper: EvidencePaper;
+  overlapStatus?: PaperOverlapStatus;
+  subsumingReviewTitle?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const url = paperUrl(paper);
   const needsTruncation = paper.abstract && paper.abstract.length > ABSTRACT_TRUNCATE;
@@ -38,25 +52,39 @@ export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
           )}
         </div>
 
-        {/* Score badges */}
-        {hasScores && (
-          <div className="flex items-center gap-1 shrink-0">
-            {paper.reliability && (
-              <EvidenceScoreBadge
-                label="Rel"
-                score={paper.reliability.score}
-                tooltip={`Reliability: ${paper.reliability.rationale}`}
-              />
-            )}
-            {paper.relatedness && (
-              <EvidenceScoreBadge
-                label="Fit"
-                score={paper.relatedness.score}
-                tooltip={`Relatedness: ${paper.relatedness.rationale}`}
-              />
-            )}
-          </div>
-        )}
+        {/* Score and overlap badges */}
+        <div className="flex items-center gap-1 shrink-0">
+          {hasScores && (
+            <>
+              {paper.reliability && (
+                <EvidenceScoreBadge
+                  label="Rel"
+                  score={paper.reliability.score}
+                  tooltip={`Reliability: ${paper.reliability.rationale}`}
+                />
+              )}
+              {paper.relatedness && (
+                <EvidenceScoreBadge
+                  label="Fit"
+                  score={paper.relatedness.score}
+                  tooltip={`Relatedness: ${paper.relatedness.rationale}`}
+                />
+              )}
+            </>
+          )}
+          {overlapStatus && overlapStatus !== "no-reviews" && (
+            <span
+              className={`inline-flex items-center rounded border px-1 py-0.5 text-[10px] font-mono cursor-default ${OVERLAP_BADGE_STYLES[overlapStatus].className}`}
+              title={
+                overlapStatus === "subsumed" && subsumingReviewTitle
+                  ? `Included in: ${subsumingReviewTitle}`
+                  : undefined
+              }
+            >
+              {OVERLAP_BADGE_STYLES[overlapStatus].label}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-2 text-xs text-[#6B6560]">
@@ -75,6 +103,13 @@ export default function EvidencePaperCard({ paper }: { paper: EvidencePaper }) {
           </span>
         )}
       </div>
+
+      {/* Subsuming review detail */}
+      {overlapStatus === "subsumed" && subsumingReviewTitle && (
+        <div className="text-[10px] text-[#9A9590] mt-0.5">
+          Covered by: {subsumingReviewTitle}
+        </div>
+      )}
 
       {/* Red flags */}
       {paper.reliability && paper.reliability.redFlags.length > 0 && (
