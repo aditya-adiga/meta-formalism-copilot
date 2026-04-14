@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EvidencePaper, EvidenceSlot } from "@/app/lib/types/evidence";
+import type { EvidencePaper, EvidenceSlot, OverlapAnalysis } from "@/app/lib/types/evidence";
 import EvidencePaperCard from "./EvidencePaperCard";
+import OverlapSummary from "./OverlapSummary";
 
 /** Sort papers by combined score (reliability + relatedness) descending.
  *  Unscored papers sort to the end. */
@@ -20,12 +21,24 @@ type EvidenceResultsSectionProps = {
   onScore?: () => void;
   /** Whether scoring is currently in progress */
   isScoring?: boolean;
+  /** Callback to trigger overlap analysis — rendered as button if provided */
+  onAnalyzeOverlap?: () => void;
+  /** Whether overlap analysis is currently in progress */
+  isAnalyzing?: boolean;
+  /** Overlap analysis results (null if not yet analyzed) */
+  overlap?: OverlapAnalysis | null;
+  /** Whether the slot has review-type papers (controls button visibility) */
+  hasReviews?: boolean;
 };
 
 export default function EvidenceResultsSection({
   slot,
   onScore,
   isScoring,
+  onAnalyzeOverlap,
+  isAnalyzing,
+  overlap,
+  hasReviews,
 }: EvidenceResultsSectionProps) {
   const [open, setOpen] = useState(true);
   const count = slot.papers.length;
@@ -55,21 +68,39 @@ export default function EvidenceResultsSection({
           )}
         </button>
 
-        {/* Score button — only show when there are papers and scoring is available */}
-        {onScore && count > 0 && (
-          <button
-            type="button"
-            disabled={isScoring}
-            onClick={onScore}
-            className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
-          >
-            {isScoring
-              ? "Scoring..."
-              : slot.scored
-                ? "Re-score"
-                : "Score papers"}
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {/* Score button — only show when there are papers and scoring is available */}
+          {onScore && count > 0 && (
+            <button
+              type="button"
+              disabled={isScoring}
+              onClick={onScore}
+              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+            >
+              {isScoring
+                ? "Scoring..."
+                : slot.scored
+                  ? "Re-score"
+                  : "Score papers"}
+            </button>
+          )}
+
+          {/* Overlap button — only show when scored and has review papers */}
+          {onAnalyzeOverlap && slot.scored && hasReviews && (
+            <button
+              type="button"
+              disabled={isAnalyzing}
+              onClick={onAnalyzeOverlap}
+              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+            >
+              {isAnalyzing
+                ? "Analyzing..."
+                : overlap
+                  ? "Re-analyze overlap"
+                  : "Check overlap"}
+            </button>
+          )}
+        </div>
       </div>
 
       {open && (
@@ -80,9 +111,33 @@ export default function EvidenceResultsSection({
             </p>
           )}
 
-          {displayPapers.map((paper) => (
-            <EvidencePaperCard key={paper.openAlexId} paper={paper} />
-          ))}
+          {overlap && <OverlapSummary analysis={overlap} />}
+
+          {displayPapers.map((paper) => {
+            const status = overlap?.paperStatus[paper.openAlexId];
+            // Find the first review that subsumes this paper (for display)
+            const subsumingReviewTitle =
+              status === "subsumed"
+                ? (() => {
+                    const rel = overlap?.relations.find(
+                      (r) => r.studyId === paper.openAlexId,
+                    );
+                    if (!rel) return undefined;
+                    return slot.papers.find(
+                      (p) => p.openAlexId === rel.reviewId,
+                    )?.title;
+                  })()
+                : undefined;
+
+            return (
+              <EvidencePaperCard
+                key={paper.openAlexId}
+                paper={paper}
+                overlapStatus={status}
+                subsumingReviewTitle={subsumingReviewTitle}
+              />
+            );
+          })}
 
           {/* Search queries used (muted) */}
           {slot.searchQueries.length > 0 && (
