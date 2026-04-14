@@ -3,11 +3,14 @@
 import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
+  /** Partial graph data from streaming (partial-JSON parsed) */
+  streamingPreview?: CausalGraphResponse["causalGraph"] | null;
   loading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
 };
@@ -37,7 +40,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {/* Variables */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Variables ({causalGraph.variables.length})
+          Factors ({causalGraph.variables.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.variables.map((v) => (
@@ -55,7 +58,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {/* Edges */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Causal Edges ({causalGraph.edges.length})
+          Relationships ({causalGraph.edges.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
@@ -76,7 +79,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
       {causalGraph.confounders.length > 0 && (
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-            Confounders ({causalGraph.confounders.length})
+            Hidden Factors ({causalGraph.confounders.length})
           </h3>
           <div className="space-y-2">
             {causalGraph.confounders.map((c) => (
@@ -94,18 +97,23 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
   );
 }
 
-export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }: CausalGraphPanelProps) {
+export default function CausalGraphPanel({ causalGraph, streamingPreview, loading, waitEstimate }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
+
+  const { displayData: displayGraph, hasDisplayData } = mergeStreamingPreview(
+    causalGraph, streamingPreview,
+    (d) => (d.variables?.length ?? 0) > 0,
+  );
 
   return (
     <ArtifactPanelShell
-      title="Causal Graph"
-      loading={loading}
-      hasData={causalGraph !== null}
-      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      title="Cause & Effect Map"
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
+      emptyMessage="No cause & effect map yet. Generate one from the Source panel or component detail."
+      loadingMessage={`Generating cause & effect map...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
     >
-      {causalGraph && (
+      {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
           {/* View toggle */}
           <div className="flex gap-1 mb-3">
@@ -133,10 +141,10 @@ export default function CausalGraphPanel({ causalGraph, loading, waitEstimate }:
 
           {viewMode === "graph" ? (
             <div className="flex-1 min-h-[400px]">
-              <CausalGraphView causalGraph={causalGraph} />
+              <CausalGraphView causalGraph={displayGraph} />
             </div>
           ) : (
-            <DetailsView causalGraph={causalGraph} />
+            <DetailsView causalGraph={displayGraph} />
           )}
         </div>
       )}

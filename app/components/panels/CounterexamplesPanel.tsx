@@ -20,7 +20,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
       title="Counterexamples"
       loading={loading}
       hasData={counterexamples !== null}
-      emptyMessage="No counterexamples yet. Generate them from the source panel or node detail."
+      emptyMessage="No counterexamples yet. Generate them from the Source panel or component detail."
       loadingMessage="Generating counterexamples..."
     >
       {counterexamples && (
@@ -33,7 +33,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
 
           {/* Claim under test */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Under Test</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Being Challenged</h3>
             <p className="text-sm text-[var(--ink-black)] leading-relaxed italic">{counterexamples.claim}</p>
           </section>
 
@@ -53,7 +53,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
                   </div>
                   <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
                   <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Targets:</span> {cx.targetAssumption}
+                    <span className="font-semibold">Challenges:</span> {cx.targetAssumption}
                   </div>
                   <div className="text-xs text-[#6B6560]">
                     <span className="font-semibold">Why it works:</span> {cx.explanation}
@@ -65,7 +65,7 @@ export default function CounterexamplesPanel({ counterexamples, loading }: Count
 
           {/* Robustness Assessment */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Robustness Assessment</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Overall Strength</h3>
             <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
           </section>
         </>

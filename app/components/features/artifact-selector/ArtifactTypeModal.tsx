@@ -43,7 +43,7 @@ export default function ArtifactTypeModal({
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-[var(--ink-black)]">
-            Choose Formalization Types
+            Choose Output Types
           </h2>
           <button
             onClick={onClose}

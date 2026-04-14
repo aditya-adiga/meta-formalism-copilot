@@ -32,7 +32,7 @@ describe('LeanCodeDisplay', () => {
   it('switches to raw editing mode when Edit is clicked', async () => {
     render(<LeanCodeDisplay {...defaultProps} />)
     await userEvent.click(screen.getByText('Edit'))
-    expect(screen.getByLabelText('Lean4 code')).toBeInTheDocument()
+    expect(screen.getByLabelText('Proof code')).toBeInTheDocument()
     expect(screen.getByText('Done')).toBeInTheDocument()
   })
 
@@ -41,7 +41,7 @@ describe('LeanCodeDisplay', () => {
     render(<LeanCodeDisplay {...defaultProps} onCodeChange={onCodeChange} />)
 
     await userEvent.click(screen.getByText('Edit'))
-    const textarea = screen.getByLabelText('Lean4 code')
+    const textarea = screen.getByLabelText('Proof code')
     await userEvent.clear(textarea)
     await userEvent.type(textarea, 'new code')
     await userEvent.click(screen.getByText('Done'))
@@ -58,7 +58,7 @@ describe('LeanCodeDisplay', () => {
       />
     )
     expect(screen.getByText('type mismatch')).toBeInTheDocument()
-    expect(screen.getByText('lake build output')).toBeInTheDocument()
+    expect(screen.getByText('Proof checker output')).toBeInTheDocument()
   })
 
   it('shows code metrics when verification is invalid', () => {
@@ -71,7 +71,7 @@ describe('LeanCodeDisplay', () => {
         verificationErrors="error"
       />
     )
-    expect(screen.getByText(`${code.length} chars · 3 lines submitted to verifier`)).toBeInTheDocument()
+    expect(screen.getByText(`${code.length} chars · 3 lines submitted for checking`)).toBeInTheDocument()
   })
 
   it('shows Re-verify button on invalid status', () => {
@@ -82,7 +82,7 @@ describe('LeanCodeDisplay', () => {
         verificationErrors="error"
       />
     )
-    expect(screen.getByText('Re-verify ↺')).toBeInTheDocument()
+    expect(screen.getByText('Re-check ↺')).toBeInTheDocument()
   })
 
   it('calls onReVerify when Re-verify is clicked', async () => {
@@ -95,7 +95,7 @@ describe('LeanCodeDisplay', () => {
         verificationErrors="error"
       />
     )
-    await userEvent.click(screen.getByText('Re-verify ↺'))
+    await userEvent.click(screen.getByText('Re-check ↺'))
     expect(onReVerify).toHaveBeenCalledOnce()
   })
 
@@ -108,29 +108,29 @@ describe('LeanCodeDisplay', () => {
         verificationErrors="error"
       />
     )
-    expect(screen.getByText('Re-verify ↺')).toBeDisabled()
+    expect(screen.getByText('Re-check ↺')).toBeDisabled()
   })
 
   it('shows the iteration bar when code is present', () => {
     render(<LeanCodeDisplay {...defaultProps} />)
-    expect(screen.getByLabelText('Lean4 iteration instruction')).toBeInTheDocument()
+    expect(screen.getByLabelText('Proof code instruction')).toBeInTheDocument()
   })
 
   it('calls onIterate when instruction is submitted', async () => {
     const onIterate = vi.fn()
     render(<LeanCodeDisplay {...defaultProps} onIterate={onIterate} />)
 
-    await userEvent.type(screen.getByLabelText('Lean4 iteration instruction'), 'fix the proof{Enter}')
+    await userEvent.type(screen.getByLabelText('Proof code instruction'), 'fix the proof{Enter}')
     expect(onIterate).toHaveBeenCalledWith('fix the proof')
   })
 
   it('disables iteration input when iterating', () => {
     render(<LeanCodeDisplay {...defaultProps} iterating={true} />)
-    expect(screen.getByLabelText('Lean4 iteration instruction')).toBeDisabled()
+    expect(screen.getByLabelText('Proof code instruction')).toBeDisabled()
   })
 
   it('shows "Iterating…" placeholder when iterating', () => {
     render(<LeanCodeDisplay {...defaultProps} iterating={true} />)
-    expect(screen.getByPlaceholderText('Iterating…')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Working…')).toBeInTheDocument()
   })
 })
