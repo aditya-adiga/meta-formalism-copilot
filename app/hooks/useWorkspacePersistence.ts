@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { VerificationStatus } from "@/app/lib/types/session";
 import { loadWorkspace, saveWorkspace, type ArtifactPersistenceData, type SaveWorkspaceInput } from "@/app/lib/utils/workspacePersistence";
+import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 
 type WorkspaceState = {
   sourceText: string;
@@ -20,6 +21,9 @@ type WorkspaceState = {
   propertyTests: string | null;
   dialecticalMap: string | null;
   counterexamples: string | null;
+  // Custom artifact types
+  customArtifactTypes: CustomArtifactTypeDefinition[];
+  customArtifactData: Record<string, string | null>;
 };
 
 const DEFAULT_STATE: WorkspaceState = {
@@ -36,6 +40,8 @@ const DEFAULT_STATE: WorkspaceState = {
   propertyTests: null,
   dialecticalMap: null,
   counterexamples: null,
+  customArtifactTypes: [],
+  customArtifactData: {},
 };
 
 export function useWorkspacePersistence() {
@@ -74,6 +80,8 @@ export function useWorkspacePersistence() {
       propertyTests: data.propertyTests,
       dialecticalMap: data.dialecticalMap,
       counterexamples: data.counterexamples,
+      customArtifactTypes: data.customArtifactTypes ?? [],
+      customArtifactData: data.customArtifactData ?? {},
     });
 
     decompRef.current = data.decomposition;
@@ -92,7 +100,8 @@ export function useWorkspacePersistence() {
     propertyTests: state.propertyTests,
     dialecticalMap: state.dialecticalMap,
     counterexamples: state.counterexamples,
-  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap, state.counterexamples]);
+    customArtifactData: state.customArtifactData,
+  }), [state.causalGraph, state.statisticalModel, state.propertyTests, state.dialecticalMap, state.counterexamples, state.customArtifactData]);
 
   const artifactRef = useRef(artifactData);
   useEffect(() => { artifactRef.current = artifactData; }, [artifactData]);
@@ -113,6 +122,7 @@ export function useWorkspacePersistence() {
         verificationErrors: s.verificationErrors,
         decomposition: decompRef.current,
         artifacts: artifactRef.current,
+        customArtifactTypes: s.customArtifactTypes,
       };
       saveWorkspace(input);
     }, 500);
@@ -149,6 +159,38 @@ export function useWorkspacePersistence() {
   const setDialecticalMap = useCallback((v: string | null) => setState((s) => ({ ...s, dialecticalMap: v })), []);
   const setCounterexamples = useCallback((v: string | null) => setState((s) => ({ ...s, counterexamples: v })), []);
 
+  // --- Custom artifact type management ---
+  const setCustomArtifactTypes = useCallback((v: CustomArtifactTypeDefinition[]) =>
+    setState((s) => ({ ...s, customArtifactTypes: v })), []);
+  const addCustomArtifactType = useCallback((def: CustomArtifactTypeDefinition) =>
+    setState((s) => ({ ...s, customArtifactTypes: [...s.customArtifactTypes, def] })), []);
+  const updateCustomArtifactType = useCallback((id: string, updates: Partial<CustomArtifactTypeDefinition>) =>
+    setState((s) => {
+      const old = s.customArtifactTypes.find((ct) => ct.id === id);
+      // Clear generated data if the system prompt changed (output is now stale)
+      const promptChanged = updates.systemPrompt != null && old && updates.systemPrompt !== old.systemPrompt;
+      return {
+        ...s,
+        customArtifactTypes: s.customArtifactTypes.map((ct) =>
+          ct.id === id ? { ...ct, ...updates, updatedAt: new Date().toISOString() } : ct,
+        ),
+        ...(promptChanged ? { customArtifactData: { ...s.customArtifactData, [id]: null } } : {}),
+      };
+    }), []);
+  const removeCustomArtifactType = useCallback((id: string) =>
+    setState((s) => ({
+      ...s,
+      customArtifactTypes: s.customArtifactTypes.filter((ct) => ct.id !== id),
+      customArtifactData: Object.fromEntries(
+        Object.entries(s.customArtifactData).filter(([k]) => k !== id),
+      ),
+    })), []);
+  const setCustomArtifactContent = useCallback((id: CustomArtifactTypeId, content: string | null) =>
+    setState((s) => {
+      if (s.customArtifactData[id] === content) return s;
+      return { ...s, customArtifactData: { ...s.customArtifactData, [id]: content } };
+    }), []);
+
   /** Build a PersistedWorkspace snapshot of the current state (synchronous) */
   const getSnapshot = useCallback((): PersistedWorkspace => {
     const s = stateRef.current;
@@ -169,6 +211,8 @@ export function useWorkspacePersistence() {
       propertyTests: a.propertyTests,
       dialecticalMap: a.dialecticalMap,
       counterexamples: a.counterexamples,
+      customArtifactTypes: s.customArtifactTypes,
+      customArtifactData: a.customArtifactData ?? {},
     };
   }, []);
 
@@ -191,6 +235,8 @@ export function useWorkspacePersistence() {
       propertyTests: data.propertyTests,
       dialecticalMap: data.dialecticalMap,
       counterexamples: data.counterexamples,
+      customArtifactTypes: data.customArtifactTypes ?? [],
+      customArtifactData: data.customArtifactData ?? {},
     });
 
     decompRef.current = data.decomposition;
@@ -212,7 +258,9 @@ export function useWorkspacePersistence() {
         propertyTests: data.propertyTests,
         dialecticalMap: data.dialecticalMap,
         counterexamples: data.counterexamples,
+        customArtifactData: data.customArtifactData ?? {},
       },
+      customArtifactTypes: data.customArtifactTypes ?? [],
     });
 
     return data.decomposition;
@@ -263,10 +311,17 @@ export function useWorkspacePersistence() {
     setDialecticalMap,
     counterexamples: state.counterexamples,
     setCounterexamples,
+    customArtifactTypes: state.customArtifactTypes,
+    setCustomArtifactTypes,
+    addCustomArtifactType,
+    updateCustomArtifactType,
+    removeCustomArtifactType,
+    customArtifactData: state.customArtifactData,
+    setCustomArtifactContent,
     restoredDecompState,
     persistDecompState,
     getSnapshot,
     resetToSnapshot,
     clearWorkspace,
-  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap, setCounterexamples, getSnapshot, resetToSnapshot, clearWorkspace]);
+  }), [state, restoredDecompState, persistDecompState, setSourceText, setExtractedFiles, setContextText, setSemiformalText, setLeanCode, setSemiformalDirty, setVerificationStatus, setVerificationErrors, setCausalGraph, setStatisticalModel, setPropertyTests, setDialecticalMap, setCounterexamples, setCustomArtifactTypes, addCustomArtifactType, updateCustomArtifactType, removeCustomArtifactType, setCustomArtifactContent, getSnapshot, resetToSnapshot, clearWorkspace]);
 }
