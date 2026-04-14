@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 
@@ -59,7 +60,7 @@ export default function GraphPanel({
   const { displayData: displayPropositions, hasDisplayData: hasNodes } = useStreamingMerge(
     propositions.length > 0 ? propositions : null,
     streamingPropositions,
-    (data) => data.length > 0,
+    (data: PropositionNode[]) => data.length > 0,
   );
   const [exporting, setExporting] = useState(false);
   const [showArtifactPicker, setShowArtifactPicker] = useState(false);
