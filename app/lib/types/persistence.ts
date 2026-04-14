@@ -9,6 +9,7 @@ export type PersistedDecomposition = {
   selectedNodeId: string | null;
   paperText: string;
   sources: SourceDocument[];
+  graphLayout?: import("./decomposition").GraphLayout;
 };
 
 export type PersistedWorkspace = {
@@ -26,6 +27,6 @@ export type PersistedWorkspace = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  balancedPerspectives: string | null;
   counterexamples: string | null;
 };

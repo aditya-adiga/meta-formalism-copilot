@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const BASE_SYSTEM_PROMPT = `You are a Lean4 formalization assistant. The user will provide an informal or semi-formal mathematical proof. Convert it into valid Lean4 code.
 
@@ -93,56 +93,21 @@ export async function POST(request: NextRequest) {
     userContent += `\n\nAdditional instruction: ${instruction}`;
   }
 
-  // Streaming path: stream raw tokens, then post-process the final text
+  // Streaming path: use transformFinalText to post-process the done event
   if (wantStream) {
-    const rawStream = streamLlm({
+    const stream = streamLlm({
       endpoint: "formalization/lean",
       systemPrompt,
       userContent,
       maxTokens: 16384,
       openRouterModel: OPENROUTER_MODEL,
+      transformFinalText: (text) => {
+        const cleaned = stripCodeFences(text);
+        return hasContext ? stripImports(cleaned) : cleaned;
+      },
     });
 
-    // Transform the `done` event to apply stripCodeFences and import stripping.
-    // Decoders are created once outside the transform callback to avoid
-    // per-chunk allocation and to preserve multi-byte character state.
-    const decoder = new TextDecoder();
-    const textEncoder = new TextEncoder();
-    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true });
-        const events = text.split("\n\n").filter(Boolean);
-        for (const eventBlock of events) {
-          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
-          if (!eventMatch) {
-            controller.enqueue(chunk);
-            continue;
-          }
-          const [, eventType, dataStr] = eventMatch;
-          if (eventType === "done") {
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.usage?.provider === "mock") {
-                data.text = mockResponse(informalProof, isRetry);
-              } else {
-                data.text = stripCodeFences(data.text);
-              }
-              if (hasContext) {
-                data.text = stripImports(data.text);
-              }
-              controller.enqueue(sseEvent("done", data));
-            } catch {
-              controller.enqueue(chunk);
-            }
-          } else {
-            // Pass through token and error events unchanged
-            controller.enqueue(textEncoder.encode(eventBlock + "\n\n"));
-          }
-        }
-      },
-    }));
-
-    return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
   }
 
   try {

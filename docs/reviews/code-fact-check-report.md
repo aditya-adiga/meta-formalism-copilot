@@ -1,148 +1,45 @@
-# Code Fact-Check Report
+# Code Fact-Check Report (Loop 2 Re-check)
 
 **Repository:** meta-formalism-copilot
-**Scope:** Branch `feat/zustand-wire-page` relative to `main`
-**Checked:** 2026-04-03 (Loop 2)
-**Prior loop:** 22 claims, 17 verified, 3 mostly accurate, 0 incorrect, 1 unverifiable
-**Fixes applied in:** commit 3ed18f8
-**Total claims checked:** 25 (22 prior + 3 new from fix commit)
-**Summary:** 22 verified, 0 mostly accurate, 0 stale, 0 incorrect, 0 unverifiable
+**Scope:** Fix commit on `feat/graph-persistence-editing` relative to `feat/zustand-wire-page`
+**Checked:** 2026-04-03
+**Prior findings re-checked:** 5
+**New claims introduced by fixes:** 2
 
 ---
 
-## Previously "Mostly Accurate" Claims -- Re-checked
+## Re-check Results
 
-### Claim 2: "persist middleware handles serialization lifecycle; custom debounced storage adapter rate-limits writes"
+### Finding 1 (Claim 8): Decision doc heading "005" vs "006"
+**Verdict:** Fix verified.
+Heading in `docs/decisions/006-zustand-state-management.md` now reads `# 006: Zustand for State Management`, matching the filename.
 
-**Location:** `app/lib/stores/workspaceStore.ts:5`
-**Type:** Architectural
-**Verdict:** Verified (was: Mostly Accurate)
-**Confidence:** High
+### Finding 2 (Claim 13): `wouldCreateCycle` JSDoc direction
+**Verdict:** Fix verified, but inline comment introduces a new inaccuracy.
+The JSDoc (lines 16-19) now correctly states: "Uses DFS from `fromId` following dependsOn chains to check if `fromId` can already reach `toId`." This matches the code: `canReach(fromId, toId)` starts at `fromId` and traverses `dependsOn` edges.
 
-The comment was rewritten in commit 3ed18f8. The new phrasing precisely describes both roles: the persist middleware manages the serialization lifecycle (when/what to save, rehydration, merging), while the custom `createDebouncedStorage` adapter (lines 30-55) rate-limits the actual `localStorage.setItem` calls with a 300ms debounce.
+**New issue:** The inline comment at line 29 reads: "A cycle exists if fromId is already reachable from toId via dependsOn." This is backwards. It should read: "A cycle exists if **toId** is already reachable from **fromId** via dependsOn." The JSDoc is correct; only this interior comment has the direction reversed.
 
-**Evidence:** `app/lib/stores/workspaceStore.ts:5,30-55`
+**Evidence:** `app/lib/utils/graphOperations.ts:29` vs `app/lib/utils/graphOperations.ts:47` (`canReach(fromId, toId)`)
 
----
+### Finding 3 (Claim 14): `addEdge` JSDoc missing third null-return condition
+**Verdict:** Fix verified.
+JSDoc now reads: "Returns null if either node doesn't exist, the edge already exists, or the edge would create a cycle." All three conditions documented, matching the code at lines 134-143.
 
-### Claim 9: "Reuses coerceDecomposition from workspacePersistence for thorough node validation."
+### Finding 4 (New): `nodesRef` comment in `useDecomposition.ts`
+**Verdict:** Verified.
+The comment at lines 27-28 says the ref "tracks latest nodes so addGraphEdge can read fresh state synchronously without depending on state.nodes in its useCallback deps (which caused stale closures)." This is accurate: the old code had `[state.nodes]` in the deps array and used `state.nodes` directly; the new code uses `nodesRef.current` with `[]` deps, avoiding stale closures from the useCallback dependency capture.
 
-**Location:** `app/lib/stores/workspaceStore.ts:59`
-**Type:** Architectural
-**Verdict:** Verified (was: Mostly Accurate)
-**Confidence:** High
-
-The comment was rewritten and the code was changed. `coerceDecomposition` is now exported from `workspacePersistence.ts` (line 114) and imported in `workspaceStore.ts` (line 21). The decomposition coercion code at line 130 calls `coerceDecomposition(persisted.decomposition)` directly, replacing the previous inline reimplementation. The function in `workspacePersistence.ts` validates every node field individually (id, label, kind, statement, proofText, dependsOn, etc.), making "thorough node validation" accurate.
-
-**Evidence:** `app/lib/stores/workspaceStore.ts:21,128-131`, `app/lib/utils/workspacePersistence.ts:114-149`
-
----
-
-### Claim 15: "Store setters -- Zustand selectors return the same function identity across state changes, so Object.is comparison prevents re-renders for these."
-
-**Location:** `app/page.tsx:92-93`
-**Type:** Behavioral
-**Verdict:** Verified (was: Mostly Accurate)
-**Confidence:** High
-
-The comment was rewritten in commit 3ed18f8. The new phrasing correctly explains the mechanism: Zustand action functions are defined once in the `create()` callback and are referentially stable. The `Object.is` comparison used by `useWorkspaceStore` sees the same function identity on every state change, so components subscribing to setters never re-render from those subscriptions.
-
-**Evidence:** `app/page.tsx:92-93`
+### Finding 5 (New): Streaming responseFormat comment in `artifactRoute.ts`
+**Verdict:** Verified.
+The comment at lines 70-73 says streaming does not pass `responseFormat` because provider streaming APIs don't support it consistently. Confirmed: `streamLlm`'s `StreamLlmOptions` type (`app/lib/llm/streamLlm.ts:25-36`) has no `responseFormat` parameter, while `callLlm` does accept it and passes it through. The batch path at line 92 does pass `config.responseFormat`.
 
 ---
 
-## Previously "Unverifiable" Claim -- Re-checked
+## Summary
 
-### Claim 11: GenerationProvenance type
+4 of 5 findings fully verified. One new issue found:
 
-**Location:** Previously `app/lib/types/artifactStore.ts:29-35`
-**Type:** Architectural
-**Verdict:** Resolved (removed)
-**Confidence:** High
-
-The `GenerationProvenance` type and its accompanying JSDoc comment were deleted in commit 3ed18f8. The file now ends cleanly with `MAX_VERSIONS = 20` at line 29. No dead code or orphaned comments remain. No other file referenced this type.
-
-**Evidence:** `app/lib/types/artifactStore.ts` (full file, 30 lines), `git diff 3ed18f8^..3ed18f8 -- app/lib/types/artifactStore.ts`
-
----
-
-## New Claims Introduced by Fix Commit
-
-### Claim 23: "Single setState call -- matches the batching pattern in resetWorkspaceToSnapshot"
-
-**Location:** `app/lib/stores/workspaceStore.ts:269`
-**Type:** Architectural
-**Verdict:** Verified
-**Confidence:** High
-
-The `migrateFromV2()` function (lines 252-283) was refactored from N individual setter calls to a single `useWorkspaceStore.setState({...})` call at line 270. The `resetWorkspaceToSnapshot` function is at `app/page.tsx:143-154` and uses the same pattern -- a single `useWorkspaceStore.setState({...})` with all fields. The batching claim is accurate.
-
-**Evidence:** `app/lib/stores/workspaceStore.ts:269-281`, `app/page.tsx:143-154`
-
----
-
-### Claim 24: "Partialize memoization -- avoid re-mapping decomposition nodes on every set() when only unrelated fields (e.g., sourceText) changed."
-
-**Location:** `app/lib/stores/workspaceStore.ts:287-288`
-**Type:** Performance
-**Verdict:** Verified
-**Confidence:** High
-
-The `sanitizeDecomposition` function (lines 294-307) uses module-level variables `_lastDecompRef` and `_lastDecompSanitized` to cache the result. When `decomposition` is the same object reference (`===` check at line 295), the cached result is returned without re-mapping nodes. Since `partialize` is called on every `set()` (Zustand persist behavior), this avoids O(n) node mapping when only unrelated fields like `sourceText` changed. The memoization is reference-based, which is correct because Zustand produces new state objects via spread only for changed fields.
-
-**Evidence:** `app/lib/stores/workspaceStore.ts:291-306,472`
-
----
-
-### Claim 25: "Batch-update persisted display state -- single setState instead of N separate set() calls"
-
-**Location:** `app/page.tsx:332`
-**Type:** Performance
-**Verdict:** Verified
-**Confidence:** High
-
-The `handleFormalizationComplete` callback (lines 332-349) builds an `artifactUpdates` map for all generated artifacts, then calls `useWorkspaceStore.setState()` once at line 346. This replaces the prior pattern of calling `store.setArtifactGenerated(key, ...)` in a loop, which would have triggered N separate `set()` calls (each triggering the debounced persist). The version capping logic (`slice(-MAX_VERSIONS + 1)`) at line 340 matches `setArtifactGenerated` in the store (line 308).
-
-**Evidence:** `app/page.tsx:332-349`, `app/lib/stores/workspaceStore.ts:302-312`
-
----
-
-## Unchanged Claims (Spot-checked for Staleness)
-
-Claims 1, 3-8, 10, 12-14, 16-22 were not modified by commit 3ed18f8 and their surrounding code is unchanged. Spot-checks:
-
-- **Claim 4** (partialize excludes actions): Line numbers shifted slightly due to new `sanitizeDecomposition` function. The `partialize` function is now at lines 460-473. Still excludes all action functions. **Still verified.**
-- **Claim 10** (versions oldest-first, capped at MAX_VERSIONS): `MAX_VERSIONS` moved from line 37 to line 29 in `artifactStore.ts` due to `GenerationProvenance` removal. Value is still 20. **Still verified.**
-- **Claim 12** (strip transient "verifying"): `sanitizeVerificationStatus` call is at line 469 (shifted from 434). **Still verified.**
-- **Claim 13** (File references dropped by JSON.stringify): Comment is at line 458-459 (shifted from 423). **Still verified.**
-
-No previously verified claims became stale.
-
----
-
-## Claim 9 Merge Comment -- Also Updated
-
-**Location:** `app/lib/stores/workspaceStore.ts:452`
-**Type:** Comment
-
-The `merge` function's comment was also updated from "This mirrors the defensive coercion in loadWorkspace() for the v2 path" to "Reuses coerceDecomposition from workspacePersistence for node-level field validation." This is consistent with the Claim 9 fix and is accurate -- the merge function calls `coercePersistedState`, which calls `coerceDecomposition`.
-
----
-
-## Claims Requiring Attention
-
-### Incorrect
-
-(None.)
-
-### Stale
-
-(None.)
-
-### Mostly Accurate
-
-(None -- all three prior "Mostly Accurate" claims are now Verified after comment fixes.)
-
-### Unverifiable
-
-(None -- the GenerationProvenance type was removed, eliminating the unverifiable forward-looking claim.)
+| Location | Issue | Severity |
+|---|---|---|
+| `app/lib/utils/graphOperations.ts:29` | Inline comment reverses fromId/toId reachability direction | Low (JSDoc is correct; only the interior comment is wrong) |

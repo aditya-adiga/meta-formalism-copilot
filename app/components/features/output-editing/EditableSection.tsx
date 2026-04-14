@@ -41,6 +41,11 @@ export default function EditableSection({ value, onChange, children }: EditableS
     prevSerializedRef.current = serialized;
   }, [serialized, editing]);
 
+  // Focus textarea when entering edit mode
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus();
+  }, [editing]);
+
   const startEditing = useCallback(() => {
     const text = isString ? (value as string) : JSON.stringify(value, null, 2);
     setEditText(text);
@@ -81,11 +86,11 @@ export default function EditableSection({ value, onChange, children }: EditableS
         setEditText(data.text);
       } else {
         // JSON-aware editing for objects/arrays
-        const data = await fetchApi<{ content: string }>("/api/edit/artifact", {
+        const data = await fetchApi<{ text: string }>("/api/edit/artifact", {
           content: editText,
           instruction: aiInstruction,
         });
-        setEditText(data.content);
+        setEditText(data.text);
       }
       setAiInstruction("");
       setParseError(null);

@@ -54,46 +54,50 @@ export async function fetchStreamingApi(
   let accumulated = "";
   let finalResult: StreamResult | null = null;
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split("\n\n");
-    // Keep the last (potentially incomplete) block in the buffer
-    buffer = blocks.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split("\n\n");
+      // Keep the last (potentially incomplete) block in the buffer
+      buffer = blocks.pop() ?? "";
 
-    for (const block of blocks) {
-      if (!block.trim()) continue;
+      for (const block of blocks) {
+        if (!block.trim()) continue;
 
-      let eventType = "";
-      let dataStr = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) eventType = line.slice(7);
-        else if (line.startsWith("data: ")) dataStr = line.slice(6);
-      }
+        let eventType = "";
+        let dataStr = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) eventType = line.slice(7);
+          else if (line.startsWith("data: ")) dataStr = line.slice(6);
+        }
 
-      if (!eventType || !dataStr) continue;
+        if (!eventType || !dataStr) continue;
 
-      if (eventType === "token") {
-        try {
-          const parsed = JSON.parse(dataStr);
-          accumulated += parsed.text;
-          callbacks.onToken(accumulated);
-        } catch { /* skip malformed */ }
-      } else if (eventType === "done") {
-        try {
-          const parsed = JSON.parse(dataStr);
-          finalResult = { text: parsed.text, usage: parsed.usage };
-        } catch { /* skip malformed */ }
-      } else if (eventType === "error") {
-        let errorMsg = "Stream error";
-        try {
-          errorMsg = JSON.parse(dataStr).error ?? errorMsg;
-        } catch { /* use default */ }
-        throw new Error(errorMsg);
+        if (eventType === "token") {
+          try {
+            const parsed = JSON.parse(dataStr);
+            accumulated += parsed.text;
+            callbacks.onToken(accumulated);
+          } catch { /* skip malformed */ }
+        } else if (eventType === "done") {
+          try {
+            const parsed = JSON.parse(dataStr);
+            finalResult = { text: parsed.text, usage: parsed.usage };
+          } catch { /* skip malformed */ }
+        } else if (eventType === "error") {
+          let errorMsg = "Stream error";
+          try {
+            errorMsg = JSON.parse(dataStr).error ?? errorMsg;
+          } catch { /* use default */ }
+          throw new Error(errorMsg);
+        }
       }
     }
+  } finally {
+    reader.releaseLock();
   }
 
   if (!finalResult) throw new Error("Stream ended without a done event");

@@ -5,7 +5,7 @@ import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
+import { CLAUDE_SONNET as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 export function buildUserMessage(req: ArtifactGenerationRequest): string {
   const parts: string[] = [];
@@ -67,6 +67,10 @@ export async function handleArtifactRoute(
 
   // Streaming path: all artifact types use real token streaming.
   // JSON artifacts stream raw tokens for partial-JSON parsing on the client.
+  // Note: streaming does not pass responseFormat (JSON schema enforcement) because
+  // provider streaming APIs don't support it consistently. The system prompt is
+  // relied upon to produce correctly-shaped JSON. The batch path enforces the schema
+  // as an extra safety net via responseFormat.
   if (wantStream) {
     const stream = streamLlm({
       endpoint: config.endpoint,

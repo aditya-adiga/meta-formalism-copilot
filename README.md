@@ -30,7 +30,7 @@ The interface is a **multi-panel workspace** with sidebar navigation. You move b
 - **Causal Graph** — Interactive visualization of variables, causal edges, confounders, and mechanisms.
 - **Statistical Model** — Variables with roles, hypotheses, assumptions, and sample requirements.
 - **Property Tests** — Invariants with preconditions, postconditions, and pseudocode generators.
-- **Dialectical Map** — Competing perspectives, tensions, and proposed synthesis.
+- **Balanced Perspectives** — Competing perspectives, tensions, and proposed synthesis.
 
 **Meta:**
 - **Analytics Panel** — Logs of all API calls and summary statistics.

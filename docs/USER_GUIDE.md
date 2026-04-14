@@ -30,7 +30,7 @@ The left sidebar (Icon Rail) lists every panel. Click an icon to switch panels.
 | Causal Graph | View and edit causal variable/edge diagrams |
 | Statistical Model | View and edit hypothesis/variable specifications |
 | Property Tests | View and edit invariant/test specifications |
-| Dialectical Map | View and edit multi-perspective argument maps |
+| Balanced Perspectives | View and edit multi-perspective argument maps |
 | Counterexamples | View and edit adversarial scenario analysis |
 | LLM Usage | See API call metrics, token counts, and costs |
 
@@ -82,7 +82,7 @@ Click one or more artifact type chips:
 | **Causal Graph** | A directed graph of variables and causal relationships with weights and confounders |
 | **Statistical Model** | Variables with roles, testable hypotheses, suggested statistical tests, and assumptions |
 | **Property Tests** | Invariants with preconditions, postconditions, pseudocode, and data generators |
-| **Dialectical Map** | Multiple perspectives on a topic, tensions between them, and a proposed synthesis |
+| **Balanced Perspectives** | Multiple perspectives on a topic, tensions between them, and a proposed synthesis |
 | **Counterexamples** | Adversarial scenarios that could falsify the claim, with plausibility ratings |
 
 Click **Browse types** for detailed descriptions and "when to use" guidance.
@@ -226,7 +226,7 @@ For decomposition mode, when a node depends on other verified nodes, their Lean 
 
 ## Working with Other Artifact Types
 
-The Causal Graph, Statistical Model, Property Tests, Dialectical Map, and Counterexamples panels all share a common interaction pattern:
+The Causal Graph, Statistical Model, Property Tests, Balanced Perspectives, and Counterexamples panels all share a common interaction pattern:
 
 ### Viewing
 

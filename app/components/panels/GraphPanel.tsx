@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
+import type { PropositionNode, SourceDocument, GraphLayout } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
@@ -37,6 +37,13 @@ type GraphPanelProps = {
   onPauseQueue: () => void;
   onResumeQueue: () => void;
   onCancelQueue: () => void;
+  graphLayout?: GraphLayout;
+  onLayoutChange?: (layout: GraphLayout) => void;
+  onAddNode?: () => void;
+  onDeleteNode?: (nodeId: string) => void;
+  onRenameNode?: (nodeId: string, label: string) => void;
+  onConnectNodes?: (fromId: string, toId: string) => boolean;
+  onDeleteEdges?: (edges: Array<{ source: string; target: string }>) => void;
 };
 
 export default function GraphPanel({
@@ -53,6 +60,13 @@ export default function GraphPanel({
   onPauseQueue,
   onResumeQueue,
   onCancelQueue,
+  graphLayout,
+  onLayoutChange,
+  onAddNode,
+  onDeleteNode,
+  onRenameNode,
+  onConnectNodes,
+  onDeleteEdges,
 }: GraphPanelProps) {
   const hasNodes = propositions.length > 0;
   const [exporting, setExporting] = useState(false);
@@ -103,6 +117,15 @@ export default function GraphPanel({
           Decomposition
         </h2>
         <div className="flex items-center gap-2">
+          {hasNodes && onAddNode && (
+            <button
+              onClick={onAddNode}
+              className="rounded-full border border-[#DDD9D5] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+              title="Add a new node to the graph"
+            >
+              + Node
+            </button>
+          )}
           {hasNodes && (
             <DownloadButton
               label={exporting ? "Exporting..." : "Export .png"}
@@ -277,6 +300,12 @@ export default function GraphPanel({
             selectedNodeId={selectedNodeId}
             onSelectNode={onSelectNode}
             sourceColorMap={sourceColorMap}
+            initialPositions={graphLayout?.positions}
+            onLayoutChange={onLayoutChange}
+            onConnect={onConnectNodes}
+            onEdgesDelete={onDeleteEdges}
+            onNodeDelete={onDeleteNode}
+            onNodeRename={onRenameNode}
           />
         )}
       </div>

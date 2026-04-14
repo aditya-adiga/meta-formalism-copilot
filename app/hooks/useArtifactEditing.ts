@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import { fetchApi } from "@/app/lib/formalization/api";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -45,11 +45,11 @@ export function useArtifactEditing(
         const newContent = content.slice(0, selection.start) + data.text + content.slice(selection.end);
         setContent(newContent);
       } else {
-        const data = await fetchApi<{ content: string }>("/api/edit/artifact", {
+        const data = await fetchApi<{ text: string }>("/api/edit/artifact", {
           content,
           instruction,
         });
-        setContent(data.content);
+        setContent(data.text);
       }
     } catch (err) {
       console.error(`[edit/${artifactType}]`, err);
@@ -66,50 +66,52 @@ export function useArtifactEditing(
 }
 
 /**
- * Convenience hook that creates editing state for all structured artifact types.
- * Accepts the persisted JSON strings and their setters from useWorkspacePersistence.
+ * Convenience hook that creates useArtifactEditing instances for all structured
+ * artifact types. Returns a keyed object so callers can do e.g.
+ * `artifactEditing.causalGraph.handleAiEdit(...)`.
  */
-export function useAllArtifactEditing(artifacts: {
+export function useAllArtifactEditing(props: {
   causalGraph: string | null;
-  setCausalGraph: (v: string | null) => void;
+  setCausalGraph: (v: string) => void;
   statisticalModel: string | null;
-  setStatisticalModel: (v: string | null) => void;
+  setStatisticalModel: (v: string) => void;
   propertyTests: string | null;
-  setPropertyTests: (v: string | null) => void;
+  setPropertyTests: (v: string) => void;
   dialecticalMap: string | null;
-  setDialecticalMap: (v: string | null) => void;
+  setDialecticalMap: (v: string) => void;
   counterexamples: string | null;
-  setCounterexamples: (v: string | null) => void;
+  setCounterexamples: (v: string) => void;
 }) {
+  // Use refs so the getContent callbacks are stable across renders
+  const refs = useRef(props);
+  useEffect(() => { refs.current = props; });
+
   const causalGraph = useArtifactEditing(
     "causal-graph",
-    () => artifacts.causalGraph,
-    (json) => artifacts.setCausalGraph(json),
+    useCallback(() => refs.current.causalGraph, []),
+    useCallback((v: string) => refs.current.setCausalGraph(v), []),
   );
-
   const statisticalModel = useArtifactEditing(
     "statistical-model",
-    () => artifacts.statisticalModel,
-    (json) => artifacts.setStatisticalModel(json),
+    useCallback(() => refs.current.statisticalModel, []),
+    useCallback((v: string) => refs.current.setStatisticalModel(v), []),
   );
-
   const propertyTests = useArtifactEditing(
     "property-tests",
-    () => artifacts.propertyTests,
-    (json) => artifacts.setPropertyTests(json),
+    useCallback(() => refs.current.propertyTests, []),
+    useCallback((v: string) => refs.current.setPropertyTests(v), []),
   );
-
   const dialecticalMap = useArtifactEditing(
-    "dialectical-map",
-    () => artifacts.dialecticalMap,
-    (json) => artifacts.setDialecticalMap(json),
+    "balanced-perspectives",
+    useCallback(() => refs.current.dialecticalMap, []),
+    useCallback((v: string) => refs.current.setDialecticalMap(v), []),
   );
-
   const counterexamples = useArtifactEditing(
     "counterexamples",
-    () => artifacts.counterexamples,
-    (json) => artifacts.setCounterexamples(json),
+    useCallback(() => refs.current.counterexamples, []),
+    useCallback((v: string) => refs.current.setCounterexamples(v), []),
   );
 
   return { causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples };
 }
+

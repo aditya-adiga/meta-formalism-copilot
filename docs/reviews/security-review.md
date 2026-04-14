@@ -1,140 +1,208 @@
-# Security Code Review: feat/zustand-wire-page (Loop 2)
+# Security Code Review: feat/graph-persistence-editing
 
-**Branch:** `feat/zustand-wire-page` relative to `main`
-**Scope:** 20 files changed -- workspaceStore.ts, page.tsx, artifactStore.ts, workspacePersistence.ts, tests, package.json, docs
-**Reviewer:** Claude Opus 4.6 (security review)
+**Branch:** `feat/graph-persistence-editing` relative to `feat/zustand-wire-page`
+**Scope:** 87 files changed (+6,376 / -1,827 lines) -- incremental diff
+**Reviewer:** Claude Opus 4.6 (security review pipeline)
 **Date:** 2026-04-03
-**Loop:** 2 (prior loop found 5 findings; fixes applied in commit 3ed18f8)
 
 ## Trust Boundary Map
 
-This diff is entirely client-side. The trust boundaries are:
+1. **Browser -> Next.js API routes (HTTP):** All `/api/*` POST handlers accept untrusted JSON from the client. New in this branch: `edit/artifact` accepts `content` (arbitrary JSON string), `instruction` (free text), and `selection` (character offsets). Existing formalization routes now accept an additional `stream: true` flag that switches to SSE streaming responses.
 
-1. **localStorage -> Zustand store (rehydration)**: Data read from `workspace-zustand-v1` localStorage key is untrusted (modifiable by browser extensions, XSS payloads, or manual editing). Zustand's `persist` middleware deserializes it via `JSON.parse`, then the custom `merge` function passes it through `coercePersistedState()` before it reaches the store.
+2. **API routes -> LLM providers (outbound HTTP):** User-supplied text is interpolated into LLM prompts and sent to Anthropic or OpenRouter. The `edit/artifact` route sends the full JSON artifact content plus user instructions to DeepSeek Chat via OpenRouter. API keys (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`) are read from `process.env`.
 
-2. **Old workspace-v2 localStorage -> Zustand store (migration)**: `migrateFromV2()` reads the old `workspace-v2` key via `loadWorkspace()`, which performs its own defensive coercion (including the now-shared `coerceDecomposition`), then writes into the store via a single `setState()` call.
+3. **LLM responses -> API response (downstream):** LLM output is parsed and returned to the client. For `edit/artifact` whole mode, JSON validity is checked. For inline mode, raw LLM text is returned without validation. Streaming responses emit SSE events with partial text.
 
-3. **Zustand store -> localStorage (persistence)**: The `partialize` function controls what is written. It sanitizes `verificationStatus` and node statuses before serialization, with memoization via `sanitizeDecomposition` to avoid redundant node mapping. The debounced storage adapter wraps `setItem` in a try/catch for quota errors.
+4. **API routes -> filesystem (cache + analytics):** LLM responses are cached to `data/cache/{sha256-hash}.json`. Analytics entries appended to `data/analytics.jsonl`. Both use deterministic hashing for filenames.
 
-4. **Snapshot/restore boundary**: `getSnapshot()` produces a deep copy via `structuredClone`. `resetToSnapshot()` receives a `WorkspaceState` and applies it via `set({ ...data })`. Callers in `page.tsx` sanitize `verificationStatus` before calling, but the store method itself does not.
+5. **SSE streaming boundary:** `streamLlm.ts` produces SSE events via `ReadableStream`. Client-side `fetchStreamingApi` reads and parses these events. `sseEvent()` uses `JSON.stringify` for data serialization.
 
-5. **Zustand store -> React components**: Same client-side JS context; no trust transition. Components read via selectors and write via setters.
+6. **localStorage -> Zustand store:** Deserialization is validated via `coercePersistedState`. New in this branch: `graphLayout` (positions + viewport) is deserialized with field-level type checking in `coerceDecomposition`.
 
-No server-side code, API routes, authentication, or cryptographic operations are changed in this diff. The `ANTHROPIC_API_KEY` is not touched.
+7. **Client-side graph editing:** User drag, connect, delete, and rename operations go through pure functions in `graphOperations.ts` that operate on in-memory state. No network calls for graph structure changes.
 
-## Fix Verification (from Loop 1)
-
-### A1 (ArtifactVersion field validation) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Added `coerceArtifactVersion()` function that validates each field of an `ArtifactVersion` individually: `id` must be a string (rejects if not), `content` must be a string (rejects if not), `createdAt` falls back to `new Date().toISOString()`, `source` is validated against a `VALID_ARTIFACT_SOURCES` Set (falls back to `"generated"`), and `editInstruction` is accepted only if it is a string. `coerceArtifactRecord` now maps through `coerceArtifactVersion` and filters nulls instead of just checking `isObject`.
-
-**Assessment:** The fix is correct and complete. It closes the deserialization gap identified in Loop 1 Finding 1. The approach is consistent with how other fields in `coercePersistedState` are validated (typeof checks with safe defaults or rejection). The `VALID_ARTIFACT_SOURCES` Set prevents injection of unexpected source values. No new issues introduced.
-
-### A4 (GenerationProvenance removal) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Removed the unused `GenerationProvenance` type from `app/lib/types/artifactStore.ts`.
-
-**Assessment:** Clean removal. The type was dead code with a misleading comment. No references existed, so no downstream breakage.
-
-### A2 (Node coercion reuse) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** The inline decomposition coercion in `coercePersistedState()` was replaced with a call to the existing `coerceDecomposition()` function from `workspacePersistence.ts` (which was made `export`). The inline version had used `isObject` filtering with a spread-and-cast pattern that did not validate individual node fields. The shared `coerceDecomposition()` validates every field of each `PropositionNode` individually (id, label, kind, statement, proofText, dependsOn, sourceId, sourceLabel, etc.).
-
-**Assessment:** This is a meaningful security improvement. The prior inline version could pass through nodes with non-string fields (e.g., `id: 42` or `statement: null`) because it only checked `isObject` at the node level. The shared function validates each field with typeof checks and safe defaults. Single source of truth eliminates drift risk between the two code paths.
+8. **Section-level AI editing (EditableSection):** User text is serialized to JSON, sent to `/api/edit/artifact`, and the LLM response replaces the edited section. The user must explicitly click Save to commit changes.
 
 ## Findings
 
-### 1. resetToSnapshot applies data without internal sanitization
-
-**Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` line 406 (`resetToSnapshot: (data) => set({ ...data })`)
-**Move:** Find the implicit sanitization assumption
-**Confidence:** Low
-
-This finding persists from Loop 1 (was Finding 2). `resetToSnapshot` spreads the provided `WorkspaceState` directly into the store with no validation. Currently, the only caller (`page.tsx:resetWorkspaceToSnapshot`) sanitizes `verificationStatus` via `sanitizeVerificationStatus()` before calling. However, the store's public API does not enforce this -- a future caller could pass unsanitized data (e.g., `verificationStatus: "verifying"` from a stale session snapshot), leaving the app in a stuck loading state.
-
-The `partialize` function would sanitize the value before it reaches localStorage, so this would only affect the in-memory state until the next page load. The blast radius is limited to the current session.
-
-**Recommendation:** Move sanitization into the store's `resetToSnapshot` method as defense-in-depth.
-
-### 2. Non-atomic migration check (TOCTOU)
-
-**Severity:** Informational
-**Location:** `app/lib/stores/workspaceStore.ts` lines 478-493 (`onRehydrateStorage`)
-**Move:** Identify time-of-check to time-of-use gaps
-**Confidence:** Low
-
-Persists from Loop 1 (was Finding 4). The rehydration callback checks for `workspace-v2` and `workspace-zustand-v1` keys, parses the Zustand key, then conditionally runs `migrateFromV2()`. This is not atomic. In practice this is benign: migration is effectively idempotent, and this is a single-user client app. The `catch` block correctly falls through to migration if the Zustand key is corrupted.
-
-**Recommendation:** No action needed.
-
-### 3. Debounced write can lose data on tab close
-
-**Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` lines 38-47 (`createDebouncedStorage.setItem`)
-**Move:** Check the error path, not just the happy path
+#### 1. No request body size limits on API routes
+**Severity:** Medium
+**Location:** All `app/api/*/route.ts` POST handlers
+**Move:** Scale attacks -- what if there are a million of these?
 **Confidence:** Medium
 
-Persists from Loop 1 (was Finding 5). The debounced storage adapter delays `localStorage.setItem` by 300ms. If the user closes the tab during the debounce window, the pending write is lost. This is a known tradeoff documented in the spike.
+None of the API routes validate the size of the incoming request body. The `content` field in `edit/artifact` and `sourceText` in formalization routes are passed directly to LLM prompts. A client could POST an arbitrarily large JSON body. Next.js has a default 1MB body parser limit, but streaming routes that use `request.json()` directly may bypass this.
 
-**Recommendation:** Consider adding a `beforeunload` listener that flushes the pending debounced write synchronously. This is a robustness improvement, not a security fix.
+**Recommendation:** Add explicit length checks on user-provided text fields (e.g., reject `content` or `sourceText` > 500KB). This prevents memory exhaustion and avoids sending excessively large prompts to the LLM.
 
-### 4. Batch artifact update in page.tsx duplicates store logic
+#### 2. `addGraphEdge` reads stale state due to React batching
+**Severity:** Low
+**Location:** `app/hooks/useDecomposition.ts:147-156`
+**Move:** Time-of-check to time-of-use gaps
+**Confidence:** High
 
-**Severity:** Informational
-**Location:** `app/page.tsx` lines 329-348 (inside `handleAllResults` callback)
-**Move:** Trace the trust boundaries
+`addGraphEdge` reads `state.nodes` from the closure to call `addEdgeOp()`, then calls `setState` with the result. The comment acknowledges this: "Read state directly to avoid React 18 batching race." However, this is backwards -- reading from the closure is the problem, not the solution. Between the cycle check (`addEdgeOp(state.nodes, ...)`) and the `setState` call, another state update (e.g., a node deletion triggered by a concurrent user action) could have changed the node array. The cycle check would pass against stale data, and the resulting `setState` would overwrite the intermediate update.
+
+In a single-user desktop app with no concurrent operations, the window is extremely narrow. But the pattern is still incorrect: the `addEdgeOp` should be called inside the `setState` updater function, not outside it. The return value problem (needing to return a boolean synchronously) is a real constraint, but the current approach trades correctness for convenience.
+
+The practical impact is low because: (a) the user cannot trigger two graph mutations in the same React render cycle through normal UI interaction, and (b) even if they could, the worst case is a cycle being introduced, which would be visible in the graph and correctable.
+
+**Recommendation:** Refactor to use a ref for the latest nodes (e.g., `nodesRef.current = state.nodes` in a `useEffect`), or move the cycle check inside the `setState` updater and use a ref or callback to communicate the boolean result.
+
+#### 3. Inline edit in `useArtifactEditing` applies LLM replacement at stale character offsets
+**Severity:** Low
+**Location:** `app/hooks/useArtifactEditing.ts:44-49`
+**Move:** Time-of-check to time-of-use gaps
+**Confidence:** Low
+
+When performing an inline edit, the client captures `selection.start` and `selection.end` at invocation time, sends them to the API, then applies the replacement to `getContent()` at response time. If content changed between invocation and response (e.g., a streaming update, a concurrent whole-document edit, or a manual edit in another section), the offsets would be stale, producing corrupted JSON.
+
+The `editing` boolean state likely prevents concurrent operations in the UI, making this a theoretical concern. But the pattern of capturing offsets before an async operation and applying them after is inherently fragile.
+
+**Recommendation:** Either snapshot the content at invocation time and compare with current content before applying (rejecting if changed), or re-validate that the original selection text still exists at the expected offsets.
+
+#### 4. LLM response fragment leaked in 502 error responses
+**Severity:** Low
+**Location:** `app/api/edit/artifact/route.ts:95-99`, `app/lib/formalization/artifactRoute.ts:106-109`
+**Move:** Check error paths
 **Confidence:** Medium
 
-The `handleAllResults` callback in `page.tsx` manually constructs `ArtifactRecord` objects with version slicing logic (`existing.versions.slice(-MAX_VERSIONS + 1)`) that duplicates the logic inside `setArtifactGenerated`. This was done for batching (single `setState` call instead of N separate calls). While the logic is currently correct and identical to the store's version, having two copies means a future change to the versioning cap or truncation strategy could be applied to one but not the other.
+When the LLM returns invalid JSON, the 502 error response includes `details: responseText.slice(0, 500)`. This leaks up to 500 characters of raw LLM output to the client. In this single-user app the risk is minimal, but if the LLM hallucinates content from its training data, this could inadvertently expose information.
 
-This is not a security vulnerability. It is noted because divergent logic in the persistence path could lead to unexpected state if the two implementations drift.
+**Recommendation:** Return a generic error message to the client and only log the LLM response server-side (which is already done via `console.error`).
 
-**Recommendation:** Consider extracting the version-building logic into a shared helper (e.g., `buildUpdatedVersions(existing, newContent, source)`) that both the store action and the page callback use.
+#### 5. Analytics data committed to repository
+**Severity:** Low
+**Location:** `data/analytics.jsonl` (68 new lines in diff)
+**Move:** Follow the secrets
+**Confidence:** High
+
+The diff shows 68 lines of analytics data including endpoints, models, token counts, costs, and timestamps. While `data/` is in `.gitignore`, this data was committed in a branch commit. It reveals infrastructure details (model choices, cost structure, usage patterns).
+
+**Recommendation:** Remove `data/analytics.jsonl` from the branch before merging. If committed intentionally for the example workspace, move it to a non-tracked location.
+
+#### 6. OpenRouter API key sent without scope restrictions
+**Severity:** Low
+**Location:** `app/lib/llm/streamLlm.ts:224-228`, `app/lib/llm/callLlm.ts:171-178`
+**Move:** Follow the secrets
+**Confidence:** Medium
+
+The `OPENROUTER_API_KEY` is used as a Bearer token for both streaming and non-streaming calls with full account access. Key leakage (e.g., via error logging or aggregation) would allow arbitrary LLM calls. This is inherent to the API design, not a code-level bug. The new `streamLlm.ts` now also uses this key, expanding the call surface.
+
+**Recommendation:** Ensure `.env.local` is in `.gitignore` (it is). Set spending limits on the OpenRouter account.
+
+#### 7. `EditableSection` AI edit sends full artifact JSON to DeepSeek Chat
+**Severity:** Low
+**Location:** `app/components/features/output-editing/EditableSection.tsx:83-88`
+**Move:** Trace trust boundaries
+**Confidence:** Medium
+
+When a user triggers an AI edit on a section, the `EditableSection` component sends the full JSON artifact content (not just the selected section) to `/api/edit/artifact`, which forwards it to DeepSeek Chat via OpenRouter. This means the full artifact content -- which may contain formalized versions of sensitive source material -- is sent to a third-party LLM provider (DeepSeek) even when the user only intended to edit one field.
+
+In a single-user research tool, the user presumably consents to LLM processing of their content. But the implicit data flow -- clicking "Edit with AI" on a single field sends the entire document to a different provider than the one used for generation -- may surprise users.
+
+**Recommendation:** Document which LLM provider is used for editing vs. generation. Consider whether section-level edits could send only the section content rather than the full artifact.
+
+#### 8. Anthropic client singleton ignores key changes
+**Severity:** Informational
+**Location:** `app/lib/llm/callLlm.ts:11-17`
+**Move:** Trace trust boundaries
+**Confidence:** High
+
+`getAnthropicClient` caches the first SDK client instance and reuses it regardless of whether `apiKey` changes. Now exported for use by both `callLlm` and `streamLlm`. If `ANTHROPIC_API_KEY` were rotated while the server is running, the old key would continue to be used.
+
+**Recommendation:** Document that key rotation requires a server restart.
+
+#### 9. `SIMULATE_STREAM_FROM_CACHE` flag available in production
+**Severity:** Informational
+**Location:** `app/lib/llm/streamLlm.ts:98`
+**Move:** Invert access control
+**Confidence:** Low
+
+The `SIMULATE_STREAM_FROM_CACHE` environment variable enables simulated streaming from cached results. If set in production, it adds a 15ms delay per 20-character chunk, which could degrade performance but is otherwise harmless.
+
+**Recommendation:** Guard with a `NODE_ENV === 'development'` check.
+
+#### 10. Graph layout deserialization lacks bounds checking on position values
+**Severity:** Informational
+**Location:** `app/lib/utils/workspacePersistence.ts:136-166`
+**Move:** Find implicit sanitization assumptions
+**Confidence:** Low
+
+The `coerceDecomposition` function validates that `graphLayout.positions` values have numeric `x` and `y` fields, but does not check for `NaN`, `Infinity`, or extremely large values. If corrupted localStorage data contained `{ x: Infinity, y: NaN }`, ReactFlow would receive invalid coordinates.
+
+The practical impact is negligible -- ReactFlow handles edge cases in positioning gracefully, and the only source of this data is the user's own localStorage. But the validation is incomplete relative to the thorough coercion applied elsewhere.
+
+**Recommendation:** Add `Number.isFinite()` checks alongside the `typeof val.x === "number"` checks. This is defense-in-depth.
 
 ## What Looks Good
 
-- **Complete deserialization validation chain.** After the A1 fix, every field at every nesting level of persisted data is type-checked before entering the store: top-level scalars in `coercePersistedState`, artifact records via `coerceArtifactRecord`, individual versions via `coerceArtifactVersion`, and decomposition nodes via the shared `coerceDecomposition`. This is thorough.
+- **API key handling.** API keys are read from environment variables and never logged, returned in responses, or written to cache/analytics. Both `callLlm` and the new `streamLlm` correctly use keys only in authorization headers.
 
-- **Single source of truth for decomposition coercion.** The A2 fix eliminated the duplicated inline coercion and now both the v2 migration path (`loadWorkspace`) and the Zustand rehydration path (`coercePersistedState`) use the same `coerceDecomposition()` function. This prevents drift.
+- **LLM cache uses SHA-256 hashing of deterministic inputs.** Cache keys are derived from `(model, systemPrompt, userContent, maxTokens)`. The hash output is a fixed-length hex string, so no path traversal is possible.
 
-- **Quota error handling in debounced storage.** `localStorage.setItem` is wrapped in try/catch with a console.warn on quota exceeded.
+- **JSON parse validation on whole-edit responses.** The `edit/artifact` route validates that whole-edit LLM responses are valid JSON before returning to the client. Invalid responses get a 502 error with server-side logging.
 
-- **`partialize` sanitizes transient states on write.** `verificationStatus: "verifying"` is stripped to `"none"` before persistence. Node verification statuses are sanitized via the memoized `sanitizeDecomposition`.
+- **Deserialization validation is thorough.** The Zustand store's `merge` function validates every field at every nesting level. The new `graphLayout` deserialization in `coerceDecomposition` follows the same careful pattern: checking `isObject`, then checking individual field types before accepting.
 
-- **`getSnapshot` uses `structuredClone` for deep copy.** Prevents mutation of the snapshot from affecting the live store. `extractedFiles` correctly strips non-serializable `File` references.
+- **SSE event encoding uses JSON.stringify.** The `sseEvent()` helper serializes data via `JSON.stringify`, preventing injection of SSE control characters.
 
-- **SSR hydration handled correctly.** `skipHydration: true` with `rehydrate()` in a client-side `useEffect` avoids Next.js hydration mismatches.
+- **Streaming reader properly releases lock.** `fetchStreamingApi` uses `try/finally` with `reader.releaseLock()`.
 
-- **No secrets in the diff.** The `ANTHROPIC_API_KEY` is not touched. No credentials, tokens, or sensitive data flow through the changed code.
+- **No `dangerouslySetInnerHTML`.** All user content and LLM output are rendered via React JSX text interpolation, which auto-escapes HTML. The new `EditableSection` component renders user-editable JSON in a `<textarea>`, not as HTML.
 
-- **`currentVersionIndex` bounds-checked on both read and write paths.** `coerceArtifactRecord` clamps the index; `undoArtifact`/`redoArtifact` guard against out-of-bounds; `resolveArtifactContent` uses optional chaining with `?? null`.
+- **Graph operations are pure functions with cycle detection.** `graphOperations.ts` implements `wouldCreateCycle` using DFS before adding edges. All mutation functions are pure (input -> output) and independently testable. The test suite covers cycle detection, duplicate edges, and missing nodes.
 
-- **Artifact version cap (MAX_VERSIONS = 20) prevents unbounded growth.** Both `setArtifactGenerated` and `setArtifactEdited` trim to the cap.
+- **Section editing requires explicit user action.** `EditableSection` shows editable content only after the user clicks "Edit", and changes are applied only when the user clicks "Save". There is no auto-save that could silently corrupt data.
 
-- **All 174 tests pass.** Including hydration and migration tests that exercise the deserialization paths.
+- **Cache and analytics writes are non-fatal.** All filesystem writes in the LLM call path are wrapped in try/catch blocks.
+
+- **`stripCodeFences` is safe.** Uses simple regex matching, no evaluation, no ReDoS risk.
+
+- **Error paths return appropriate status codes.** LLM failures return 502, input validation failures return 400, and internal errors are caught and logged.
+
+- **Migration handles rename gracefully.** `loadWorkspace` falls back from `balancedPerspectives` to `dialecticalMap` during deserialization, handling the rename without data loss.
 
 ## Summary Table
 
-| # | Finding | Severity | Status | Location | Confidence |
-|---|---------|----------|--------|----------|------------|
-| A1 | ArtifactVersion inner fields not validated | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A2 | Decomposition coercion duplicated inline | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A4 | Unused GenerationProvenance type | Informational | FIXED (3ed18f8) | artifactStore.ts | -- |
-| 1 | resetToSnapshot accepts unsanitized data | Low | Open (unchanged) | workspaceStore.ts:406 | Low |
-| 2 | Non-atomic migration check (TOCTOU) | Informational | Open (accepted) | workspaceStore.ts:478-493 | Low |
-| 3 | Debounced write can lose data on tab close | Low | Open (accepted) | workspaceStore.ts:38-47 | Medium |
-| 4 | Batch artifact update duplicates store logic | Informational | NEW | page.tsx:329-348 | Medium |
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| 1 | No request body size limits | Medium | All API routes | Medium |
+| 2 | `addGraphEdge` reads stale state | Low | useDecomposition.ts:147-156 | High |
+| 3 | Inline edit offset TOCTOU | Low | useArtifactEditing.ts:44-49 | Low |
+| 4 | LLM response fragment in 502 errors | Low | edit/artifact/route.ts:95, artifactRoute.ts:106 | Medium |
+| 5 | Analytics data committed to repo | Low | data/analytics.jsonl | High |
+| 6 | OpenRouter API key scope | Low | streamLlm.ts:224, callLlm.ts:171 | Medium |
+| 7 | Full artifact sent to DeepSeek for section edits | Low | EditableSection.tsx:83-88 | Medium |
+| 8 | Anthropic client ignores key rotation | Informational | callLlm.ts:11-17 | High |
+| 9 | SIMULATE_STREAM_FROM_CACHE in production | Informational | streamLlm.ts:98 | Low |
+| 10 | Graph layout positions lack bounds checking | Informational | workspacePersistence.ts:136-166 | Low |
+
+## Re-review (Loop 2)
+
+**Date:** 2026-04-03
+**Scope:** `git diff HEAD~1` (fix commit for A1 finding)
+
+### A1 Re-check: `addGraphEdge` stale state (Finding 2)
+
+**Status: FIXED**
+
+The fix applies the recommended `nodesRef.current` pattern. `nodesRef` is updated synchronously during render (`nodesRef.current = state.nodes` at the top of `useDecomposition`), which is the standard React idiom for keeping refs in sync with state. `addGraphEdge` now reads `nodesRef.current` instead of the closure-captured `state.nodes`, eliminating the stale-closure problem.
+
+**Residual note:** A narrow TOCTOU window remains: between `addEdgeOp(nodesRef.current, ...)` and the `setState` call, the `setState` updater uses the pre-computed `result` rather than `prev.nodes`, so a concurrent mutation would be overwritten. This is the same class of issue noted in the original review but with a much smaller window. Severity remains Low with negligible practical impact in single-user usage. No action needed.
+
+### Other changes in this commit
+
+- `graphOperations.ts`: JSDoc comment corrections only (no logic changes).
+- `artifactRoute.ts`: Added clarifying comment about streaming vs. batch JSON schema enforcement (no logic changes).
+- Review documents updated.
+
+**No new security issues introduced by this fix commit.**
 
 ## Overall Assessment
 
-The three fixes from Loop 1 are correct and complete. The `coerceArtifactVersion` function (A1) closes the last gap in the deserialization validation chain. The `coerceDecomposition` reuse (A2) eliminates duplicated logic and ensures consistent node-level validation across both the v2 migration and Zustand rehydration paths. The `GenerationProvenance` removal (A4) is clean dead-code removal.
+The branch introduces graph persistence and editing (node add/delete/rename, edge add/delete with cycle detection, position persistence), section-level inline editing with AI assistance, SSE streaming for LLM responses, and a rename of dialectical-map to balanced-perspectives.
 
-No new security vulnerabilities were introduced by the fixes. The one new finding (Finding 4, Informational) is a maintainability concern about duplicated version-building logic in `page.tsx`, not a security issue.
+The security posture is reasonable for a single-user research tool. No Critical or High severity issues were found. The sole Medium finding (request body size limits) carries over from the prior review. The new Low finding about `addGraphEdge` stale state (Finding 2) is the most architecturally interesting: it is a genuine TOCTOU bug where the cycle check runs against a potentially outdated node array, but the practical exploit window is negligible in single-user usage. The implicit data flow in section editing (Finding 7) -- where editing one field sends the entire artifact to a third-party LLM -- is worth documenting for user transparency.
 
-The two remaining Low findings (resetToSnapshot sanitization, debounced write data loss) and the Informational TOCTOU are acceptable for a single-user client-side application. None represent exploitable vulnerabilities in the current threat model.
-
-No Critical or High severity issues found. The branch is ready to merge from a security perspective.
+The graph operations layer (`graphOperations.ts`) is well-designed from a security perspective: pure functions, no side effects, cycle detection before mutation, comprehensive test coverage. The deserialization path for graph layout follows established validation patterns.

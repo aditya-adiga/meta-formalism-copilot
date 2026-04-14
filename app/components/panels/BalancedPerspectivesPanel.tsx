@@ -1,15 +1,15 @@
 "use client";
 
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type DialecticalMapPanelProps = {
-  dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
+  dialecticalMap: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   /** Partial map data from streaming (partial-JSON parsed) */
-  streamingPreview?: DialecticalMapResponse["dialecticalMap"] | null;
+  streamingPreview?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps;
