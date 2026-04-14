@@ -2,16 +2,24 @@
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
-import ArtifactPanelShell from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import EditableSection from "@/app/components/features/output-editing/EditableSection";
+import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type PropertyTestsPanelProps = {
   propertyTests: PropertyTestsResponse["propertyTests"] | null;
   /** Partial data from streaming (partial-JSON parsed) */
   streamingPreview?: PropertyTestsResponse["propertyTests"] | null;
   loading?: boolean;
-};
+  onContentChange?: (json: string) => void;
+} & ArtifactEditingProps;
 
-export default function PropertyTestsPanel({ propertyTests, streamingPreview, loading }: PropertyTestsPanelProps) {
+export default function PropertyTestsPanel({
+  propertyTests, streamingPreview, loading,
+  onContentChange, onAiEdit, editing, editWaitEstimate,
+}: PropertyTestsPanelProps) {
+  const { updateField, updateArrayItem } = useFieldUpdaters(propertyTests, onContentChange);
+
   const { displayData, hasDisplayData } = mergeStreamingPreview(
     propertyTests, streamingPreview,
     (d) => (d.properties?.length ?? 0) > 0,
@@ -24,6 +32,9 @@ export default function PropertyTestsPanel({ propertyTests, streamingPreview, lo
       hasData={hasDisplayData}
       emptyMessage="No property tests yet. Generate them from the source panel or node detail."
       loadingMessage="Generating property tests..."
+      onAiEdit={onAiEdit}
+      editing={editing}
+      editWaitEstimate={editWaitEstimate}
     >
       {hasDisplayData && displayData && (
         <>
@@ -31,7 +42,9 @@ export default function PropertyTestsPanel({ propertyTests, streamingPreview, lo
           {displayData.summary && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{displayData.summary}</p>
+            <EditableSection value={displayData.summary} onChange={(v) => updateField("summary", v)}>
+              <p className="text-sm text-[var(--ink-black)] leading-relaxed">{displayData.summary}</p>
+            </EditableSection>
           </section>
           )}
 
@@ -42,23 +55,25 @@ export default function PropertyTestsPanel({ propertyTests, streamingPreview, lo
               Properties ({displayData.properties.length})
             </h3>
             <div className="space-y-3">
-              {displayData.properties.map((p) => (
-                <div key={p.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-[#9A9590]">{p.id}</span>
-                    <span className="text-sm font-medium text-[var(--ink-black)]">{p.name}</span>
+              {displayData.properties.map((p, i) => (
+                <EditableSection key={p.id} value={p} onChange={(newP) => updateArrayItem("properties", i, newP)}>
+                  <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-[#9A9590]">{p.id}</span>
+                      <span className="text-sm font-medium text-[var(--ink-black)]">{p.name}</span>
+                    </div>
+                    <p className="text-xs text-[#6B6560]">{p.description}</p>
+                    <div className="text-xs text-[#6B6560]">
+                      <span className="font-semibold">Pre:</span> {p.preconditions}
+                    </div>
+                    <div className="text-xs text-[#6B6560]">
+                      <span className="font-semibold">Post:</span> {p.postcondition}
+                    </div>
+                    <pre className="rounded bg-[#F5F1ED] px-3 py-2 text-xs font-mono text-[var(--ink-black)] overflow-x-auto whitespace-pre-wrap">
+                      {p.pseudocode}
+                    </pre>
                   </div>
-                  <p className="text-xs text-[#6B6560]">{p.description}</p>
-                  <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Pre:</span> {p.preconditions}
-                  </div>
-                  <div className="text-xs text-[#6B6560]">
-                    <span className="font-semibold">Post:</span> {p.postcondition}
-                  </div>
-                  <pre className="rounded bg-[#F5F1ED] px-3 py-2 text-xs font-mono text-[var(--ink-black)] overflow-x-auto whitespace-pre-wrap">
-                    {p.pseudocode}
-                  </pre>
-                </div>
+                </EditableSection>
               ))}
             </div>
           </section>
@@ -72,13 +87,15 @@ export default function PropertyTestsPanel({ propertyTests, streamingPreview, lo
               </h3>
               <div className="space-y-2">
                 {displayData.dataGenerators.map((g, i) => (
-                  <div key={i} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
-                    <span className="text-sm font-medium text-[var(--ink-black)]">{g.name}</span>
-                    <p className="mt-1 text-xs text-[#6B6560]">{g.description}</p>
-                    <p className="mt-1 text-xs text-[#9A9590]">
-                      <span className="font-semibold">Constraints:</span> {g.constraints}
-                    </p>
-                  </div>
+                  <EditableSection key={i} value={g} onChange={(newG) => updateArrayItem("dataGenerators", i, newG)}>
+                    <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
+                      <span className="text-sm font-medium text-[var(--ink-black)]">{g.name}</span>
+                      <p className="mt-1 text-xs text-[#6B6560]">{g.description}</p>
+                      <p className="mt-1 text-xs text-[#9A9590]">
+                        <span className="font-semibold">Constraints:</span> {g.constraints}
+                      </p>
+                    </div>
+                  </EditableSection>
                 ))}
               </div>
             </section>
