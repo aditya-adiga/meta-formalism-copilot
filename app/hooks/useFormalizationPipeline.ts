@@ -98,6 +98,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
 
       const result = await leanRetryLoop(semiformal, {
         onLeanCode: (code) => {
+          onToken.cancel();
           a.setLeanCode(code);
           a.onSessionUpdate?.({ leanCode: code });
         },

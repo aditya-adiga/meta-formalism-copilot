@@ -22,6 +22,13 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/** Create an Error with a `details` property for structured error info. */
+function errorWithDetails(message: string, details: string): Error {
+  const err = new Error(message);
+  (err as Error & { details: string }).details = details;
+  return err;
+}
+
 /** Extract a `details` property from an error, if present. */
 function getErrorDetails(err: unknown): string {
   return (typeof err === "object" && err !== null && "details" in err)
@@ -257,9 +264,7 @@ async function streamOpenRouter(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    const err = new Error(`OpenRouter API error: ${response.status}`);
-    (err as Error & { details: string }).details = errorBody;
-    throw err;
+    throw errorWithDetails(`OpenRouter API error: ${response.status}`, errorBody);
   }
 
   const reader = response.body?.getReader();
