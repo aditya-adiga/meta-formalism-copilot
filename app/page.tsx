@@ -32,6 +32,7 @@ import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
+import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
@@ -114,6 +115,20 @@ export default function Home() {
     catch { return null; }
   }, [persistedCounterexamples]);
 
+  // --- Artifact editing ---
+  const artifactEditing = useAllArtifactEditing({
+    causalGraph: persistedCausalGraph,
+    setCausalGraph: setPersistedCausalGraph,
+    statisticalModel: persistedStatisticalModel,
+    setStatisticalModel: setPersistedStatisticalModel,
+    propertyTests: persistedPropertyTests,
+    setPropertyTests: setPersistedPropertyTests,
+    dialecticalMap: persistedDialecticalMap,
+    setDialecticalMap: setPersistedDialecticalMap,
+    counterexamples: persistedCounterexamples,
+    setCounterexamples: setPersistedCounterexamples,
+  });
+
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
@@ -184,8 +199,10 @@ export default function Home() {
     for (const artifact of session.artifacts) {
       const setter = artifactSetters[artifact.type as keyof typeof artifactSetters];
       if (setter) setter(artifact.content);
+      // Handle counterexamples separately (not in artifactSetters)
+      if (artifact.type === "counterexamples") setPersistedCounterexamples(artifact.content);
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, artifactSetters]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, artifactSetters, setPersistedCounterexamples]);
 
   const {
     activeSession,
@@ -238,7 +255,11 @@ export default function Home() {
       const value = results[type as ArtifactType];
       if (value) setter(JSON.stringify(value));
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes, artifactSetters]);
+    // Handle counterexamples separately (not in artifactSetters)
+    if (results["counterexamples"]) {
+      setPersistedCounterexamples(JSON.stringify(results["counterexamples"]));
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, artifactSetters, setPersistedCounterexamples]);
 
   // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
   const {
@@ -648,6 +669,11 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["causal-graph"] as CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
+
+            onContentChange={setPersistedCausalGraph}
+            onAiEdit={artifactEditing.causalGraph.handleAiEdit}
+            editing={artifactEditing.causalGraph.editing}
+            editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
           />
         );
       case "statistical-model":
@@ -656,6 +682,11 @@ export default function Home() {
             statisticalModel={statisticalModel}
             streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
+
+            onContentChange={setPersistedStatisticalModel}
+            onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
+            editing={artifactEditing.statisticalModel.editing}
+            editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
           />
         );
       case "property-tests":
@@ -664,6 +695,11 @@ export default function Home() {
             propertyTests={propertyTests}
             streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
+
+            onContentChange={setPersistedPropertyTests}
+            onAiEdit={artifactEditing.propertyTests.handleAiEdit}
+            editing={artifactEditing.propertyTests.editing}
+            editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
           />
         );
       case "dialectical-map":
@@ -672,6 +708,11 @@ export default function Home() {
             dialecticalMap={dialecticalMap}
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
+
+            onContentChange={setPersistedDialecticalMap}
+            onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
+            editing={artifactEditing.dialecticalMap.editing}
+            editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
           />
         );
       case "counterexamples":
@@ -679,6 +720,11 @@ export default function Home() {
           <CounterexamplesPanel
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
+
+            onContentChange={setPersistedCounterexamples}
+            onAiEdit={artifactEditing.counterexamples.handleAiEdit}
+            editing={artifactEditing.counterexamples.editing}
+            editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
           />
         );
       case "analytics":
@@ -699,10 +745,16 @@ export default function Home() {
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
+    setPersistedCausalGraph,
     statisticalModel, statisticalModelLoading,
+    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
+    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
+    setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
+    setPersistedCounterexamples,
+    artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
   ]);
