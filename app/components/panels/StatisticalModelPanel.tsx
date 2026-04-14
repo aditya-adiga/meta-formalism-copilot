@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
+import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -40,6 +43,16 @@ export default function StatisticalModelPanel({
     statisticalModel, streamingPreview,
     (d) => (d.variables?.length ?? 0) > 0,
   );
+
+  // Build a concise search description from the artifact for evidence search
+  const evidenceSearchContent = useMemo(() => {
+    if (!statisticalModel) return "";
+    const parts = [statisticalModel.summary];
+    for (const h of statisticalModel.hypotheses.slice(0, 3)) {
+      parts.push(h.statement);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [statisticalModel]);
 
   return (
     <ArtifactPanelShell
@@ -140,6 +153,20 @@ export default function StatisticalModelPanel({
                   {displayModel.sampleRequirements}
                 </p>
               </EditableSection>
+            </section>
+          )}
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="statistical-model"
+                elementId={WHOLE_ARTIFACT_ELEMENT_ID}
+                elementContent={evidenceSearchContent}
+              />
             </section>
           )}
         </>
