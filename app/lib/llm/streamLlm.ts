@@ -22,6 +22,20 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/** Create an Error with a `details` property for structured error info. */
+function errorWithDetails(message: string, details: string): Error {
+  const err = new Error(message);
+  (err as Error & { details: string }).details = details;
+  return err;
+}
+
+/** Extract a `details` property from an error, if present. */
+function getErrorDetails(err: unknown): string {
+  return (typeof err === "object" && err !== null && "details" in err)
+    ? String((err as Record<string, unknown>).details)
+    : "";
+}
+
 type StreamLlmOptions = {
   endpoint: string;
   systemPrompt: string;
@@ -144,9 +158,10 @@ export function streamLlm({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
-        console.error(`[${endpoint}] Stream error:`, message);
+        const details = getErrorDetails(err);
+        console.error(`[${endpoint}] Stream error:`, message, details);
         try {
-          controller.enqueue(sseEvent("error", { error: message, details: "" }));
+          controller.enqueue(sseEvent("error", { error: message, details }));
         } catch { /* controller may already be closed */ }
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -249,7 +264,7 @@ async function streamOpenRouter(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} — ${errorBody}`);
+    throw errorWithDetails(`OpenRouter API error: ${response.status}`, errorBody);
   }
 
   const reader = response.body?.getReader();

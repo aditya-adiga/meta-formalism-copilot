@@ -1,4 +1,4 @@
-import { generateLean, verifyLean } from "./api";
+import { generateLean, generateLeanStreaming, verifyLean } from "./api";
 
 export const MAX_LEAN_ATTEMPTS = 3;
 
@@ -15,6 +15,8 @@ export type LeanRetryCallbacks = {
   isCancelled?: () => boolean;
   /** Optional: Lean dependency context to prepend for verification */
   dependencyContext?: string;
+  /** Called with accumulated text as tokens stream in */
+  onToken?: (accumulated: string) => void;
 };
 
 export type LeanRetryResult = {
@@ -31,7 +33,7 @@ export async function leanRetryLoop(
   semiformal: string,
   callbacks: LeanRetryCallbacks,
 ): Promise<LeanRetryResult> {
-  const { onLeanCode, onErrors, onAttemptStart, onVerifyStart, isCancelled, dependencyContext } = callbacks;
+  const { onLeanCode, onErrors, onAttemptStart, onVerifyStart, isCancelled, dependencyContext, onToken } = callbacks;
 
   let currentCode = "";
   let lastErrors = "";
@@ -43,13 +45,18 @@ export async function leanRetryLoop(
 
     onAttemptStart?.(attempt);
 
-    currentCode = await generateLean(
+    const isRetry = attempt > 1;
+    const args = [
       semiformal,
-      attempt > 1 ? currentCode : undefined,
-      attempt > 1 ? lastErrors : undefined,
+      isRetry ? currentCode : undefined,
+      isRetry ? lastErrors : undefined,
       undefined,
       dependencyContext || undefined,
-    );
+    ] as const;
+
+    currentCode = onToken
+      ? await generateLeanStreaming(...args, onToken)
+      : await generateLean(...args);
     onLeanCode(currentCode);
 
     if (isCancelled?.()) {
