@@ -22,6 +22,13 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/** Extract a `details` property from an error, if present. */
+function getErrorDetails(err: unknown): string {
+  return (typeof err === "object" && err !== null && "details" in err)
+    ? String((err as Record<string, unknown>).details)
+    : "";
+}
+
 type StreamLlmOptions = {
   endpoint: string;
   systemPrompt: string;
@@ -144,7 +151,7 @@ export function streamLlm({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
-        const details = (err as Error & { details?: string }).details ?? "";
+        const details = getErrorDetails(err);
         console.error(`[${endpoint}] Stream error:`, message, details);
         try {
           controller.enqueue(sseEvent("error", { error: message, details }));

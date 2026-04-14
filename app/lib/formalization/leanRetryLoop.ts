@@ -45,24 +45,18 @@ export async function leanRetryLoop(
 
     onAttemptStart?.(attempt);
 
-    if (onToken) {
-      currentCode = await generateLeanStreaming(
-        semiformal,
-        attempt > 1 ? currentCode : undefined,
-        attempt > 1 ? lastErrors : undefined,
-        undefined,
-        dependencyContext || undefined,
-        onToken,
-      );
-    } else {
-      currentCode = await generateLean(
-        semiformal,
-        attempt > 1 ? currentCode : undefined,
-        attempt > 1 ? lastErrors : undefined,
-        undefined,
-        dependencyContext || undefined,
-      );
-    }
+    const isRetry = attempt > 1;
+    const args = [
+      semiformal,
+      isRetry ? currentCode : undefined,
+      isRetry ? lastErrors : undefined,
+      undefined,
+      dependencyContext || undefined,
+    ] as const;
+
+    currentCode = onToken
+      ? await generateLeanStreaming(...args, onToken)
+      : await generateLean(...args);
     onLeanCode(currentCode);
 
     if (isCancelled?.()) {
