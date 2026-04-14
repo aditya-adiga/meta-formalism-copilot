@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { transformSseStream } from "@/app/lib/llm/transformSseStream";
-import { removeCachedResult } from "@/app/lib/llm/cache";
-import { decompositionSchema } from "@/app/lib/llm/schemas";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
@@ -118,61 +116,13 @@ export async function POST(request: NextRequest) {
     openRouterModel: OPENROUTER_MODEL,
   });
 
-    // Transform the `done` event to substitute mock content when no API key is set.
-    const transformed = rawStream.pipeThrough(transformSseStream((data) => {
-      if (data.usage?.provider === "mock") {
-        data.text = JSON.stringify(mockResponse(documents));
-      }
-    }));
-
-    // Next.js route handlers accept Response; cast avoids a type mismatch with NextResponse
-    return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
-  }
-
-  try {
-    const { text: responseText, usage, cacheKey } = await callLlm({
-      endpoint: "decomposition/extract",
-      systemPrompt: SYSTEM_PROMPT,
-      userContent: userMessage,
-      maxTokens: 16384,
-      openRouterModel: OPENROUTER_MODEL,
-      responseFormat: decompositionSchema,
-    });
-
-    if (usage.provider === "mock") {
-      return NextResponse.json({ propositions: mockResponse(documents) });
+  // Transform the `done` event to substitute mock content when no API key is set.
+  const transformed = rawStream.pipeThrough(transformSseStream((data) => {
+    if (data.usage?.provider === "mock") {
+      data.text = JSON.stringify(mockResponse(documents));
     }
   }));
 
-    try {
-      const parsed = JSON.parse(stripCodeFences(responseText));
-      // Support both wrapped { propositions: [...] } and legacy bare array formats
-      const propositions = Array.isArray(parsed) ? parsed : parsed.propositions;
-      return NextResponse.json({ propositions });
-    } catch {
-      // JSON parse failed — invalidate the cached bad response
-      if (cacheKey) {
-        try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
-      }
-      const preview = responseText.slice(0, 500);
-      console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);
-      return NextResponse.json(
-        { error: "LLM response was not valid JSON", details: preview },
-        { status: 502 },
-      );
-    }
-  } catch (err) {
-    if (err instanceof OpenRouterError) {
-      return NextResponse.json(
-        { error: err.message, details: err.details },
-        { status: 502 },
-      );
-    }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[decomposition/extract] Unexpected error:", message);
-    return NextResponse.json(
-      { error: `LLM call failed: ${message}` },
-      { status: 502 },
-    );
-  }
+  // Next.js route handlers accept Response; cast avoids a type mismatch with NextResponse
+  return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
 }
