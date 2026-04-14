@@ -1,40 +1,43 @@
 "use client";
 
 import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
-import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
-type DialecticalMapPanelProps = {
-  dialecticalMap: BalancedPerspectivesResponse["balancedPerspectives"] | null;
-  /** Partial map data from streaming (partial-JSON parsed) */
+type BalancedPerspectivesPanelProps = {
+  balancedPerspectives: BalancedPerspectivesResponse["balancedPerspectives"] | null;
+  /** Partial data from streaming (partial-JSON parsed) */
   streamingPreview?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
-export default function DialecticalMapPanel({
-  dialecticalMap, streamingPreview, loading,
+export default function BalancedPerspectivesPanel({
+  balancedPerspectives, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
-}: DialecticalMapPanelProps) {
-  const { updateField, updateArrayItem } = useFieldUpdaters(dialecticalMap, onContentChange);
+  isStale, onRegenerate,
+}: BalancedPerspectivesPanelProps) {
+  const { updateField, updateArrayItem } = useFieldUpdaters(balancedPerspectives, onContentChange);
 
-  const { displayData: displayMap, hasDisplayData } = mergeStreamingPreview(
-    dialecticalMap, streamingPreview,
+  const { displayData: displayMap, hasDisplayData } = useStreamingMerge(
+    balancedPerspectives, streamingPreview,
     (d) => (d.perspectives?.length ?? 0) > 0 || !!d.topic,
   );
 
   return (
     <ArtifactPanelShell
-      title="Dialectical Map"
+      title="Balanced Perspectives"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
-      loadingMessage="Generating dialectical map..."
+      emptyMessage="No balanced perspectives yet. Generate one from the source panel or node detail."
+      loadingMessage="Generating balanced perspectives..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayMap && (
         <>
