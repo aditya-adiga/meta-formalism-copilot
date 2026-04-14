@@ -78,6 +78,8 @@ describe("mapOpenAlexWork", () => {
     expect(paper.journal).toBe("Nature");
     expect(paper.oaUrl).toBe("https://example.com/paper.pdf");
     expect(paper.doi).toBe("https://doi.org/10.1234/test");
+    expect(paper.reliability).toBeNull();
+    expect(paper.relatedness).toBeNull();
   });
 
   it("handles minimal work object with missing fields", () => {
@@ -92,6 +94,8 @@ describe("mapOpenAlexWork", () => {
     expect(paper.journal).toBeNull();
     expect(paper.oaUrl).toBeNull();
     expect(paper.doi).toBeNull();
+    expect(paper.reliability).toBeNull();
+    expect(paper.relatedness).toBeNull();
   });
 
   it("filters out authorships with missing display_name", () => {
@@ -119,6 +123,8 @@ describe("deduplicatePapers", () => {
     journal: null,
     doi: null,
     oaUrl: null,
+    reliability: null,
+    relatedness: null,
   });
 
   it("removes duplicates by openAlexId", () => {
