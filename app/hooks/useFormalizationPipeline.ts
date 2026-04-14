@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { generateSemiformal, generateLean, verifyLean } from "@/app/lib/formalization/api";
+import { generateSemiformalStreaming, generateLeanStreaming, verifyLean } from "@/app/lib/formalization/api";
 import { leanRetryLoop } from "@/app/lib/formalization/leanRetryLoop";
+import { throttle } from "@/app/lib/utils/throttle";
 import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 
 export type { LoadingPhase, VerificationStatus };
@@ -62,7 +63,11 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     setLoadingPhase("semiformal");
 
     try {
-      const proof = await generateSemiformal(inputText);
+      const onToken = throttle((accumulated: string) => {
+        acc.current.setSemiformal(accumulated);
+      }, 50);
+
+      const proof = await generateSemiformalStreaming(inputText, undefined, onToken);
       a.setSemiformal(proof);
       a.onSessionUpdate?.({ semiformalText: proof });
     } catch (err) {
@@ -171,12 +176,17 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     try {
       const depContext = a.getDependencyContext?.();
 
-      const newCode = await generateLean(
+      const onToken = throttle((accumulated: string) => {
+        acc.current.setLeanCode(accumulated);
+      }, 50);
+
+      const newCode = await generateLeanStreaming(
         semiformal,
         currentLean || undefined,
         currentErrors || undefined,
         instruction || undefined,
         depContext || undefined,
+        onToken,
       );
 
       a.setLeanCode(newCode);

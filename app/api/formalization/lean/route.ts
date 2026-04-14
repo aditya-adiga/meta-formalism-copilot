@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
+import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
@@ -48,6 +49,15 @@ Guidelines:
 - Return only the corrected Lean4 code with no additional commentary`;
 
 
+/** Strip `import ...` lines — used when dependency context already provides them. */
+function stripImports(code: string): string {
+  return code
+    .split("\n")
+    .filter((line) => !/^import\s+/.test(line.trim()))
+    .join("\n")
+    .replace(/^\n+/, "");
+}
+
 function mockResponse(informalProof: string, isRetry: boolean): string {
   const snippet = informalProof.slice(0, 60).replace(/\n/g, " ");
   return `-- Mock Lean4 output (no API key configured)${isRetry ? " [RETRY]" : ""}
@@ -62,7 +72,8 @@ theorem example_formalization (P Q : Prop) (hp : P) (hq : Q) : P ∧ Q := by
 }
 
 export async function POST(request: NextRequest) {
-  const { informalProof, previousAttempt, errors, instruction, contextLeanCode } = await request.json();
+  const body = await request.json();
+  const { informalProof, previousAttempt, errors, instruction, contextLeanCode, stream: wantStream } = body;
 
   const isRetry = Boolean(previousAttempt && errors);
   const hasContext = Boolean(contextLeanCode);
@@ -82,6 +93,58 @@ export async function POST(request: NextRequest) {
     userContent += `\n\nAdditional instruction: ${instruction}`;
   }
 
+  // Streaming path: stream raw tokens, then post-process the final text
+  if (wantStream) {
+    const rawStream = streamLlm({
+      endpoint: "formalization/lean",
+      systemPrompt,
+      userContent,
+      maxTokens: 16384,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+
+    // Transform the `done` event to apply stripCodeFences and import stripping.
+    // Decoders are created once outside the transform callback to avoid
+    // per-chunk allocation and to preserve multi-byte character state.
+    const decoder = new TextDecoder();
+    const textEncoder = new TextEncoder();
+    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        const text = decoder.decode(chunk, { stream: true });
+        const events = text.split("\n\n").filter(Boolean);
+        for (const eventBlock of events) {
+          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
+          if (!eventMatch) {
+            controller.enqueue(chunk);
+            continue;
+          }
+          const [, eventType, dataStr] = eventMatch;
+          if (eventType === "done") {
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.usage?.provider === "mock") {
+                data.text = mockResponse(informalProof, isRetry);
+              } else {
+                data.text = stripCodeFences(data.text);
+              }
+              if (hasContext) {
+                data.text = stripImports(data.text);
+              }
+              controller.enqueue(sseEvent("done", data));
+            } catch {
+              controller.enqueue(chunk);
+            }
+          } else {
+            // Pass through token and error events unchanged
+            controller.enqueue(textEncoder.encode(eventBlock + "\n\n"));
+          }
+        }
+      },
+    }));
+
+    return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
+  }
+
   try {
     const { text: responseText, usage } = await callLlm({
       endpoint: "formalization/lean",
@@ -98,11 +161,7 @@ export async function POST(request: NextRequest) {
     // Safety net: strip import lines when context already provides them.
     // LLMs sometimes include `import Mathlib` despite being told not to.
     if (hasContext) {
-      leanCode = leanCode
-        .split("\n")
-        .filter((line) => !/^import\s+/.test(line.trim()))
-        .join("\n")
-        .replace(/^\n+/, "");
+      leanCode = stripImports(leanCode);
     }
 
     return NextResponse.json({ leanCode });

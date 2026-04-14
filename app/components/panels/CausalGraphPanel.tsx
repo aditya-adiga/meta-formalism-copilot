@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
@@ -10,6 +11,8 @@ import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type CausalGraphPanelProps = {
   causalGraph: CausalGraphResponse["causalGraph"] | null;
+  /** Partial graph data from streaming (partial-JSON parsed) */
+  streamingPreview?: CausalGraphResponse["causalGraph"] | null;
   loading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
   onContentChange?: (json: string) => void;
@@ -114,23 +117,28 @@ function DetailsView({
 }
 
 export default function CausalGraphPanel({
-  causalGraph, loading, waitEstimate,
+  causalGraph, streamingPreview, loading, waitEstimate,
   onContentChange, onAiEdit, editing, editWaitEstimate,
 }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
+  const { displayData: displayGraph, hasDisplayData } = mergeStreamingPreview(
+    causalGraph, streamingPreview,
+    (d) => (d.variables?.length ?? 0) > 0,
+  );
+
   return (
     <ArtifactPanelShell
       title="Causal Graph"
-      loading={loading}
-      hasData={causalGraph !== null}
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
       emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
       loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
     >
-      {causalGraph && (
+      {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
           {/* View toggle */}
           <div className="flex gap-1 mb-3">
@@ -158,10 +166,10 @@ export default function CausalGraphPanel({
 
           {viewMode === "graph" ? (
             <div className="flex-1 min-h-[400px]">
-              <CausalGraphView causalGraph={causalGraph} />
+              <CausalGraphView causalGraph={displayGraph} />
             </div>
           ) : (
-            <DetailsView causalGraph={causalGraph} onContentChange={onContentChange} />
+            <DetailsView causalGraph={displayGraph} onContentChange={onContentChange} />
           )}
         </div>
       )}
