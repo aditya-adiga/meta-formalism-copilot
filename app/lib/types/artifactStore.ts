@@ -1,0 +1,29 @@
+/**
+ * Types for the artifact versioning layer in the Zustand workspace store.
+ *
+ * Each structured artifact (causal-graph, statistical-model, etc.) is stored
+ * as an ArtifactRecord with a version history. This enables undo/redo and
+ * preserves user edits across regeneration cycles.
+ */
+
+import type { ArtifactType } from "./session";
+
+/** Subset of ArtifactType that uses structured JSON and the versioned store.
+ *  Semiformal and lean are stored as flat string fields for pipeline compatibility. */
+export type ArtifactKey = Exclude<ArtifactType, "semiformal" | "lean">;
+
+export type ArtifactVersion = {
+  id: string;
+  content: string;
+  createdAt: string;
+  source: "generated" | "ai-edit" | "manual-edit";
+  editInstruction?: string;
+};
+
+export type ArtifactRecord = {
+  type: ArtifactKey;
+  currentVersionIndex: number; // pointer into versions[]
+  versions: ArtifactVersion[]; // oldest-first, capped at MAX_VERSIONS
+};
+
+export const MAX_VERSIONS = 20;
