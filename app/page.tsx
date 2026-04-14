@@ -87,7 +87,7 @@ export default function Home() {
     "causal-graph": setPersistedCausalGraph,
     "statistical-model": setPersistedStatisticalModel,
     "property-tests": setPersistedPropertyTests,
-    "dialectical-map": setPersistedDialecticalMap,
+    "balanced-perspectives": setPersistedDialecticalMap,
   } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
@@ -696,7 +696,7 @@ export default function Home() {
         return (
           <DialecticalMapPanel
             dialecticalMap={dialecticalMap}
-            streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
+            streamingPreview={streamingJsonPreview["balanced-perspectives"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
 
             onContentChange={setPersistedDialecticalMap}
