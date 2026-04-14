@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
-import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 import CausalGraphView from "@/app/components/features/causal-graph/CausalGraphView";
 
@@ -100,7 +100,7 @@ function DetailsView({ causalGraph }: { causalGraph: CausalGraphResponse["causal
 export default function CausalGraphPanel({ causalGraph, streamingPreview, loading, waitEstimate }: CausalGraphPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
-  const { displayData: displayGraph, hasDisplayData } = useStreamingMerge(
+  const { displayData: displayGraph, hasDisplayData } = mergeStreamingPreview(
     causalGraph, streamingPreview,
     (d) => (d.variables?.length ?? 0) > 0,
   );

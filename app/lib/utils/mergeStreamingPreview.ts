@@ -5,7 +5,7 @@
  * fall back to the streaming preview during generation, and derive
  * `hasDisplayData` + adjusted `loading` for ArtifactPanelShell.
  */
-export function useStreamingMerge<T>(
+export function mergeStreamingPreview<T>(
   finalData: T | null,
   streamingPreview: T | null | undefined,
   hasContent: (data: T) => boolean,

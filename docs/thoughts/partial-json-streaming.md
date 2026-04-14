@@ -33,7 +33,7 @@ text artifacts already use. The `done` event still carries full accumulated text
 
 Switch JSON artifact generation from `fetch()` + `res.json()` to `fetchStreamingApi()`.
 In the `onToken` callback, run `partial-json`'s `parse()` on accumulated text, throttled at 50ms.
-Store partial result in `streamingPreview` state (already exists, currently semiformal-only).
+Store partial result in `streamingJsonPreview` state.
 
 ### Layout refactor: incremental positioning (`useCausalGraphLayout`)
 

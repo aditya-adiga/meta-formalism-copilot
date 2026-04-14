@@ -1,7 +1,7 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
-import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type StatisticalModelPanelProps = {
@@ -28,7 +28,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function StatisticalModelPanel({ statisticalModel, streamingPreview, loading }: StatisticalModelPanelProps) {
-  const { displayData: displayModel, hasDisplayData } = useStreamingMerge(
+  const { displayData: displayModel, hasDisplayData } = mergeStreamingPreview(
     statisticalModel, streamingPreview,
     (d) => (d.variables?.length ?? 0) > 0,
   );

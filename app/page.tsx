@@ -399,7 +399,7 @@ export default function Home() {
     const request = { sourceText: text, context, nodeId, nodeLabel };
 
     // Clear persisted data for types being regenerated so streaming previews
-    // are visible via useStreamingMerge (which prefers finalData over preview)
+    // are visible via mergeStreamingPreview (which prefers finalData over preview)
     for (const type of artifactTypes) {
       const setter = artifactSetters[type as keyof typeof artifactSetters];
       if (setter) setter("");

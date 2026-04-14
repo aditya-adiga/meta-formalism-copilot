@@ -1,7 +1,7 @@
 "use client";
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
-import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type PropertyTestsPanelProps = {
@@ -12,7 +12,7 @@ type PropertyTestsPanelProps = {
 };
 
 export default function PropertyTestsPanel({ propertyTests, streamingPreview, loading }: PropertyTestsPanelProps) {
-  const { displayData, hasDisplayData } = useStreamingMerge(
+  const { displayData, hasDisplayData } = mergeStreamingPreview(
     propertyTests, streamingPreview,
     (d) => (d.properties?.length ?? 0) > 0,
   );

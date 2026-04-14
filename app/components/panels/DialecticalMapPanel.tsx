@@ -1,7 +1,7 @@
 "use client";
 
 import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
-import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type DialecticalMapPanelProps = {
@@ -12,7 +12,7 @@ type DialecticalMapPanelProps = {
 };
 
 export default function DialecticalMapPanel({ dialecticalMap, streamingPreview, loading }: DialecticalMapPanelProps) {
-  const { displayData: displayMap, hasDisplayData } = useStreamingMerge(
+  const { displayData: displayMap, hasDisplayData } = mergeStreamingPreview(
     dialecticalMap, streamingPreview,
     (d) => (d.perspectives?.length ?? 0) > 0 || !!d.topic,
   );
