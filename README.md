@@ -17,24 +17,34 @@ Instead of generalizing via exclusion (finding what's common and discarding the 
 
 ### How it works
 
-The interface supports a collaborative, iterative workflow:
+The interface is a **multi-panel workspace** with sidebar navigation. You move between panels via a collapsible Icon Rail on the left edge.
 
-- **Left Panel**: Enter source material (insights, research notes, conceptual material) and describe the theoretical context or domain for formalization. Refine your context description iteratively before generating output.
-- **Right Panel**: View the generated formalism and actively shape it through AI-assisted editing:
-  - Edit selected portions with inline instructions
-  - Transform the entire output with high-level directives
-  - Manual editing combined with AI suggestions
+**Input & Decomposition:**
+- **Source Panel** — Enter or upload source material (text, .txt, .doc, .docx, .pdf). Describe the theoretical context and select which artifact types to generate.
+- **Decomposition Panel** — Extract propositions from your sources into an interactive dependency graph. Each node can be formalized independently with its own context.
+- **Node Detail Panel** — Inspect a single proposition: its statement, proof, dependencies, and per-node artifacts.
 
-This bidirectional approach ensures you remain an active participant in the formalization process, not a passive consumer of AI output.
+**Artifact Panels** (each generated from your source + context):
+- **Semiformal Proof** — Deductive proof with KaTeX math rendering. Supports inline editing (select text + Cmd+K) and whole-text transformation.
+- **Lean4 Code** — Machine-verifiable Lean 4 code generated from the semiformal proof. Includes verification status, AI-assisted error fixing, and manual editing.
+- **Causal Graph** — Interactive visualization of variables, causal edges, confounders, and mechanisms.
+- **Statistical Model** — Variables with roles, hypotheses, assumptions, and sample requirements.
+- **Property Tests** — Invariants with preconditions, postconditions, and pseudocode generators.
+- **Dialectical Map** — Competing perspectives, tensions, and proposed synthesis.
 
-Built with Next.js, TypeScript, and Tailwind CSS.
+**Meta:**
+- **Analytics Panel** — Logs of all API calls and summary statistics.
+
+The workspace supports **multiple sessions** — you can create, switch between, rename, and delete independent workspaces. All state persists across page refreshes via localStorage.
+
+Built with Next.js, TypeScript, Tailwind CSS, and ReactFlow.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- Docker (for Lean 4 verification)
+- Docker (optional, for Lean 4 verification)
 
 ### Install and run
 
@@ -87,6 +97,9 @@ The app continues to work without the verifier — the API route falls back to a
 - `npm run build` - Build for production
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
+- `npm test` - Run tests (Vitest)
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:ui` - Run tests with Vitest UI
 
 ## How to Contribute
 
@@ -94,10 +107,9 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed 
 
 ## Project Documentation
 
-For detailed documentation, see the [`documentation/`](./documentation) folder:
-
-- [BACKGROUND.md](./documentation/BACKGROUND.md) - Theoretical foundation, Live Theory philosophy, and research context
-- [ARCHITECTURE.md](./documentation/ARCHITECTURE.md) - Technical structure, component hierarchy, and implementation details
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical structure, component hierarchy, and implementation details
+- [docs/decisions/](./docs/decisions/) - Architectural decision records
+- [docs/thoughts/](./docs/thoughts/) - Working notes and exploration logs
 
 ## Questions or Issues?
 

@@ -87,7 +87,15 @@ export function streamLlm({
         const cached = await getCachedResult(effectiveModel, systemPrompt, userContent, maxTokens);
         if (cached) {
           console.log(`[${endpoint}] stream cache hit (model: ${effectiveModel}, hash: ${cacheHash.slice(0, 8)})`);
-          controller.enqueue(sseEvent("done", { text: cached.text, usage: cached.usage }));
+
+          if (process.env.SIMULATE_STREAM_FROM_CACHE === "true") {
+            // Simulate token-by-token streaming from cache for testing
+            // partial-JSON rendering without making expensive API calls.
+            console.log(`[${endpoint}] simulating stream from cache (${cached.text.length} chars)`);
+            await simulateStreamFromCache(controller, cached.text, cached.usage);
+          } else {
+            controller.enqueue(sseEvent("done", { text: cached.text, usage: cached.usage }));
+          }
           controller.close();
           return;
         }
@@ -144,6 +152,29 @@ export function streamLlm({
       }
     },
   });
+}
+
+/**
+ * Simulate token-by-token streaming from a cached result.
+ * Emits chunks of ~20 chars with a small delay between each,
+ * so the client sees the same partial-JSON rendering behavior
+ * as a real LLM stream.
+ */
+async function simulateStreamFromCache(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  text: string,
+  usage: LlmCallUsage,
+): Promise<void> {
+  const CHUNK_SIZE = 20;
+  const DELAY_MS = 15;
+
+  for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+    const chunk = text.slice(i, i + CHUNK_SIZE);
+    controller.enqueue(sseEvent("token", { text: chunk }));
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+
+  controller.enqueue(sseEvent("done", { text, usage }));
 }
 
 type StreamProviderOptions = {

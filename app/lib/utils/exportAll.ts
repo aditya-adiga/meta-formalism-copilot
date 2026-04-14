@@ -5,10 +5,7 @@
 
 import JSZip from "jszip";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
-import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
-import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse, CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import { sanitizeFilename, triggerDownload } from "./export";
 import { getGraphViewportElement, graphToPngBlob } from "./exportGraph";
 
@@ -20,6 +17,7 @@ type ExportAllOptions = {
   statisticalModel?: StatisticalModelResponse["statisticalModel"] | null;
   propertyTests?: PropertyTestsResponse["propertyTests"] | null;
   dialecticalMap?: DialecticalMapResponse["dialecticalMap"] | null;
+  counterexamples?: CounterexamplesResponse["counterexamples"] | null;
 };
 
 export async function exportAllAsZip({
@@ -30,6 +28,7 @@ export async function exportAllAsZip({
   statisticalModel,
   propertyTests,
   dialecticalMap,
+  counterexamples,
 }: ExportAllOptions) {
   const zip = new JSZip();
 
@@ -53,6 +52,9 @@ export async function exportAllAsZip({
   }
   if (dialecticalMap) {
     zip.file("dialectical-map.json", JSON.stringify(dialecticalMap, null, 2));
+  }
+  if (counterexamples) {
+    zip.file("counterexamples.json", JSON.stringify(counterexamples, null, 2));
   }
 
   // Graph screenshot (best-effort)

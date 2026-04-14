@@ -9,6 +9,7 @@ export type PanelId =
   | "statistical-model"
   | "property-tests"
   | "dialectical-map"
+  | "counterexamples"
   | "analytics";
 
 export type PanelGroup = "navigation" | "artifacts" | "meta";

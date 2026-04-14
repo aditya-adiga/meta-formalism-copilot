@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import type { ResponseFormat } from "@/app/lib/llm/callLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
 import { removeCachedResult } from "@/app/lib/llm/cache";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
@@ -38,6 +39,8 @@ type ArtifactRouteConfig = {
   maxTokens?: number;
   /** How to parse the LLM response. Default: "json" (parse as JSON). "text" returns raw text. */
   parseResponse?: "json" | "text";
+  /** When provided, enforces structured JSON output via OpenRouter's response_format. */
+  responseFormat?: ResponseFormat;
   /** Optional: transform the request body before building the user message (e.g. legacy field mapping). */
   transformBody?: (body: Record<string, unknown>) => ArtifactGenerationRequest;
 };
@@ -62,22 +65,17 @@ export async function handleArtifactRoute(
   const wantStream = Boolean(rawBody.stream);
   const userMessage = buildUserMessage(body);
 
-  // Streaming path: text artifacts get real token streaming; JSON artifacts
-  // use batch call wrapped in a single SSE `done` event (raw JSON tokens
-  // aren't useful UI feedback).
+  // Streaming path: all artifact types use real token streaming.
+  // JSON artifacts stream raw tokens for partial-JSON parsing on the client.
   if (wantStream) {
-    if (config.parseResponse === "text") {
-      const stream = streamLlm({
-        endpoint: config.endpoint,
-        systemPrompt: config.systemPrompt,
-        userContent: userMessage,
-        maxTokens: config.maxTokens ?? 8192,
-        openRouterModel: OPENROUTER_MODEL,
-      });
-      return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
-    }
-    // JSON artifacts: batch call, wrap result in SSE
-    return handleBatchAsSSE(config, body, userMessage);
+    const stream = streamLlm({
+      endpoint: config.endpoint,
+      systemPrompt: config.systemPrompt,
+      userContent: userMessage,
+      maxTokens: config.maxTokens ?? 8192,
+      openRouterModel: OPENROUTER_MODEL,
+    });
+    return new Response(stream, { headers: SSE_HEADERS }) as unknown as NextResponse;
   }
 
   try {
@@ -87,6 +85,7 @@ export async function handleArtifactRoute(
       userContent: userMessage,
       maxTokens: config.maxTokens ?? 8192,
       openRouterModel: OPENROUTER_MODEL,
+      responseFormat: config.responseFormat,
     });
 
     if (usage.provider === "mock") {
@@ -127,37 +126,3 @@ export async function handleArtifactRoute(
   }
 }
 
-/** Wrap a single SSE event in a Response. */
-function sseResponse(event: Uint8Array, status = 200): NextResponse {
-  const stream = new ReadableStream({
-    start(controller) { controller.enqueue(event); controller.close(); },
-  });
-  return new Response(stream, { headers: SSE_HEADERS, status }) as unknown as NextResponse;
-}
-
-/** Run a batch LLM call and wrap the result as a single SSE `done` event.
- *  Used for JSON artifact types where streaming raw tokens isn't useful. */
-async function handleBatchAsSSE(
-  config: ArtifactRouteConfig,
-  body: ArtifactGenerationRequest,
-  userMessage: string,
-): Promise<NextResponse> {
-  try {
-    const { text: responseText, usage } = await callLlm({
-      endpoint: config.endpoint,
-      systemPrompt: config.systemPrompt,
-      userContent: userMessage,
-      maxTokens: config.maxTokens ?? 8192,
-      openRouterModel: OPENROUTER_MODEL,
-    });
-
-    const text = usage.provider === "mock"
-      ? JSON.stringify(config.mockResponse(body.sourceText))
-      : responseText;
-
-    return sseResponse(sseEvent("done", { text, usage }));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return sseResponse(sseEvent("error", { error: message, details: "" }), 502);
-  }
-}
