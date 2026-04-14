@@ -174,6 +174,11 @@ export const REVIEW_STUDY_TYPES: readonly StudyType[] = [
   "systematic-review",
 ] as const;
 
+/** Check whether a study type is a review type (meta-analysis or systematic-review) */
+export function isReviewType(studyType: string | undefined | null): boolean {
+  return !!studyType && (REVIEW_STUDY_TYPES as readonly string[]).includes(studyType);
+}
+
 /** Overlap analysis result for an evidence slot */
 export type OverlapAnalysis = {
   /** All detected containment relationships */

@@ -43,11 +43,24 @@ export default function EvidenceResultsSection({
   const [open, setOpen] = useState(true);
   const count = slot.papers.length;
 
-  // Sort papers by score when scores are available
   const displayPapers = useMemo(() => {
     if (slot.scored) return sortByScore(slot.papers);
     return slot.papers;
   }, [slot.papers, slot.scored]);
+
+  // Pre-build a lookup from studyId → subsuming review title (avoids O(R*P) per render)
+  const subsumingReviewTitles = useMemo(() => {
+    if (!overlap) return new Map<string, string>();
+    const titleById = new Map(slot.papers.map((p) => [p.openAlexId, p.title]));
+    const result = new Map<string, string>();
+    for (const rel of overlap.relations) {
+      if (!result.has(rel.studyId)) {
+        const title = titleById.get(rel.reviewId);
+        if (title) result.set(rel.studyId, title);
+      }
+    }
+    return result;
+  }, [overlap, slot.papers]);
 
   return (
     <div className="mt-2 border-t border-[#DDD9D5] pt-2">
@@ -69,7 +82,6 @@ export default function EvidenceResultsSection({
         </button>
 
         <div className="flex items-center gap-1">
-          {/* Score button — only show when there are papers and scoring is available */}
           {onScore && count > 0 && (
             <button
               type="button"
@@ -85,7 +97,6 @@ export default function EvidenceResultsSection({
             </button>
           )}
 
-          {/* Overlap button — only show when scored and has review papers */}
           {onAnalyzeOverlap && slot.scored && hasReviews && (
             <button
               type="button"
@@ -113,33 +124,15 @@ export default function EvidenceResultsSection({
 
           {overlap && <OverlapSummary analysis={overlap} />}
 
-          {displayPapers.map((paper) => {
-            const status = overlap?.paperStatus[paper.openAlexId];
-            // Find the first review that subsumes this paper (for display)
-            const subsumingReviewTitle =
-              status === "subsumed"
-                ? (() => {
-                    const rel = overlap?.relations.find(
-                      (r) => r.studyId === paper.openAlexId,
-                    );
-                    if (!rel) return undefined;
-                    return slot.papers.find(
-                      (p) => p.openAlexId === rel.reviewId,
-                    )?.title;
-                  })()
-                : undefined;
+          {displayPapers.map((paper) => (
+            <EvidencePaperCard
+              key={paper.openAlexId}
+              paper={paper}
+              overlapStatus={overlap?.paperStatus[paper.openAlexId]}
+              subsumingReviewTitle={subsumingReviewTitles.get(paper.openAlexId)}
+            />
+          ))}
 
-            return (
-              <EvidencePaperCard
-                key={paper.openAlexId}
-                paper={paper}
-                overlapStatus={status}
-                subsumingReviewTitle={subsumingReviewTitle}
-              />
-            );
-          })}
-
-          {/* Search queries used (muted) */}
           {slot.searchQueries.length > 0 && (
             <div className="text-[10px] text-[#9A9590] mt-1">
               Searched: {slot.searchQueries.join(" | ")}

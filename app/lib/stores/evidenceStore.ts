@@ -165,10 +165,25 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
       clearEvidence: (key: string) =>
         set((state: EvidenceState) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { [key]: _removed, ...rest } = state.slots;
+          const { [key]: _s, ...restSlots } = state.slots;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { [key]: _removedOverlap, ...restOverlap } = state.overlap;
-          return { slots: rest, overlap: restOverlap };
+          const { [key]: _o, ...restOverlap } = state.overlap;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _l, ...restLoading } = state.loading;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _sc, ...restScoring } = state.scoring;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _a, ...restAnalyzing } = state.analyzing;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _e, ...restErrors } = state.errors;
+          return {
+            slots: restSlots,
+            overlap: restOverlap,
+            loading: restLoading,
+            scoring: restScoring,
+            analyzing: restAnalyzing,
+            errors: restErrors,
+          };
         }),
 
       clearAll: () => set({ slots: {}, overlap: {}, loading: {}, scoring: {}, analyzing: {}, errors: {} }),

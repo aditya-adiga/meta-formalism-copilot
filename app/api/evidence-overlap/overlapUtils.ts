@@ -9,9 +9,9 @@ import type {
   PaperOverlapStatus,
   EvidenceOverlapRequest,
 } from "@/app/lib/types/evidence";
-import { REVIEW_STUDY_TYPES } from "@/app/lib/types/evidence";
+import { isReviewType } from "@/app/lib/types/evidence";
 
-type OverlapPaper = EvidenceOverlapRequest["papers"][number];
+export type OverlapPaper = EvidenceOverlapRequest["papers"][number];
 
 /** Partition papers into reviews (meta-analysis, systematic-review) and studies. */
 export function partitionPapers(papers: OverlapPaper[]): {
@@ -21,8 +21,7 @@ export function partitionPapers(papers: OverlapPaper[]): {
   const reviews: OverlapPaper[] = [];
   const studies: OverlapPaper[] = [];
   for (const p of papers) {
-    const studyType = p.reliability?.studyType;
-    if (studyType && (REVIEW_STUDY_TYPES as readonly string[]).includes(studyType)) {
+    if (isReviewType(p.reliability?.studyType)) {
       reviews.push(p);
     } else {
       studies.push(p);
@@ -100,17 +99,16 @@ export function findUnmatchedPairs(
 
 /** Derive per-paper overlap status from the full set of relations.
  *
- *  - Papers with review study types get "review"
+ *  - Papers whose IDs are in reviewIds get "review"
  *  - Studies that appear in any relation as the studyId get "subsumed"
  *  - Remaining studies get "novel"
- *  - If there are no reviews at all, every paper gets "no-reviews" */
+ *  - If reviewIds is empty, every paper gets "no-reviews" */
 export function derivePaperStatus(
   papers: OverlapPaper[],
   relations: SubsumptionRelation[],
+  reviewIds: Set<string>,
 ): Record<string, PaperOverlapStatus> {
-  const { reviews } = partitionPapers(papers);
-
-  if (reviews.length === 0) {
+  if (reviewIds.size === 0) {
     const status: Record<string, PaperOverlapStatus> = {};
     for (const p of papers) {
       status[p.openAlexId] = "no-reviews";
@@ -118,7 +116,6 @@ export function derivePaperStatus(
     return status;
   }
 
-  const reviewIds = new Set(reviews.map((r) => r.openAlexId));
   const subsumedIds = new Set(relations.map((r) => r.studyId));
 
   const status: Record<string, PaperOverlapStatus> = {};

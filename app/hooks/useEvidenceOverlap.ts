@@ -6,7 +6,7 @@ import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { fetchApi } from "@/app/lib/formalization/api";
 import {
   serializeTargetKey,
-  REVIEW_STUDY_TYPES,
+  isReviewType,
   type EvidenceArtifactType,
   type EvidenceOverlapResponse,
 } from "@/app/lib/types/evidence";
@@ -36,11 +36,7 @@ export function useEvidenceOverlap(
   // Check whether the slot has any review-type papers (only meaningful when scored)
   const hasReviews =
     slot?.scored === true &&
-    slot.papers.some(
-      (p) =>
-        p.reliability?.studyType &&
-        (REVIEW_STUDY_TYPES as readonly string[]).includes(p.reliability.studyType),
-    );
+    slot.papers.some((p) => isReviewType(p.reliability?.studyType));
 
   const analyze = useCallback(async () => {
     const { setAnalyzing, applyOverlap, setError } = useEvidenceStore.getState();
@@ -50,7 +46,7 @@ export function useEvidenceOverlap(
     if (useEvidenceStore.getState().analyzing[key]) return;
 
     setAnalyzing(key, true);
-    setError(key, null);
+    if (useEvidenceStore.getState().errors[key]) setError(key, null);
     try {
       const result = await fetchApi<EvidenceOverlapResponse>(
         "/api/evidence-overlap",

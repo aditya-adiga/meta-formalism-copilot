@@ -173,7 +173,7 @@ describe("derivePaperStatus", () => {
       { reviewId: "R1", studyId: "S1", detectionMethod: "citation-graph" as const, confidence: 1.0 },
     ];
 
-    const status = derivePaperStatus(papers, relations);
+    const status = derivePaperStatus(papers, relations, new Set(["R1"]));
     expect(status).toEqual({
       R1: "review",
       S1: "subsumed",
@@ -187,7 +187,7 @@ describe("derivePaperStatus", () => {
       makePaper("S2", { studyType: "cohort" }),
     ];
 
-    const status = derivePaperStatus(papers, []);
+    const status = derivePaperStatus(papers, [], new Set());
     expect(status).toEqual({
       S1: "no-reviews",
       S2: "no-reviews",
@@ -200,7 +200,7 @@ describe("derivePaperStatus", () => {
       makePaper("S1", { studyType: "rct" }),
     ];
 
-    const status = derivePaperStatus(papers, []);
+    const status = derivePaperStatus(papers, [], new Set(["R1"]));
     expect(status).toEqual({
       R1: "review",
       S1: "novel",
@@ -218,7 +218,7 @@ describe("derivePaperStatus", () => {
       { reviewId: "R2", studyId: "S1", detectionMethod: "llm-fallback" as const, confidence: 0.7 },
     ];
 
-    const status = derivePaperStatus(papers, relations);
+    const status = derivePaperStatus(papers, relations, new Set(["R1", "R2"]));
     expect(status.S1).toBe("subsumed");
   });
 });
