@@ -144,9 +144,10 @@ export function streamLlm({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
-        console.error(`[${endpoint}] Stream error:`, message);
+        const details = (err as Error & { details?: string }).details ?? "";
+        console.error(`[${endpoint}] Stream error:`, message, details);
         try {
-          controller.enqueue(sseEvent("error", { error: message, details: "" }));
+          controller.enqueue(sseEvent("error", { error: message, details }));
         } catch { /* controller may already be closed */ }
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -249,7 +250,9 @@ async function streamOpenRouter(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} — ${errorBody}`);
+    const err = new Error(`OpenRouter API error: ${response.status}`);
+    (err as Error & { details: string }).details = errorBody;
+    throw err;
   }
 
   const reader = response.body?.getReader();

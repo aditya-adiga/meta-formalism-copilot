@@ -92,6 +92,10 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
     try {
       const depContext = a.getDependencyContext?.();
 
+      const onToken = throttle((accumulated: string) => {
+        acc.current.setLeanCode(accumulated);
+      }, 50);
+
       const result = await leanRetryLoop(semiformal, {
         onLeanCode: (code) => {
           a.setLeanCode(code);
@@ -110,6 +114,7 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
           a.onSessionUpdate?.({ verificationStatus: "verifying" });
         },
         dependencyContext: depContext || undefined,
+        onToken,
       });
 
       const vStatus = result.valid ? "valid" as const : "invalid" as const;

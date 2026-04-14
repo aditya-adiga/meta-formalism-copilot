@@ -4,7 +4,7 @@ Status: implementation complete
 
 ## Problem
 
-JSON artifact types (causal-graph, statistical-model, property-tests, dialectical-map) currently
+JSON artifact types (causal-graph, statistical-model, property-tests, balanced-perspectives) currently
 use batch `callLlm()` wrapped in a single SSE `done` event (`artifactRoute.ts:86`). Users see
 nothing during 15-85s of generation. Phase 1 streaming (raw token preview) exists for text
 artifacts but not JSON ones. Phase 2 (decision 005) calls for progressive rendering of the
@@ -81,7 +81,7 @@ aligns with how ReactFlow wants to work.
 4. ~~`useArtifactGeneration`: wire up streaming for JSON types with throttled partial updates~~ done
 5. ~~Refactor `useCausalGraphLayout` from pure `useMemo` to incremental state~~ done
 6. ~~`CausalGraphView`: render partial graph data during streaming~~ done
-7. ~~Repeat partial rendering for other JSON panels~~ done (statistical-model, property-tests, dialectical-map)
+7. ~~Repeat partial rendering for other JSON panels~~ done (statistical-model, property-tests, balanced-perspectives)
 
 ## Risks & open questions
 
