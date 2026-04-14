@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
+import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { ARTIFACT_ROUTE, ARTIFACT_RESPONSE_KEY } from "@/app/lib/types/artifacts";
 import { fetchStreamingApi, fetchApi } from "@/app/lib/formalization/api";
