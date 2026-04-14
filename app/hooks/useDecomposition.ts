@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { DecompositionState, PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
-import { fetchApi } from "@/app/lib/formalization/api";
+import { fetchStreamingApi } from "@/app/lib/formalization/api";
+import { parse as parsePartialJson } from "partial-json";
+import { stripCodeFences, stripLeadingCodeFence } from "@/app/lib/utils/stripCodeFences";
+import { throttle } from "@/app/lib/utils/throttle";
 
 const INITIAL_STATE: DecompositionState = {
   nodes: [],
@@ -94,7 +97,18 @@ export function useDecomposition() {
     const labelMap = new Map(documents.map((d) => [d.sourceId, d.sourceLabel]));
 
     try {
-      const data = await fetchApi<{ propositions: Array<Record<string, unknown>> }>("/api/decomposition/extract", { documents });
+      const onToken = throttle((accumulated: string) => {
+        try {
+          const partial = parsePartialJson(stripLeadingCodeFence(accumulated));
+          // Support both bare array and wrapped { propositions: [...] } formats
+          const items = Array.isArray(partial) ? partial : partial?.propositions;
+          if (Array.isArray(items) && items.length > 0) {
+            setStreamingNodes(toPropositionNodes(items, labelMap));
+          }
+        } catch {
+          // partial-json parse failed — wait for more tokens
+        }
+      }, 50);
 
       const { text: finalText } = await fetchStreamingApi(
         "/api/decomposition/extract",
