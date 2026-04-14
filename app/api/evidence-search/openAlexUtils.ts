@@ -77,6 +77,8 @@ export function mapOpenAlexWork(work: OpenAlexWork): EvidencePaper {
     journal: work.primary_location?.source?.display_name ?? null,
     doi: work.doi ?? null,
     oaUrl: work.open_access?.oa_url ?? null,
+    reliability: null,
+    relatedness: null,
   };
 }
 
