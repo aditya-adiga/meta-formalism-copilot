@@ -1,10 +1,13 @@
 "use client";
 
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
+import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell from "./ArtifactPanelShell";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
+  /** Partial model data from streaming (partial-JSON parsed) */
+  streamingPreview?: StatisticalModelResponse["statisticalModel"] | null;
   loading?: boolean;
 };
 
@@ -24,30 +27,38 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-export default function StatisticalModelPanel({ statisticalModel, loading }: StatisticalModelPanelProps) {
+export default function StatisticalModelPanel({ statisticalModel, streamingPreview, loading }: StatisticalModelPanelProps) {
+  const { displayData: displayModel, hasDisplayData } = mergeStreamingPreview(
+    statisticalModel, streamingPreview,
+    (d) => (d.variables?.length ?? 0) > 0,
+  );
+
   return (
     <ArtifactPanelShell
       title="Statistical Model"
-      loading={loading}
-      hasData={statisticalModel !== null}
+      loading={loading && !hasDisplayData}
+      hasData={hasDisplayData}
       emptyMessage="No statistical model yet. Generate one from the Source panel or component detail."
       loadingMessage="Generating statistical model..."
     >
-      {statisticalModel && (
+      {hasDisplayData && displayModel && (
         <>
           {/* Summary */}
+          {displayModel.summary && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
-            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{statisticalModel.summary}</p>
+            <p className="text-sm text-[var(--ink-black)] leading-relaxed">{displayModel.summary}</p>
           </section>
+          )}
 
           {/* Variables */}
+          {(displayModel.variables?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Factors ({statisticalModel.variables.length})
+              Factors ({displayModel.variables.length})
             </h3>
             <div className="space-y-2">
-              {statisticalModel.variables.map((v) => (
+              {displayModel.variables.map((v) => (
                 <div key={v.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-[#9A9590]">{v.id}</span>
@@ -61,14 +72,16 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               ))}
             </div>
           </section>
+          )}
 
           {/* Hypotheses */}
+          {(displayModel.hypotheses?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Predictions ({statisticalModel.hypotheses.length})
+              Predictions ({displayModel.hypotheses.length})
             </h3>
             <div className="space-y-2">
-              {statisticalModel.hypotheses.map((h) => (
+              {displayModel.hypotheses.map((h) => (
                 <div key={h.id} className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                   <p className="text-sm font-medium text-[var(--ink-black)]">{h.statement}</p>
                   <p className="mt-1 text-xs text-[#6B6560]">
@@ -81,15 +94,16 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
               ))}
             </div>
           </section>
+          )}
 
           {/* Assumptions */}
-          {statisticalModel.assumptions.length > 0 && (
+          {(displayModel.assumptions?.length ?? 0) > 0 && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Assumptions ({statisticalModel.assumptions.length})
+                Assumptions ({displayModel.assumptions.length})
               </h3>
               <ul className="list-disc pl-5 space-y-1">
-                {statisticalModel.assumptions.map((a, i) => (
+                {displayModel.assumptions.map((a, i) => (
                   <li key={i} className="text-sm text-[var(--ink-black)]">{a}</li>
                 ))}
               </ul>
@@ -97,13 +111,13 @@ export default function StatisticalModelPanel({ statisticalModel, loading }: Sta
           )}
 
           {/* Sample Requirements */}
-          {statisticalModel.sampleRequirements && (
+          {displayModel.sampleRequirements && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
                 Data Needed
               </h3>
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">
-                {statisticalModel.sampleRequirements}
+                {displayModel.sampleRequirements}
               </p>
             </section>
           )}
