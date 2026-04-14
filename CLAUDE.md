@@ -44,13 +44,15 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
   - `artifact-selector/` — Artifact type selection UI
   - `causal-graph/` — Graph visualization components
   - `lean-display/` — Lean code display with syntax highlighting
+  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidencePaperCard` for grounding artifacts in published research
 - `components/ui/` — Shared UI components and icons
 - `hooks/` — Custom hooks: `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useArtifactGeneration`, `useArtifactEditing`, `useAnalytics`, etc.
 - `lib/types/` — TypeScript type definitions for panels, sessions, artifacts, decomposition
 - `lib/llm/` — LLM integration (Anthropic SDK, schemas, caching)
 - `lib/formalization/` — Shared artifact generation logic
 - `lib/utils/` — Utilities (PDF parsing, LaTeX parsing, export, text selection)
-- `api/` — Next.js API routes for formalization, editing, verification, decomposition, analytics
+- `lib/stores/` — Zustand stores: `evidenceStore` (evidence search results, persisted to localStorage)
+- `api/` — Next.js API routes for formalization, editing, verification, decomposition, analytics, evidence search
 
 ### Key Patterns
 
