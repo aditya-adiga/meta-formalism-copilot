@@ -4,6 +4,7 @@ import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
 type PropertyTestsPanelProps = {
@@ -50,10 +51,7 @@ export default function PropertyTestsPanel({
 
           {/* Properties */}
           {(displayData.properties?.length ?? 0) > 0 && (
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Properties ({displayData.properties.length})
-            </h3>
+          <CollapsibleSection title="Properties" defaultOpen={false} count={displayData.properties.length}>
             <div className="space-y-3">
               {displayData.properties.map((p, i) => (
                 <EditableSection key={p.id} value={p} onChange={(newP) => updateArrayItem("properties", i, newP)}>
@@ -76,15 +74,12 @@ export default function PropertyTestsPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
           )}
 
           {/* Data Generators */}
           {(displayData.dataGenerators?.length ?? 0) > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Data Generators ({displayData.dataGenerators.length})
-              </h3>
+            <CollapsibleSection title="Data Generators" defaultOpen={false} count={displayData.dataGenerators.length}>
               <div className="space-y-2">
                 {displayData.dataGenerators.map((g, i) => (
                   <EditableSection key={i} value={g} onChange={(newG) => updateArrayItem("dataGenerators", i, newG)}>
@@ -98,7 +93,7 @@ export default function PropertyTestsPanel({
                   </EditableSection>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
         </>
       )}
