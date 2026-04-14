@@ -37,7 +37,6 @@ export default function EvidencePaperCard({
   const [expanded, setExpanded] = useState(false);
   const url = paperUrl(paper);
   const needsTruncation = paper.abstract && paper.abstract.length > ABSTRACT_TRUNCATE;
-  const hasScores = paper.reliability !== null || paper.relatedness !== null;
 
   return (
     <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-1">
@@ -52,25 +51,20 @@ export default function EvidencePaperCard({
           )}
         </div>
 
-        {/* Score and overlap badges */}
         <div className="flex items-center gap-1 shrink-0">
-          {hasScores && (
-            <>
-              {paper.reliability && (
-                <EvidenceScoreBadge
-                  label="Rel"
-                  score={paper.reliability.score}
-                  tooltip={`Reliability: ${paper.reliability.rationale}`}
-                />
-              )}
-              {paper.relatedness && (
-                <EvidenceScoreBadge
-                  label="Fit"
-                  score={paper.relatedness.score}
-                  tooltip={`Relatedness: ${paper.relatedness.rationale}`}
-                />
-              )}
-            </>
+          {paper.reliability && (
+            <EvidenceScoreBadge
+              label="Rel"
+              score={paper.reliability.score}
+              tooltip={`Reliability: ${paper.reliability.rationale}`}
+            />
+          )}
+          {paper.relatedness && (
+            <EvidenceScoreBadge
+              label="Fit"
+              score={paper.relatedness.score}
+              tooltip={`Relatedness: ${paper.relatedness.rationale}`}
+            />
           )}
           {overlapStatus && overlapStatus !== "no-reviews" && (
             <span
@@ -96,7 +90,6 @@ export default function EvidencePaperCard({
             {paper.citedByCount} cited
           </span>
         )}
-        {/* Study type badge when scored */}
         {paper.reliability && (
           <span className="rounded bg-[#E8E4E0] px-1.5 py-0.5 text-[10px] font-mono text-[#6B6560]">
             {STUDY_TYPE_LABELS[paper.reliability.studyType]}
