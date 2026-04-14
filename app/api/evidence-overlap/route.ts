@@ -15,10 +15,10 @@ import { fetchWorksByIds } from "@/app/api/evidence-search/openAlexUtils";
 import {
   type EvidenceOverlapRequest,
   type EvidenceOverlapResponse,
-  type PaperOverlapStatus,
   type SubsumptionRelation,
 } from "@/app/lib/types/evidence";
 import {
+  type OverlapPaper,
   partitionPapers,
   buildRelationsFromRefs,
   findUnmatchedPairs,
@@ -124,17 +124,14 @@ export async function POST(request: NextRequest) {
 
     const papers = body.papers;
     const { reviews, studies } = partitionPapers(papers);
+    const reviewIdSet = new Set(reviews.map((r) => r.openAlexId));
 
     // If no reviews, every paper is "no-reviews" — skip OpenAlex and LLM calls
     if (reviews.length === 0) {
-      const paperStatus: Record<string, PaperOverlapStatus> = {};
-      for (const p of papers) {
-        paperStatus[p.openAlexId] = "no-reviews";
-      }
       const response: EvidenceOverlapResponse = {
         analysis: {
           relations: [],
-          paperStatus,
+          paperStatus: derivePaperStatus(papers, [], reviewIdSet),
           analyzedAt: new Date().toISOString(),
         },
       };
@@ -142,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Fetch referenced_works for review papers from OpenAlex
-    const reviewIds = reviews.map((r) => r.openAlexId);
+    const reviewIds = [...reviewIdSet];
     const refWorks = await fetchWorksByIds(reviewIds, OPENALEX_MAILTO);
 
     // Build a map of review ID → referenced work IDs
@@ -166,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Combine relations and derive status
     const allRelations = [...citationRelations, ...llmRelations];
-    const paperStatus = derivePaperStatus(papers, allRelations);
+    const paperStatus = derivePaperStatus(papers, allRelations, reviewIdSet);
 
     const response: EvidenceOverlapResponse = {
       analysis: {
@@ -193,7 +190,7 @@ export async function POST(request: NextRequest) {
 // LLM fallback classification
 // ---------------------------------------------------------------------------
 
-type PaperPair = { review: EvidenceOverlapRequest["papers"][number]; study: EvidenceOverlapRequest["papers"][number] };
+type PaperPair = { review: OverlapPaper; study: OverlapPaper };
 
 async function classifyOverlapWithLlm(
   pairs: PaperPair[],

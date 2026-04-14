@@ -88,7 +88,7 @@ export function mapOpenAlexWork(work: OpenAlexWork): EvidencePaper {
 // Batch fetch by ID (for overlap detection — retrieves referenced_works)
 // ---------------------------------------------------------------------------
 
-const OPENALEX_API_URL = "https://api.openalex.org/works";
+export const OPENALEX_API_URL = "https://api.openalex.org/works";
 const FETCH_BY_ID_TIMEOUT_MS = 10_000;
 
 /** Batch-fetch OpenAlex works by ID, returning only `id` and `referenced_works`.
