@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { ArtifactType } from "@/app/lib/types/session";
 import { fetchApi } from "@/app/lib/formalization/api";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -63,5 +63,55 @@ export function useArtifactEditing(
     editWaitEstimate,
     handleAiEdit,
   };
+}
+
+/**
+ * Convenience hook that creates useArtifactEditing instances for all structured
+ * artifact types. Returns a keyed object so callers can do e.g.
+ * `artifactEditing.causalGraph.handleAiEdit(...)`.
+ */
+export function useAllArtifactEditing(props: {
+  causalGraph: string | null;
+  setCausalGraph: (v: string) => void;
+  statisticalModel: string | null;
+  setStatisticalModel: (v: string) => void;
+  propertyTests: string | null;
+  setPropertyTests: (v: string) => void;
+  dialecticalMap: string | null;
+  setDialecticalMap: (v: string) => void;
+  counterexamples: string | null;
+  setCounterexamples: (v: string) => void;
+}) {
+  // Use refs so the getContent callbacks are stable across renders
+  const refs = useRef(props);
+  useEffect(() => { refs.current = props; });
+
+  const causalGraph = useArtifactEditing(
+    "causal-graph",
+    useCallback(() => refs.current.causalGraph, []),
+    useCallback((v: string) => refs.current.setCausalGraph(v), []),
+  );
+  const statisticalModel = useArtifactEditing(
+    "statistical-model",
+    useCallback(() => refs.current.statisticalModel, []),
+    useCallback((v: string) => refs.current.setStatisticalModel(v), []),
+  );
+  const propertyTests = useArtifactEditing(
+    "property-tests",
+    useCallback(() => refs.current.propertyTests, []),
+    useCallback((v: string) => refs.current.setPropertyTests(v), []),
+  );
+  const dialecticalMap = useArtifactEditing(
+    "balanced-perspectives",
+    useCallback(() => refs.current.dialecticalMap, []),
+    useCallback((v: string) => refs.current.setDialecticalMap(v), []),
+  );
+  const counterexamples = useArtifactEditing(
+    "counterexamples",
+    useCallback(() => refs.current.counterexamples, []),
+    useCallback((v: string) => refs.current.setCounterexamples(v), []),
+  );
+
+  return { causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples };
 }
 
