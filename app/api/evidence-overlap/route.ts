@@ -25,12 +25,16 @@ import {
   derivePaperStatus,
 } from "./overlapUtils";
 
-if (!process.env.OPENALEX_MAILTO) {
-  throw new Error(
-    "OPENALEX_MAILTO env var is required — OpenAlex's polite pool needs a real contact email.",
-  );
+function getOpenAlexMailto(): string {
+  const mailto = process.env.OPENALEX_MAILTO;
+  if (!mailto) {
+    throw new Error(
+      "OPENALEX_MAILTO env var is required — OpenAlex's polite pool needs a real contact email. " +
+      "See https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication",
+    );
+  }
+  return mailto;
 }
-const OPENALEX_MAILTO: string = process.env.OPENALEX_MAILTO;
 const MAX_PAPERS = 20;
 
 // ---------------------------------------------------------------------------
@@ -140,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Fetch referenced_works for review papers from OpenAlex
     const reviewIds = [...reviewIdSet];
-    const refWorks = await fetchWorksByIds(reviewIds, OPENALEX_MAILTO);
+    const refWorks = await fetchWorksByIds(reviewIds, getOpenAlexMailto());
 
     // Build a map of review ID → referenced work IDs
     const refsMap = new Map<string, string[]>();
