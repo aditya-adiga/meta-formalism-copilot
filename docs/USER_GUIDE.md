@@ -255,6 +255,65 @@ Toggle between views with the **Graph / Details** tabs.
 
 Each counterexample has a plausibility rating (high / medium / low) shown with color coding, plus a robustness assessment of the overall claim.
 
+### Evidence grounding
+
+Statistical Model and Counterexamples panels include an **Evidence** section for finding and incorporating published research. See [Evidence Grounding](#evidence-grounding) below for the full workflow.
+
+---
+
+## Evidence Grounding
+
+Statistical Model and Counterexamples artifacts can be grounded in published academic research. The evidence workflow finds relevant papers, scores them, detects overlap, and proposes concrete edits to your artifact.
+
+### Finding evidence
+
+1. Open a **Statistical Model** or **Counterexamples** panel that has generated content.
+2. Scroll to the **Evidence** section at the bottom.
+3. Click **"Find evidence"** to search for relevant papers via OpenAlex.
+4. Results appear as paper cards showing title, authors, year, journal, and citation count.
+5. Click **"Refresh evidence"** to re-run the search (e.g., after editing the artifact).
+
+### Scoring papers
+
+1. After papers are found, click **"Score papers"**.
+2. The AI assesses each paper for:
+   - **Reliability** (Rel) — study type, methodology quality, red flags. Score badge: green (≥0.7), amber (≥0.4), red (<0.4).
+   - **Relatedness** (Fit) — how directly the paper addresses your artifact's claims. Same color scale.
+3. Papers are re-sorted by combined score. Study type labels (e.g., "Meta-analysis", "RCT", "Cohort Study") and any methodology red flags are displayed.
+
+### Checking overlap
+
+When scored results include review papers (meta-analyses or systematic reviews):
+
+1. A **"Check overlap"** button appears.
+2. Click it to detect which individual studies are already covered by the reviews.
+3. Papers receive status badges:
+   - **Review paper** (blue) — this is a meta-analysis or systematic review.
+   - **Included in review** (amber) — this study is covered by a review in the results.
+   - **Novel** (green) — this study is newer than or not included in the reviews.
+4. A summary bar shows counts (e.g., "3 studies subsumed by 1 review, 2 novel studies").
+
+### Suggesting edits (assisted integration)
+
+After papers are scored, the AI can propose specific changes to your artifact based on the evidence:
+
+1. Click **"Suggest edits"**.
+2. The AI generates 2–5 proposed edits, each targeting a specific field in your artifact.
+3. Each proposal shows:
+   - **Field label** — which part of the artifact would change (e.g., "Hypothesis H1").
+   - **Edit type badge** — Update prior (blue), Add evidence (green), Contradiction (red), or Refine wording (grey).
+   - **Diff** — the current value (red, strikethrough) and proposed value (green).
+   - **Rationale** — why the edit is warranted, referencing specific paper findings.
+   - **Paper citations** — which papers support the proposal.
+4. For each proposal, click **Approve** or **Reject**.
+5. Click **"Apply N approved edits"** to update the artifact. The proposals are cleared after applying.
+6. Click **"Re-suggest edits"** to generate a fresh set of proposals.
+
+### Evidence persistence
+
+- Found papers, scores, overlap analysis, and proposals are saved to localStorage and survive page refreshes.
+- Evidence is per-artifact — each Statistical Model or Counterexamples artifact maintains its own evidence state.
+
 ---
 
 ## Session Management
