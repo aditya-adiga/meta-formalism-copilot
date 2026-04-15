@@ -1,8 +1,33 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 
 const ONBOARDING_SEEN_KEY = "mfc-onboarding-seen";
+
+// Tiny external store so we can read localStorage without hydration mismatch.
+let _onboardingVisible: boolean | null = null;
+const _onboardingListeners = new Set<() => void>();
+
+function getOnboardingSnapshot(): boolean {
+  if (_onboardingVisible === null) {
+    _onboardingVisible = !localStorage.getItem(ONBOARDING_SEEN_KEY);
+  }
+  return _onboardingVisible;
+}
+
+function getOnboardingServerSnapshot(): boolean {
+  return false;
+}
+
+function subscribeOnboarding(cb: () => void): () => void {
+  _onboardingListeners.add(cb);
+  return () => _onboardingListeners.delete(cb);
+}
+
+function setOnboardingVisible(v: boolean): void {
+  _onboardingVisible = v;
+  for (const cb of _onboardingListeners) cb();
+}
 
 type OnboardingStep = {
   title: string;
@@ -288,19 +313,19 @@ function OnboardingOverlayInner({ onClose }: { onClose: () => void }) {
 
 /** Hook to manage onboarding visibility state */
 export function useOnboarding() {
-  // Initialize from localStorage — show on first visit
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !localStorage.getItem(ONBOARDING_SEEN_KEY);
-  });
+  // useSyncExternalStore with a server snapshot avoids hydration mismatch
+  // (React error #418): server always returns false, client reads localStorage.
+  const showOnboarding = useSyncExternalStore(
+    subscribeOnboarding, getOnboardingSnapshot, getOnboardingServerSnapshot,
+  );
 
   const closeOnboarding = useCallback(() => {
-    setShowOnboarding(false);
+    setOnboardingVisible(false);
     localStorage.setItem(ONBOARDING_SEEN_KEY, "true");
   }, []);
 
   const openOnboarding = useCallback(() => {
-    setShowOnboarding(true);
+    setOnboardingVisible(true);
   }, []);
 
   return { showOnboarding, closeOnboarding, openOnboarding };
