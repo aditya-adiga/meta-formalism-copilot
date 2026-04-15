@@ -51,6 +51,14 @@ describe("resolveFieldPath", () => {
   it("returns null for empty path", () => {
     expect(resolveFieldPath({ a: 1 }, "")).toBeNull();
   });
+
+  it("rejects prototype pollution paths", () => {
+    const obj = { a: 1 };
+    expect(resolveFieldPath(obj, "__proto__")).toBeNull();
+    expect(resolveFieldPath(obj, "constructor")).toBeNull();
+    expect(resolveFieldPath(obj, "prototype")).toBeNull();
+    expect(resolveFieldPath(obj, "__proto__.polluted")).toBeNull();
+  });
 });
 
 describe("getFieldValue", () => {

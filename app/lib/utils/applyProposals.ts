@@ -6,6 +6,9 @@ import type { IntegrationProposal } from "@/app/lib/types/evidence";
  *
  * Returns null if the path cannot be resolved against the object.
  */
+// Prevent prototype pollution via LLM-generated field paths
+const DENIED_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
 export function resolveFieldPath(
   obj: Record<string, unknown>,
   path: string,
@@ -17,6 +20,7 @@ export function resolveFieldPath(
     .filter(Boolean);
 
   if (segments.length === 0) return null;
+  if (segments.some((s) => DENIED_SEGMENTS.has(s))) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- navigating dynamic paths
   let current: any = obj;
