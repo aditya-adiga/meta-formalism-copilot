@@ -273,7 +273,7 @@ export default function Home() {
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes } = useDecomposition();
+  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes, addGraphNode, removeGraphNode, renameGraphNode, addGraphEdge, removeGraphEdge } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
 
   // --- Auto-formalize queue ---
@@ -673,6 +673,17 @@ export default function Home() {
     }
   }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId]);
 
+  const handleAddNode = useCallback(() => {
+    const newId = addGraphNode({ label: "New node" });
+    handleSelectNode(newId);
+  }, [addGraphNode, handleSelectNode]);
+
+  const handleDeleteEdges = useCallback((edges: Array<{ source: string; target: string }>) => {
+    for (const edge of edges) {
+      removeGraphEdge(edge.source, edge.target);
+    }
+  }, [removeGraphEdge]);
+
   // Resolve dependencies for NodeDetailPanel
   const selectedNodeDeps = useMemo(() => {
     if (!selectedNode) return [];
@@ -796,6 +807,11 @@ export default function Home() {
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
+            onAddNode={handleAddNode}
+            onDeleteNode={removeGraphNode}
+            onRenameNode={renameGraphNode}
+            onConnectNodes={addGraphEdge}
+            onDeleteEdges={handleDeleteEdges}
           />
         );
       case "node-detail":
@@ -892,6 +908,7 @@ export default function Home() {
     handleGenerate, handleGenerateLean, handleSemiformalTextChange, handleLeanCodeChange,
     activePipeline, isAnyGenerating,
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
+    handleAddNode, removeGraphNode, renameGraphNode, addGraphEdge, handleDeleteEdges,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     activeCausalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,

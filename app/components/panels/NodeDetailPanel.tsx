@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
 /** Renders a single non-deductive artifact stored on a node */
 function NodeArtifactSection({ artifact }: { artifact: NodeArtifact }) {
   const meta = ARTIFACT_META[artifact.type as keyof typeof ARTIFACT_META];
+  if (!meta) return null; // unknown artifact type — skip rendering
   // Try to pretty-print JSON content; fall back to raw string
   let display: string;
   try {

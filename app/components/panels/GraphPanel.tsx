@@ -289,6 +289,9 @@ export default function GraphPanel({
         {hasContent && !hasNodes && extractionStatus !== "extracting" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-[#9A9590]">
             <p>Click &quot;{buttonLabel}&quot; to extract key claims</p>
+            {onAddNode && (
+              <p>or <button onClick={onAddNode} className="text-[var(--ink-black)] underline hover:no-underline">add a node manually</button></p>
+            )}
             {extractionStatus === "error" && (
               <p className="text-red-600">Extraction failed. Try again.</p>
             )}
