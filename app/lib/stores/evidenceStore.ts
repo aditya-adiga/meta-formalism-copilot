@@ -11,7 +11,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { EvidenceSlot, PaperScore, OverlapAnalysis } from "@/app/lib/types/evidence";
+import type { EvidenceSlot, PaperScore, OverlapAnalysis, IntegrationProposal } from "@/app/lib/types/evidence";
 
 // ---------------------------------------------------------------------------
 // Debounced localStorage adapter (same pattern as workspaceStore)
@@ -56,12 +56,16 @@ interface EvidenceState {
   slots: Record<string, EvidenceSlot>;
   /** Per-element overlap analysis results */
   overlap: Record<string, OverlapAnalysis>;
+  /** Per-element integration proposals */
+  proposals: Record<string, IntegrationProposal[]>;
   /** Per-element loading state (search or scoring) */
   loading: Record<string, boolean>;
   /** Per-element scoring loading state */
   scoring: Record<string, boolean>;
   /** Per-element overlap analysis loading state */
   analyzing: Record<string, boolean>;
+  /** Per-element integration loading state */
+  integrating: Record<string, boolean>;
   /** Per-element error messages */
   errors: Record<string, string>;
 }
@@ -71,11 +75,18 @@ interface EvidenceActions {
   setLoading: (key: string, loading: boolean) => void;
   setScoring: (key: string, scoring: boolean) => void;
   setAnalyzing: (key: string, analyzing: boolean) => void;
+  setIntegrating: (key: string, integrating: boolean) => void;
   setError: (key: string, error: string | null) => void;
   /** Apply LLM scores to papers in a slot */
   applyScores: (key: string, scores: PaperScore[]) => void;
   /** Apply overlap analysis results */
   applyOverlap: (key: string, analysis: OverlapAnalysis) => void;
+  /** Store integration proposals */
+  setProposals: (key: string, proposals: IntegrationProposal[]) => void;
+  /** Update decision on a single proposal */
+  setProposalDecision: (key: string, proposalId: string, decision: boolean) => void;
+  /** Clear all proposals for a slot */
+  clearProposals: (key: string) => void;
   clearEvidence: (key: string) => void;
   clearAll: () => void;
 }
@@ -83,9 +94,11 @@ interface EvidenceActions {
 const DEFAULT_STATE: EvidenceState = {
   slots: {},
   overlap: {},
+  proposals: {},
   loading: {},
   scoring: {},
   analyzing: {},
+  integrating: {},
   errors: {},
 };
 
@@ -116,6 +129,11 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
       setAnalyzing: (key: string, analyzing: boolean) =>
         set((state: EvidenceState) => ({
           analyzing: { ...state.analyzing, [key]: analyzing },
+        })),
+
+      setIntegrating: (key: string, integrating: boolean) =>
+        set((state: EvidenceState) => ({
+          integrating: { ...state.integrating, [key]: integrating },
         })),
 
       setError: (key: string, error: string | null) =>
@@ -162,6 +180,32 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           overlap: { ...state.overlap, [key]: analysis },
         })),
 
+      setProposals: (key: string, proposals: IntegrationProposal[]) =>
+        set((state: EvidenceState) => ({
+          proposals: { ...state.proposals, [key]: proposals },
+        })),
+
+      setProposalDecision: (key: string, proposalId: string, decision: boolean) =>
+        set((state: EvidenceState) => {
+          const current = state.proposals[key];
+          if (!current) return {};
+          return {
+            proposals: {
+              ...state.proposals,
+              [key]: current.map((p) =>
+                p.id === proposalId ? { ...p, decision } : p,
+              ),
+            },
+          };
+        }),
+
+      clearProposals: (key: string) =>
+        set((state: EvidenceState) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _removed, ...rest } = state.proposals;
+          return { proposals: rest };
+        }),
+
       clearEvidence: (key: string) =>
         set((state: EvidenceState) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -169,32 +213,43 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _o, ...restOverlap } = state.overlap;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _p, ...restProposals } = state.proposals;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _l, ...restLoading } = state.loading;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _sc, ...restScoring } = state.scoring;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _a, ...restAnalyzing } = state.analyzing;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _i, ...restIntegrating } = state.integrating;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _e, ...restErrors } = state.errors;
           return {
             slots: restSlots,
             overlap: restOverlap,
+            proposals: restProposals,
             loading: restLoading,
             scoring: restScoring,
             analyzing: restAnalyzing,
+            integrating: restIntegrating,
             errors: restErrors,
           };
         }),
 
-      clearAll: () => set({ slots: {}, overlap: {}, loading: {}, scoring: {}, analyzing: {}, errors: {} }),
+      clearAll: () => set({
+        slots: {}, overlap: {}, proposals: {},
+        loading: {}, scoring: {}, analyzing: {}, integrating: {}, errors: {},
+      }),
     }),
     {
       name: "evidence-store-v1",
       storage: typeof window !== "undefined"
         ? createJSONStorage(() => debouncedStorage)
         : undefined,
-      // Only persist slots and overlap, not transient loading state
-      partialize: (state: EvidenceState & EvidenceActions) => ({ slots: state.slots, overlap: state.overlap }),
+      // Only persist slots, overlap, and proposals — not transient loading state
+      partialize: (state: EvidenceState & EvidenceActions) => ({
+        slots: state.slots, overlap: state.overlap, proposals: state.proposals,
+      }),
       skipHydration: true,
     },
   ),
