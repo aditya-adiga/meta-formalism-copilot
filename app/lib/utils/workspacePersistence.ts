@@ -100,7 +100,7 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
     causalGraph: artifacts.causalGraph,
     statisticalModel: artifacts.statisticalModel,
     propertyTests: artifacts.propertyTests,
-    balancedPerspectives: artifacts.balancedPerspectives,
+    balancedPerspectives: artifacts.balancedPerspectives ?? artifacts.dialecticalMap ?? null,
     counterexamples: artifacts.counterexamples,
     customArtifactTypes: input.customArtifactTypes ?? [],
     customArtifactData: input.customArtifactData ?? artifacts.customArtifactData ?? {},
