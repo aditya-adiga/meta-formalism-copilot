@@ -33,8 +33,8 @@ export default function FindEvidenceButton({
   const { isScoring, score } = useEvidenceScoring(artifactType, elementId);
   const { overlap, isAnalyzing, analyze, hasReviews } = useEvidenceOverlap(artifactType, elementId);
   const {
-    proposals, isIntegrating, integrate, setDecision,
-    hasProposals, canIntegrate,
+    proposals, isIntegrating, error: integrationError, integrate, setDecision,
+    clearProposals, hasProposals, canIntegrate,
   } = useEvidenceIntegration(artifactType, elementId);
 
   const canSuggestEdits = canIntegrate && !!artifactJson && !!onContentChange;
@@ -43,7 +43,8 @@ export default function FindEvidenceButton({
     if (!artifactJson || !onContentChange || proposals.length === 0) return;
     const updated = applyProposals(artifactJson, proposals);
     onContentChange(updated);
-  }, [artifactJson, onContentChange, proposals]);
+    clearProposals();
+  }, [artifactJson, onContentChange, proposals, clearProposals]);
 
   return (
     <div className="mt-1.5">
@@ -89,6 +90,10 @@ export default function FindEvidenceButton({
               ? "Re-suggest edits"
               : "Suggest edits"}
         </button>
+      )}
+
+      {integrationError && (
+        <p className="text-xs text-red-600 mt-1">{integrationError}</p>
       )}
 
       {hasProposals && slot && (

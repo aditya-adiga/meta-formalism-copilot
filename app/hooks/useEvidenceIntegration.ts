@@ -106,12 +106,17 @@ export function useEvidenceIntegration(
     [key],
   );
 
+  const clearProposals = useCallback(() => {
+    useEvidenceStore.getState().clearProposals(key);
+  }, [key]);
+
   return {
     proposals,
     isIntegrating,
     error,
     integrate,
     setDecision,
+    clearProposals,
     hasProposals: proposals.length > 0,
     canIntegrate: (slot?.scored ?? false) && !isIntegrating,
   };
