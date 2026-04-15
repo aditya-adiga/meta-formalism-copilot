@@ -89,6 +89,16 @@ export default function CounterexamplesPanel({
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
                         {cx.plausibility}
                       </span>
+                      {cx.isEmpirical === true && (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+                          Hypothetical
+                        </span>
+                      )}
+                      {cx.isEmpirical === false && (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">
+                          Logical
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
                     <div className="text-xs text-[#6B6560]">
@@ -97,6 +107,11 @@ export default function CounterexamplesPanel({
                     <div className="text-xs text-[#6B6560]">
                       <span className="font-semibold">Why it works:</span> {cx.explanation}
                     </div>
+                    {cx.isEmpirical === true && (
+                      <p className="text-xs text-blue-600 italic">
+                        This counterexample describes evidence that would challenge the claim. Use Find Evidence to search for real papers.
+                      </p>
+                    )}
                   </div>
                 </EditableSection>
               ))}
