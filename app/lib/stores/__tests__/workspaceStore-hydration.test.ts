@@ -2,13 +2,18 @@
  * Tests for SSR hydration and migration from workspace-v2 format.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useWorkspaceStore, migrateFromV2 } from "../workspaceStore";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
 beforeEach(() => {
+  vi.useFakeTimers();
   localStorage.clear();
   useWorkspaceStore.setState(useWorkspaceStore.getInitialState());
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("SSR hydration", () => {
@@ -59,6 +64,7 @@ describe("SSR hydration", () => {
     await useWorkspaceStore.persist.rehydrate();
 
     useWorkspaceStore.getState().setSourceText("auto-saved");
+    vi.advanceTimersByTime(300); // flush debounced storage write
 
     const raw = localStorage.getItem("workspace-zustand-v1");
     expect(raw).not.toBeNull();
@@ -69,6 +75,7 @@ describe("SSR hydration", () => {
   it("persisted data excludes action functions", async () => {
     await useWorkspaceStore.persist.rehydrate();
     useWorkspaceStore.getState().setSourceText("test");
+    vi.advanceTimersByTime(300); // flush debounced storage write
 
     const stored = JSON.parse(localStorage.getItem("workspace-zustand-v1")!);
     expect(stored.state.setSourceText).toBeUndefined();
