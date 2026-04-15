@@ -9,9 +9,15 @@ type IconRailProps = {
   onSelectPanel: (id: PanelId) => void;
   onExportAll?: () => void;
   exportAllDisabled?: boolean;
+  secondaryPanelId?: PanelId | null;
+  onSelectSecondaryPanel?: (id: PanelId) => void;
 };
 
-export default function IconRail({ panels, activePanelId, onSelectPanel, onExportAll, exportAllDisabled }: IconRailProps) {
+export default function IconRail({
+  panels, activePanelId, onSelectPanel,
+  onExportAll, exportAllDisabled,
+  secondaryPanelId, onSelectSecondaryPanel,
+}: IconRailProps) {
   const [expanded, setExpanded] = useState(false);
 
   const visiblePanels = panels.filter((p) => !p.hidden);
@@ -40,7 +46,9 @@ export default function IconRail({ panels, activePanelId, onSelectPanel, onExpor
       </button>
 
       {visiblePanels.map((panel, idx) => {
-        const isActive = panel.id === activePanelId;
+        const isPrimary = panel.id === activePanelId;
+        const isSecondary = panel.id === secondaryPanelId;
+        const isActive = isPrimary || isSecondary;
         const prevPanel = idx > 0 ? visiblePanels[idx - 1] : null;
         const showSeparator = prevPanel && prevPanel.group && panel.group && prevPanel.group !== panel.group;
         return (
@@ -49,8 +57,14 @@ export default function IconRail({ panels, activePanelId, onSelectPanel, onExpor
             <div className="mx-3 my-1 border-t border-[#DDD9D5]" />
           )}
           <button
-            onClick={() => onSelectPanel(panel.id)}
-            title={expanded ? undefined : panel.label}
+            onClick={(e) => {
+              if (e.altKey && onSelectSecondaryPanel) {
+                onSelectSecondaryPanel(panel.id);
+              } else {
+                onSelectPanel(panel.id);
+              }
+            }}
+            title={expanded ? undefined : `${panel.label}${onSelectSecondaryPanel ? " (Alt+click for split view)" : ""}`}
             className={`
               group relative flex items-center gap-3 px-3 py-3 text-left transition-colors
               ${isActive
@@ -58,19 +72,19 @@ export default function IconRail({ panels, activePanelId, onSelectPanel, onExpor
                 : "text-[#6B6560] hover:bg-[var(--rail-hover)] hover:text-[var(--ink-black)]"
               }
             `}
-            aria-current={isActive ? "page" : undefined}
+            aria-current={isPrimary ? "page" : undefined}
           >
-            {/* Active indicator bar */}
-            {isActive && (
+            {isPrimary && (
               <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-[var(--rail-active)]" />
             )}
+            {isSecondary && !isPrimary && (
+              <span className="absolute right-0 top-1 bottom-1 w-[3px] rounded-l-full bg-[var(--rail-active)] opacity-50" />
+            )}
 
-            {/* Icon — always visible */}
             <span className="flex shrink-0 items-center justify-center w-6 h-6">
               {panel.icon}
             </span>
 
-            {/* Label + status — only when expanded */}
             {expanded && (
               <span className="flex min-w-0 flex-col overflow-hidden">
                 <span className="truncate text-xs font-semibold">{panel.label}</span>
