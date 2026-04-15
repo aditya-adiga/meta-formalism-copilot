@@ -12,7 +12,7 @@ const PLAUSIBILITY_STYLES: Record<string, string> = {
 };
 
 type CounterexamplesPanelProps = {
-  counterexamples: CounterexamplesResponse["counterexamples"] | null;
+  counterexamples: CounterexamplesResponse["counterexamplesAnalysis"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps;
@@ -55,10 +55,10 @@ export default function CounterexamplesPanel({
           {/* Counterexamples */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Counterexamples ({counterexamples.counterexamples.length})
+              Counterexamples ({counterexamples.counterexamples?.length ?? 0})
             </h3>
             <div className="space-y-3">
-              {counterexamples.counterexamples.map((cx, i) => (
+              {counterexamples.counterexamples?.map((cx, i) => (
                 <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("counterexamples", i, newCx)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">

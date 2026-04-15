@@ -17,7 +17,7 @@ type ExportAllOptions = {
   statisticalModel?: StatisticalModelResponse["statisticalModel"] | null;
   propertyTests?: PropertyTestsResponse["propertyTests"] | null;
   dialecticalMap?: DialecticalMapResponse["dialecticalMap"] | null;
-  counterexamples?: CounterexamplesResponse["counterexamples"] | null;
+  counterexamples?: CounterexamplesResponse["counterexamplesAnalysis"] | null;
 };
 
 export async function exportAllAsZip({

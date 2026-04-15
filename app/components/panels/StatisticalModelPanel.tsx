@@ -68,10 +68,10 @@ export default function StatisticalModelPanel({
           {(displayModel.variables?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Variables ({displayModel.variables.length})
+              Variables ({displayModel.variables?.length ?? 0})
             </h3>
             <div className="space-y-2">
-              {displayModel.variables.map((v, i) => (
+              {displayModel.variables?.map((v, i) => (
                 <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <div className="flex items-center gap-2">
@@ -93,10 +93,10 @@ export default function StatisticalModelPanel({
           {(displayModel.hypotheses?.length ?? 0) > 0 && (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Hypotheses ({displayModel.hypotheses.length})
+              Hypotheses ({displayModel.hypotheses?.length ?? 0})
             </h3>
             <div className="space-y-2">
-              {displayModel.hypotheses.map((h, i) => (
+              {displayModel.hypotheses?.map((h, i) => (
                 <EditableSection key={h.id} value={h} onChange={(newH) => updateArrayItem("hypotheses", i, newH)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2">
                     <p className="text-sm font-medium text-[var(--ink-black)]">{h.statement}</p>
@@ -117,10 +117,10 @@ export default function StatisticalModelPanel({
           {(displayModel.assumptions?.length ?? 0) > 0 && (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Assumptions ({displayModel.assumptions.length})
+                Assumptions ({displayModel.assumptions?.length ?? 0})
               </h3>
               <div className="space-y-1 pl-5">
-                {displayModel.assumptions.map((a, i) => (
+                {displayModel.assumptions?.map((a, i) => (
                   <EditableSection key={i} value={a} onChange={(newA) => updateArrayItem("assumptions", i, newA)}>
                     <p className="text-sm text-[var(--ink-black)] before:content-['•'] before:mr-2 before:text-[#9A9590]">{a}</p>
                   </EditableSection>
