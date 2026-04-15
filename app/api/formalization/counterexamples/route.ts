@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   return handleArtifactRoute(request, {
     endpoint: "formalization/counterexamples",
     systemPrompt: SYSTEM_PROMPT,
-    responseKey: "counterexamples",
+    responseKey: "counterexamplesAnalysis",
     mockResponse,
   });
 }

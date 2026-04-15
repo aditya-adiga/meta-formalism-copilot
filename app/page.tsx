@@ -201,7 +201,7 @@ export default function Home() {
 
   const counterexamples = useMemo(() => {
     if (!persistedCounterexamples) return null;
-    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
+    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamplesAnalysis"]; }
     catch { return null; }
   }, [persistedCounterexamples]);
 

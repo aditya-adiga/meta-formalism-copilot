@@ -16,7 +16,7 @@ const PLAUSIBILITY_STYLES: Record<string, string> = {
 };
 
 type CounterexamplesPanelProps = {
-  counterexamples: CounterexamplesResponse["counterexamples"] | null;
+  counterexamples: CounterexamplesResponse["counterexamplesAnalysis"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps & StalenessProps;
@@ -37,7 +37,7 @@ export default function CounterexamplesPanel({
   const evidenceSearchContent = useMemo(() => {
     if (!counterexamples) return "";
     const parts = [counterexamples.claim];
-    for (const cx of counterexamples.counterexamples.slice(0, 3)) {
+    for (const cx of (counterexamples.counterexamples ?? []).slice(0, 3)) {
       parts.push(cx.scenario);
     }
     return parts.filter(Boolean).join(". ");
@@ -75,9 +75,9 @@ export default function CounterexamplesPanel({
           </section>
 
           {/* Counterexamples */}
-          <CollapsibleSection title="Counterexamples" defaultOpen={false} count={counterexamples.counterexamples.length}>
+          <CollapsibleSection title="Counterexamples" defaultOpen={false} count={counterexamples.counterexamples?.length}>
             <div className="space-y-3">
-              {counterexamples.counterexamples.map((cx, i) => (
+              {counterexamples.counterexamples?.map((cx, i) => (
                 <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("counterexamples", i, newCx)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">

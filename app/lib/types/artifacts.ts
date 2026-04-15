@@ -117,7 +117,7 @@ export type DialecticalMapResponse = {
 
 /** Counterexamples response shape */
 export type CounterexamplesResponse = {
-  counterexamples: {
+  counterexamplesAnalysis: {
     claim: string;
     counterexamples: Array<{
       id: string;
@@ -209,5 +209,5 @@ export const ARTIFACT_RESPONSE_KEY: Record<BuiltinArtifactType, string> = {
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
   "balanced-perspectives": "balancedPerspectives",
-  counterexamples: "counterexamples",
+  counterexamples: "counterexamplesAnalysis",
 };
