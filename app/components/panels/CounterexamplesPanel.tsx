@@ -9,10 +9,21 @@ import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
 import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
+const BADGE_BASE = "rounded-full px-2 py-0.5 text-xs font-medium";
+
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
   medium: "bg-amber-100 text-amber-700",
   low: "bg-green-100 text-green-700",
+};
+
+// isEmpirical === true → "Hypothetical": empirical counterexamples use hypothetical
+// framing ("if evidence showed X...") to avoid fabricating citations. The label tells
+// the user to verify via Find Evidence rather than trusting the LLM's claim.
+// isEmpirical === undefined (old artifacts) → no badge shown.
+const EMPIRICAL_STYLES: Record<string, { label: string; classes: string }> = {
+  true: { label: "Hypothetical", classes: "bg-blue-100 text-blue-700" },
+  false: { label: "Logical", classes: "bg-gray-100 text-gray-600" },
 };
 
 type CounterexamplesPanelProps = {
@@ -86,17 +97,12 @@ export default function CounterexamplesPanel({
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs text-[#9A9590]">{cx.id}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
+                      <span className={`${BADGE_BASE} ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
                         {cx.plausibility}
                       </span>
-                      {cx.isEmpirical === true && (
-                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
-                          Hypothetical
-                        </span>
-                      )}
-                      {cx.isEmpirical === false && (
-                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">
-                          Logical
+                      {cx.isEmpirical != null && (
+                        <span className={`${BADGE_BASE} ${EMPIRICAL_STYLES[String(cx.isEmpirical)].classes}`}>
+                          {EMPIRICAL_STYLES[String(cx.isEmpirical)].label}
                         </span>
                       )}
                     </div>
