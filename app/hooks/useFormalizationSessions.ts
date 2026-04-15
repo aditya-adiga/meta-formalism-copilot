@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from "react";
 import type { FormalizationSession, SessionScope, SessionsState, ArtifactData, ArtifactType } from "@/app/lib/types/session";
 
 export type SessionRestoreHandler = (session: FormalizationSession) => void;
@@ -8,16 +8,40 @@ export type SessionRestoreHandler = (session: FormalizationSession) => void;
 type SessionUpdatableFields = Partial<Pick<FormalizationSession, "semiformalText" | "leanCode" | "verificationStatus" | "verificationErrors" | "artifacts">>;
 
 const STORAGE_KEY = "metaformalism-sessions";
+const EMPTY_STATE: SessionsState = { sessions: [], activeSessionId: null };
 
 function loadFromStorage(): SessionsState {
-  if (typeof window === "undefined") return { sessions: [], activeSessionId: null };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as SessionsState;
   } catch {
     // Ignore parse errors
   }
-  return { sessions: [], activeSessionId: null };
+  return EMPTY_STATE;
+}
+
+// External store for SSR-safe hydration (mirrors useWorkspaceSessions pattern).
+// useSyncExternalStore with a server snapshot avoids hydration mismatch (React #418).
+let _fSessionsCache: SessionsState | null = null;
+const _fListeners = new Set<() => void>();
+
+function getFSessionsSnapshot(): SessionsState {
+  if (!_fSessionsCache) _fSessionsCache = loadFromStorage();
+  return _fSessionsCache;
+}
+
+function getFServerSnapshot(): SessionsState {
+  return EMPTY_STATE;
+}
+
+function subscribeToFSessions(cb: () => void): () => void {
+  _fListeners.add(cb);
+  return () => _fListeners.delete(cb);
+}
+
+function emitFSessionsChange(next: SessionsState): void {
+  _fSessionsCache = next;
+  for (const cb of _fListeners) cb();
 }
 
 function scopeMatches(a: SessionScope, b: SessionScope): boolean {
@@ -29,7 +53,14 @@ function scopeMatches(a: SessionScope, b: SessionScope): boolean {
 const DEBOUNCE_MS = 500;
 
 export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
-  const [state, setState] = useState<SessionsState>(loadFromStorage);
+  // useSyncExternalStore with a server snapshot avoids hydration mismatch
+  // (React error #418): server always renders EMPTY_STATE, client reads localStorage.
+  const state = useSyncExternalStore(subscribeToFSessions, getFSessionsSnapshot, getFServerSnapshot);
+  const setState = useCallback((updater: SessionsState | ((prev: SessionsState) => SessionsState)) => {
+    const next = typeof updater === "function" ? updater(getFSessionsSnapshot()) : updater;
+    emitFSessionsChange(next);
+  }, []);
+
   const mounted = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
@@ -95,7 +126,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     // We compute it eagerly from state to avoid stale closure issues
     newSession.runNumber = runNumber;
     return newSession;
-  }, []);
+  }, [setState]);
 
   const updateSession = useCallback((id: string, updates: SessionUpdatableFields) => {
     setState((prev) => ({
@@ -106,11 +137,11 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
           : s
       ),
     }));
-  }, []);
+  }, [setState]);
 
   const selectSession = useCallback((id: string) => {
     setState((prev) => ({ ...prev, activeSessionId: id }));
-  }, []);
+  }, [setState]);
 
   /**
    * Select a session and restore its state into the workspace.
@@ -122,7 +153,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     if (!session) return;
     setState((prev) => ({ ...prev, activeSessionId: sessionId }));
     onRestoreRef.current?.(session);
-  }, [state.sessions]);
+  }, [state.sessions, setState]);
 
   /**
    * Mirror an update to the active session (if one exists).
@@ -140,7 +171,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
         ),
       };
     });
-  }, []);
+  }, [setState]);
 
   /**
    * Upsert an artifact entry in the active session's artifacts[].
@@ -172,7 +203,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
         }),
       };
     });
-  }, []);
+  }, [setState]);
 
   const sessionsForScope = useCallback((scope: SessionScope): FormalizationSession[] => {
     return state.sessions
@@ -199,7 +230,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setState(data);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, []);
+  }, [setState]);
 
   /** Clear all formalization sessions */
   const clearAllSessions = useCallback(() => {
@@ -207,7 +238,7 @@ export function useFormalizationSessions(onRestore?: SessionRestoreHandler) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setState(empty);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
-  }, []);
+  }, [setState]);
 
   return {
     sessions: state.sessions,
