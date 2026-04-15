@@ -45,6 +45,11 @@ export default function StatisticalModelPanel({
     (d) => (d.variables?.length ?? 0) > 0,
   );
 
+  const artifactJson = useMemo(
+    () => statisticalModel ? JSON.stringify(statisticalModel) : undefined,
+    [statisticalModel],
+  );
+
   // Build a concise search description from the artifact for evidence search
   const evidenceSearchContent = useMemo(() => {
     if (!statisticalModel) return "";
@@ -158,6 +163,8 @@ export default function StatisticalModelPanel({
                 artifactType="statistical-model"
                 elementId={WHOLE_ARTIFACT_ELEMENT_ID}
                 elementContent={evidenceSearchContent}
+                artifactJson={artifactJson}
+                onContentChange={onContentChange}
               />
             </section>
           )}
