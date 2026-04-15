@@ -46,7 +46,7 @@ Valid fieldPaths include:
   counterexamples: `The artifact is a counterexamples analysis with this structure:
 {
   "claim": "string",
-  "counterexamples": [{ "id": "string", "scenario": "string", "targetAssumption": "string", "explanation": "string", "plausibility": "high|medium|low" }],
+  "counterexamples": [{ "id": "string", "scenario": "string", "targetAssumption": "string", "explanation": "string", "plausibility": "high|medium|low", "isEmpirical": "boolean (optional)" }],
   "robustnessAssessment": "string",
   "summary": "string"
 }
@@ -56,6 +56,7 @@ Valid fieldPaths include:
 - "counterexamples[i].scenario" — a counterexample scenario
 - "counterexamples[i].explanation" — why the counterexample works
 - "counterexamples[i].plausibility" — plausibility rating (high/medium/low)
+- "counterexamples[i].isEmpirical" — whether the counterexample relies on empirical claims
 - "robustnessAssessment" — overall robustness assessment
 - "summary" — the analysis summary`,
 };
