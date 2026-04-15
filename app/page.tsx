@@ -520,7 +520,15 @@ export default function Home() {
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
-    setActivePanelId("node-detail");
+    // If we're in split mode with the graph visible, open node-detail in the
+    // secondary panel so the graph stays visible for context.
+    if (secondaryPanelId !== null && activePanelId === "decomposition") {
+      setSecondaryPanelId("node-detail");
+    } else if (secondaryPanelId !== null && secondaryPanelId === "decomposition") {
+      setActivePanelId("node-detail");
+    } else {
+      setActivePanelId("node-detail");
+    }
     // Auto-select the most recent session for this node
     const node = decomp.nodes.find((n) => n.id === id);
     if (node) {
@@ -529,7 +537,7 @@ export default function Home() {
         selectSession(nodeSessions[0].id);
       }
     }
-  }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId]);
+  }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId, secondaryPanelId, activePanelId, setSecondaryPanelId]);
 
   // Resolve dependencies for NodeDetailPanel
   const selectedNodeDeps = useMemo(() => {
