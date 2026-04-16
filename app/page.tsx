@@ -31,6 +31,7 @@ import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
+import { useActiveStructuredArtifacts } from "@/app/hooks/useActiveStructuredArtifacts";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
@@ -486,6 +487,14 @@ export default function Home() {
     nodePipeline.loadingPhase,
   );
 
+  const {
+    activeCausalGraph, activeStatisticalModel, activePropertyTests,
+    activeDialecticalMap, activeCounterexamples,
+  } = useActiveStructuredArtifacts(
+    causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples,
+    selectedNode, isDecompMode,
+  );
+
   // Determine if any RPC is in flight (for workspace session-switch guard)
   const isAnyRpcBusy = loadingPhase !== "idle" || isAnyGenerating || queueRunning;
 
@@ -652,15 +661,15 @@ export default function Home() {
     activeSemiformal, activeLeanCode, loadingPhase,
     activeVerificationStatus, semiformalReadyForLean,
     nodes: decomp.nodes, selectedNode,
-    hasCausalGraph: causalGraph !== null,
+    hasCausalGraph: activeCausalGraph !== null,
     causalGraphLoading,
-    hasStatisticalModel: statisticalModel !== null,
+    hasStatisticalModel: activeStatisticalModel !== null,
     statisticalModelLoading,
-    hasPropertyTests: propertyTests !== null,
+    hasPropertyTests: activePropertyTests !== null,
     propertyTestsLoading,
-    hasDialecticalMap: dialecticalMap !== null,
+    hasDialecticalMap: activeDialecticalMap !== null,
     dialecticalMapLoading,
-    hasCounterexamples: counterexamples !== null,
+    hasCounterexamples: activeCounterexamples !== null,
     counterexamplesLoading,
   });
 
@@ -779,7 +788,7 @@ export default function Home() {
       case "causal-graph":
         return (
           <CausalGraphPanel
-            causalGraph={causalGraph}
+            causalGraph={activeCausalGraph}
             streamingPreview={streamingJsonPreview["causal-graph"] as CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
@@ -793,7 +802,7 @@ export default function Home() {
       case "statistical-model":
         return (
           <StatisticalModelPanel
-            statisticalModel={statisticalModel}
+            statisticalModel={activeStatisticalModel}
             streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
 
@@ -806,7 +815,7 @@ export default function Home() {
       case "property-tests":
         return (
           <PropertyTestsPanel
-            propertyTests={propertyTests}
+            propertyTests={activePropertyTests}
             streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
 
@@ -819,7 +828,7 @@ export default function Home() {
       case "dialectical-map":
         return (
           <DialecticalMapPanel
-            dialecticalMap={dialecticalMap}
+            dialecticalMap={activeDialecticalMap}
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
 
@@ -832,7 +841,7 @@ export default function Home() {
       case "counterexamples":
         return (
           <CounterexamplesPanel
-            counterexamples={counterexamples}
+            counterexamples={activeCounterexamples}
             loading={counterexamplesLoading}
 
             onContentChange={setPersistedCounterexamples}
@@ -858,15 +867,15 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
+    activeCausalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
     setPersistedCausalGraph,
-    statisticalModel, statisticalModelLoading,
+    activeStatisticalModel, statisticalModelLoading,
     setPersistedStatisticalModel,
-    propertyTests, propertyTestsLoading,
+    activePropertyTests, propertyTestsLoading,
     setPersistedPropertyTests,
-    dialecticalMap, dialecticalMapLoading,
+    activeDialecticalMap, dialecticalMapLoading,
     setPersistedDialecticalMap,
-    counterexamples, counterexamplesLoading,
+    activeCounterexamples, counterexamplesLoading,
     setPersistedCounterexamples,
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
