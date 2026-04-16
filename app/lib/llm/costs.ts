@@ -7,7 +7,7 @@ type ModelPricing = {
   output: number; // cost per token
 };
 
-// Prices sourced from provider pricing pages as of 2025-05.
+// Prices sourced from provider pricing pages as of 2026-04.
 // Stored as per-token for direct multiplication with token counts.
 const PRICING: Record<string, ModelPricing> = {
   // Anthropic direct — same model IDs as used in SDK calls
@@ -37,7 +37,9 @@ export function formatRecordedCost(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
-/** Recompute cost from model + token counts, falling back to stored costUsd. */
+/** Recompute cost from model + token counts, falling back to stored costUsd.
+ *  Uses falsy check intentionally: if the model isn't in PRICING, computeCost
+ *  returns 0, and we prefer the original recorded cost over a silent zero. */
 export function recomputeEntryCost(entry: { model: string; inputTokens: number; outputTokens: number; costUsd: number }): number {
   return computeCost(entry.model, entry.inputTokens, entry.outputTokens) || entry.costUsd;
 }
@@ -58,7 +60,6 @@ const ENDPOINT_ESTIMATES: Record<string, { model: string; outputTokens: number }
   "formalization/statistical-model":    { model: "claude-sonnet-4-6", outputTokens: 1150 },
   "formalization/property-tests":       { model: "claude-sonnet-4-6", outputTokens: 2250 },
   "formalization/counterexamples":      { model: "claude-sonnet-4-6", outputTokens: 2000 },
-  "formalization/balanced-perspectives": { model: "claude-sonnet-4-6", outputTokens: 2050 },
   "formalization/dialectical-map":      { model: "claude-sonnet-4-6", outputTokens: 2400 },
   "edit/whole":                         { model: "deepseek/deepseek-chat-v3-0324", outputTokens: 800 },
 };

@@ -78,7 +78,7 @@ export default function LeanPanel({
             />
           )}
           {verificationStatus === "invalid" && loadingPhase === "idle" && (
-            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]}>
+            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]} position="below">
               <button
                 onClick={() => onLeanIterate("")}
                 className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
@@ -88,7 +88,7 @@ export default function LeanPanel({
             </CostTooltip>
           )}
           {semiformalDirty && loadingPhase === "idle" && (
-            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]}>
+            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]} position="below">
               <button
                 onClick={onRegenerateLean}
                 className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"

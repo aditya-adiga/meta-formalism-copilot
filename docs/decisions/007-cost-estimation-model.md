@@ -48,13 +48,13 @@ The direction is intuitive — structured prose endpoints generate more tokens t
 
 **Defer latency estimation.** Latency depends on model and output length (which we're predicting, not observing at request time). A two-stage estimate (predict output tokens → predict latency from output tokens + model) would be needed, but the practical value is low since users primarily care about cost.
 
-## Implementation guidance (once data collection is complete)
+## Implementation notes
 
-- Replace the flat `EXPECTED_OUTPUT_TOKENS = 2500` in `estimateCost` with a lookup table keyed by endpoint
-- The `estimateCost` function signature should accept endpoint as a parameter
-- Consider grouping endpoints into tiers (low/medium/high output) rather than fitting exact per-endpoint numbers, since some endpoints have very few observations
+- Per-endpoint median output tokens are stored in `ENDPOINT_ESTIMATES` in `lib/llm/costs.ts`
+- `estimateCost` accepts artifact types and maps them to endpoint keys for lookup
 - Model effect is small enough to ignore for estimates unless the app starts offering model selection to users
+- Some endpoints have very few observations; coefficients may be refined as more data is collected
 
 ## Status
 
-Waiting on additional data collection before finalizing coefficients. Analysis notebook: `data/analytics_regression.ipynb`.
+Shipped in `feat/cost-estimation-tooltips`. Per-endpoint estimates are live in `CostTooltip`. Coefficients are based on 246 calls (2026-04-16) and may be refined with additional data. Analysis notebook: `data/analytics_regression.ipynb`.

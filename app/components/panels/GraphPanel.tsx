@@ -155,6 +155,7 @@ export default function GraphPanel({
             <CostTooltip
               inputCharLength={totalInputCharLength}
               artifactTypes={["decomposition"]}
+              position="below"
             >
               <button
                 onClick={onDecompose}
