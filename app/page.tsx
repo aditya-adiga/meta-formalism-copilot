@@ -116,7 +116,7 @@ export default function Home() {
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
 
   // --- Analytics ---
-  const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
+  const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics, costOf: analyticsCostOf } = useAnalytics();
 
   const setActivePanelId = useCallback((id: PanelId) => {
     if (id === "analytics") refreshAnalytics();
@@ -716,7 +716,7 @@ export default function Home() {
           />
         );
       case "analytics":
-        return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
+        return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} costOf={analyticsCostOf} />;
       default:
         return undefined;
     }
@@ -743,7 +743,7 @@ export default function Home() {
     counterexamples, counterexamplesLoading,
     setPersistedCounterexamples,
     artifactEditing,
-    analyticsEntries, analyticsSummary, clearAnalytics,
+    analyticsEntries, analyticsSummary, clearAnalytics, analyticsCostOf,
     waitEstimate,
   ]);
 

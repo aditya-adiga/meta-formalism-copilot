@@ -7,6 +7,7 @@ import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
 import DownloadButton from "@/app/components/ui/DownloadButton";
+import CostTooltip from "@/app/components/ui/CostTooltip";
 
 // Dynamic import to avoid SSR issues with ReactFlow
 const ProofGraph = dynamic(
@@ -146,13 +147,18 @@ export default function GraphPanel({
             </>
           )}
           {hasContent && (
-            <button
-              onClick={onDecompose}
-              disabled={extractionStatus === "extracting" || queueActive}
-              className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+            <CostTooltip
+              inputCharLength={sourceDocuments.reduce((sum, doc) => sum + doc.text.length, 0)}
+              artifactTypes={["decomposition"]}
             >
+              <button
+                onClick={onDecompose}
+                disabled={extractionStatus === "extracting" || queueActive}
+                className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
+              >
               {buttonLabel}
-            </button>
+              </button>
+            </CostTooltip>
           )}
         </div>
       </div>

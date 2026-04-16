@@ -4,6 +4,8 @@ type AnalyticsPanelProps = {
   entries: AnalyticsEntry[];
   summary: AnalyticsSummary;
   onClear: () => void;
+  /** Recompute cost from model + tokens (fixes stale costUsd in stored entries). */
+  costOf: (e: AnalyticsEntry) => number;
 };
 
 function formatCost(usd: number): string {
@@ -40,7 +42,7 @@ function shortModel(model: string): string {
   return parts[parts.length - 1];
 }
 
-export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsPanelProps) {
+export default function AnalyticsPanel({ entries, summary, onClear, costOf }: AnalyticsPanelProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Header */}
@@ -95,7 +97,7 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
                     <td className="px-3 py-1.5 text-[#6B6560]">{shortModel(e.model)}</td>
                     <td className="px-3 py-1.5 text-right">{e.inputTokens.toLocaleString()}</td>
                     <td className="px-3 py-1.5 text-right">{e.outputTokens.toLocaleString()}</td>
-                    <td className="px-3 py-1.5 text-right">{formatCost(e.costUsd)}</td>
+                    <td className="px-3 py-1.5 text-right">{formatCost(costOf(e))}</td>
                     <td className="px-3 py-1.5 text-right">{formatLatency(e.latencyMs)}</td>
                   </tr>
                 ))}

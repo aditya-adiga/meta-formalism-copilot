@@ -6,6 +6,7 @@ import { downloadLeanCode } from "@/app/lib/utils/export";
 import VerificationBadge from "@/app/components/ui/VerificationBadge";
 import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import CostTooltip from "@/app/components/ui/CostTooltip";
 
 type LeanPanelProps = {
   leanCode: string;
@@ -77,20 +78,24 @@ export default function LeanPanel({
             />
           )}
           {verificationStatus === "invalid" && loadingPhase === "idle" && (
-            <button
-              onClick={() => onLeanIterate("")}
-              className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
-            >
-              Verification failed — Fix with AI
-            </button>
+            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]}>
+              <button
+                onClick={() => onLeanIterate("")}
+                className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                Verification failed — Fix with AI
+              </button>
+            </CostTooltip>
           )}
           {semiformalDirty && loadingPhase === "idle" && (
-            <button
-              onClick={onRegenerateLean}
-              className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
-            >
-              Semiformal changed — Regenerate
-            </button>
+            <CostTooltip inputCharLength={leanCode.length} artifactTypes={["lean"]}>
+              <button
+                onClick={onRegenerateLean}
+                className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
+              >
+                Semiformal changed — Regenerate
+              </button>
+            </CostTooltip>
           )}
         </div>
       </div>
