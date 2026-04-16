@@ -84,7 +84,7 @@ export default function InputPanel({
           onGenerate={onFormalise}
           loading={loading}
           loadingState={loadingState}
-          sourceText={sourceText}
+          sourceCharLength={sourceText.length}
         />
       </div>
     </div>

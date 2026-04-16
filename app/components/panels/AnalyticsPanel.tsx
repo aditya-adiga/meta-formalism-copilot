@@ -1,18 +1,11 @@
 import type { AnalyticsEntry, AnalyticsSummary } from "@/app/lib/types/analytics";
+import { formatRecordedCost, recomputeEntryCost } from "@/app/lib/llm/costs";
 
 type AnalyticsPanelProps = {
   entries: AnalyticsEntry[];
   summary: AnalyticsSummary;
   onClear: () => void;
-  /** Recompute cost from model + tokens (fixes stale costUsd in stored entries). */
-  costOf: (e: AnalyticsEntry) => number;
 };
-
-function formatCost(usd: number): string {
-  if (usd === 0) return "$0.00";
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  return `$${usd.toFixed(2)}`;
-}
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -42,7 +35,7 @@ function shortModel(model: string): string {
   return parts[parts.length - 1];
 }
 
-export default function AnalyticsPanel({ entries, summary, onClear, costOf }: AnalyticsPanelProps) {
+export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsPanelProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Header */}
@@ -66,7 +59,7 @@ export default function AnalyticsPanel({ entries, summary, onClear, costOf }: An
             label="Total Tokens"
             value={formatTokens(summary.totalInputTokens + summary.totalOutputTokens)}
           />
-          <SummaryCard label="Est. Cost" value={formatCost(summary.totalCostUsd)} />
+          <SummaryCard label="Est. Cost" value={formatRecordedCost(summary.totalCostUsd)} />
           <SummaryCard label="Avg Latency" value={formatLatency(summary.averageLatencyMs)} />
         </div>
 
@@ -97,7 +90,7 @@ export default function AnalyticsPanel({ entries, summary, onClear, costOf }: An
                     <td className="px-3 py-1.5 text-[#6B6560]">{shortModel(e.model)}</td>
                     <td className="px-3 py-1.5 text-right">{e.inputTokens.toLocaleString()}</td>
                     <td className="px-3 py-1.5 text-right">{e.outputTokens.toLocaleString()}</td>
-                    <td className="px-3 py-1.5 text-right">{formatCost(costOf(e))}</td>
+                    <td className="px-3 py-1.5 text-right">{formatRecordedCost(recomputeEntryCost(e))}</td>
                     <td className="px-3 py-1.5 text-right">{formatLatency(e.latencyMs)}</td>
                   </tr>
                 ))}
@@ -107,7 +100,7 @@ export default function AnalyticsPanel({ entries, summary, onClear, costOf }: An
                   <td className="px-3 py-2" colSpan={3}>Total ({entries.length} calls)</td>
                   <td className="px-3 py-2 text-right">{summary.totalInputTokens.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right">{summary.totalOutputTokens.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right">{formatCost(summary.totalCostUsd)}</td>
+                  <td className="px-3 py-2 text-right">{formatRecordedCost(summary.totalCostUsd)}</td>
                   <td className="px-3 py-2 text-right">{formatLatency(summary.averageLatencyMs)} avg</td>
                 </tr>
               </tfoot>

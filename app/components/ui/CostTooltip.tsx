@@ -1,20 +1,16 @@
 "use client";
 
 import { useState, useRef, useCallback, type ReactNode } from "react";
-import { estimateCost } from "@/app/lib/llm/costs";
+import { estimateCost, formatEstimatedCost } from "@/app/lib/llm/costs";
+import type { ArtifactType } from "@/app/lib/types/session";
 
 const WARN_THRESHOLD_USD = 0.10;
-
-function formatCost(usd: number): string {
-  if (usd < 0.005) return "<$0.01";
-  return `$${usd.toFixed(2)}`;
-}
 
 type CostTooltipProps = {
   /** Character length of the input that will be sent to the LLM. */
   inputCharLength: number;
   /** Artifact types this action will generate (used for per-endpoint cost estimates). */
-  artifactTypes?: string[];
+  artifactTypes?: (ArtifactType | "decomposition")[];
   children: ReactNode;
 };
 
@@ -47,7 +43,7 @@ export default function CostTooltip({
 
   return (
     <div
-      className="relative inline-flex"
+      className="relative flex"
       onMouseEnter={show}
       onMouseLeave={hide}
     >
@@ -63,7 +59,7 @@ export default function CostTooltip({
           {isWarning && (
             <span className="mr-1" aria-label="warning">&#x26A0;</span>
           )}
-          Est. {formatCost(cost)}
+          Est. {formatEstimatedCost(cost)}
         </div>
       )}
     </div>

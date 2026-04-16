@@ -65,6 +65,11 @@ export default function GraphPanel({
   const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
   const progressPct = queueProgress.total > 0 ? (processed / queueProgress.total) * 100 : 0;
 
+  const totalInputCharLength = useMemo(
+    () => sourceDocuments.reduce((sum, doc) => sum + doc.text.length, 0),
+    [sourceDocuments],
+  );
+
   const sourceColorMap: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
     for (let i = 0; i < sourceDocuments.length; i++) {
@@ -148,7 +153,7 @@ export default function GraphPanel({
           )}
           {hasContent && (
             <CostTooltip
-              inputCharLength={sourceDocuments.reduce((sum, doc) => sum + doc.text.length, 0)}
+              inputCharLength={totalInputCharLength}
               artifactTypes={["decomposition"]}
             >
               <button
@@ -156,7 +161,7 @@ export default function GraphPanel({
                 disabled={extractionStatus === "extracting" || queueActive}
                 className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
               >
-              {buttonLabel}
+                {buttonLabel}
               </button>
             </CostTooltip>
           )}

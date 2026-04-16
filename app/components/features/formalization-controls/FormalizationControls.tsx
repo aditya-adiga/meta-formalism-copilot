@@ -13,8 +13,8 @@ type FormalizationControlsProps = {
   loadingState?: ArtifactLoadingState;
   /** Placeholder text shown when contextText is empty (e.g. global context for per-node override) */
   contextPlaceholder?: string;
-  /** Source text character length, used for cost estimation tooltip. */
-  sourceText?: string;
+  /** Source text character count, used for cost estimation tooltip. */
+  sourceCharLength?: number;
 };
 
 export default function FormalizationControls({
@@ -26,7 +26,7 @@ export default function FormalizationControls({
   loading,
   loadingState = {},
   contextPlaceholder,
-  sourceText,
+  sourceCharLength,
 }: FormalizationControlsProps) {
   // Derive per-chip loading booleans from loadingState
   const chipLoading: Partial<Record<ArtifactType, boolean>> = {};
@@ -69,7 +69,7 @@ export default function FormalizationControls({
       {/* Docked Formalise button */}
       <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
         <CostTooltip
-          inputCharLength={(sourceText?.length ?? 0) + contextText.length}
+          inputCharLength={(sourceCharLength ?? 0) + contextText.length}
           artifactTypes={selectedArtifactTypes}
         >
           <button

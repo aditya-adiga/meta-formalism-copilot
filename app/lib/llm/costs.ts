@@ -1,5 +1,6 @@
-/** Static pricing table for models used in this app.
- *  Prices are per-token (not per million tokens). */
+/** Prices are per-token (not per million tokens). */
+
+import type { ArtifactType } from "@/app/lib/types/session";
 
 type ModelPricing = {
   input: number;  // cost per token
@@ -21,6 +22,24 @@ export function computeCost(model: string, inputTokens: number, outputTokens: nu
   const pricing = PRICING[model];
   if (!pricing) return 0;
   return inputTokens * pricing.input + outputTokens * pricing.output;
+}
+
+/** Format a cost estimate — rounds sub-cent values to "<$0.01". */
+export function formatEstimatedCost(usd: number): string {
+  if (usd < 0.005) return "<$0.01";
+  return `$${usd.toFixed(2)}`;
+}
+
+/** Format a recorded cost — shows 4 decimals for sub-cent values. */
+export function formatRecordedCost(usd: number): string {
+  if (usd === 0) return "$0.00";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(2)}`;
+}
+
+/** Recompute cost from model + token counts, falling back to stored costUsd. */
+export function recomputeEntryCost(entry: { model: string; inputTokens: number; outputTokens: number; costUsd: number }): number {
+  return computeCost(entry.model, entry.inputTokens, entry.outputTokens) || entry.costUsd;
 }
 
 /**
@@ -46,7 +65,7 @@ const ENDPOINT_ESTIMATES: Record<string, { model: string; outputTokens: number }
 const DEFAULT_ESTIMATE = { model: "claude-sonnet-4-6", outputTokens: 1750 };
 
 /** Map an artifact type to its analytics endpoint key. */
-function artifactEndpoint(artifactType: string): string {
+function artifactEndpoint(artifactType: ArtifactType | "decomposition"): string {
   if (artifactType === "decomposition") return "decomposition/extract";
   return `formalization/${artifactType}`;
 }
@@ -60,7 +79,7 @@ function artifactEndpoint(artifactType: string): string {
  */
 export function estimateCost(
   inputCharLength: number,
-  artifactTypes?: string[],
+  artifactTypes?: (ArtifactType | "decomposition")[],
 ): number {
   const inputTokens = Math.ceil(inputCharLength / 4);
   if (!artifactTypes || artifactTypes.length === 0) {
