@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import type { AnalyticsEntry, AnalyticsSummary } from "@/app/lib/types/analytics";
+import { recomputeEntryCost } from "@/app/lib/llm/costs";
 
 export function useAnalytics() {
   const [entries, setEntries] = useState<AnalyticsEntry[]>([]);
@@ -35,7 +36,7 @@ export function useAnalytics() {
     const totalCalls = entries.length;
     const totalInputTokens = entries.reduce((s, e) => s + e.inputTokens, 0);
     const totalOutputTokens = entries.reduce((s, e) => s + e.outputTokens, 0);
-    const totalCostUsd = entries.reduce((s, e) => s + e.costUsd, 0);
+    const totalCostUsd = entries.reduce((s, e) => s + recomputeEntryCost(e), 0);
     const averageLatencyMs = totalCalls > 0
       ? entries.reduce((s, e) => s + e.latencyMs, 0) / totalCalls
       : 0;
