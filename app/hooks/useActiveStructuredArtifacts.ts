@@ -14,7 +14,7 @@ export type ActiveStructuredArtifacts = {
   activeStatisticalModel: StatisticalModelResponse["statisticalModel"] | null;
   activePropertyTests: PropertyTestsResponse["propertyTests"] | null;
   activeDialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
-  activeCounterexamples: CounterexamplesResponse["counterexamplesAnalysis"] | null;
+  activeCounterexamples: CounterexamplesResponse["counterexamples"] | null;
 };
 
 function findNodeArtifact<T>(node: PropositionNode, type: ArtifactKey): T | null {
