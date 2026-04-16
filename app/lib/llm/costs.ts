@@ -23,29 +23,27 @@ export function computeCost(model: string, inputTokens: number, outputTokens: nu
   return inputTokens * pricing.input + outputTokens * pricing.output;
 }
 
-/** Default model for cost estimates (direct Anthropic Sonnet — most common path). */
-const ESTIMATE_MODEL = "claude-sonnet-4-6";
-
 /**
- * Median output tokens per endpoint, derived from analytics regression
- * (179 calls, 2026-04-16). See docs/decisions/007-cost-estimation-model.md.
+ * Per-endpoint estimation parameters: which model is used and median output
+ * tokens observed. Model assignments mirror the imports in each API route
+ * (see app/api/ and app/lib/formalization/artifactRoute.ts).
  *
- * Endpoint is the strongest predictor of output tokens (partial eta² = 0.317).
- * Rounded medians used as interim estimates pending more Sonnet data collection.
+ * Median output tokens derived from analytics data (246 calls, 2026-04-16).
+ * See docs/decisions/007-cost-estimation-model.md.
  */
-const MEDIAN_OUTPUT_TOKENS: Record<string, number> = {
-  "decomposition/extract":          2100,
-  "formalization/semiformal":       1250,
-  "formalization/lean":             1450,
-  "formalization/causal-graph":     1300,
-  "formalization/statistical-model": 1100,
-  "formalization/property-tests":   2250,
-  "formalization/counterexamples":  2000,
-  "formalization/balanced-perspectives": 1750,
-  "formalization/dialectical-map":  2400,
-  "edit/whole":                     1400,
+const ENDPOINT_ESTIMATES: Record<string, { model: string; outputTokens: number }> = {
+  "decomposition/extract":              { model: "claude-sonnet-4-6", outputTokens: 2100 },
+  "formalization/semiformal":           { model: "claude-sonnet-4-6", outputTokens: 1250 },
+  "formalization/lean":                 { model: "claude-sonnet-4-6", outputTokens: 1450 },
+  "formalization/causal-graph":         { model: "claude-sonnet-4-6", outputTokens: 1500 },
+  "formalization/statistical-model":    { model: "claude-sonnet-4-6", outputTokens: 1150 },
+  "formalization/property-tests":       { model: "claude-sonnet-4-6", outputTokens: 2250 },
+  "formalization/counterexamples":      { model: "claude-sonnet-4-6", outputTokens: 2000 },
+  "formalization/balanced-perspectives": { model: "claude-sonnet-4-6", outputTokens: 2050 },
+  "formalization/dialectical-map":      { model: "claude-sonnet-4-6", outputTokens: 2400 },
+  "edit/whole":                         { model: "deepseek/deepseek-chat-v3-0324", outputTokens: 800 },
 };
-const DEFAULT_OUTPUT_TOKENS = 1750;
+const DEFAULT_ESTIMATE = { model: "claude-sonnet-4-6", outputTokens: 1750 };
 
 /** Map an artifact type to its analytics endpoint key. */
 function artifactEndpoint(artifactType: string): string {
@@ -54,10 +52,11 @@ function artifactEndpoint(artifactType: string): string {
 }
 
 /**
- * Estimated cost for one or more LLM calls based on expected output length.
+ * Estimated cost for one or more LLM calls based on per-endpoint model
+ * pricing and median output tokens.
  *
  * Pass `artifactTypes` (e.g. ["semiformal", "lean"]) to get a per-endpoint
- * estimate. Falls back to a cross-endpoint median when no types are provided.
+ * estimate. Falls back to default Sonnet estimate when no types are provided.
  */
 export function estimateCost(
   inputCharLength: number,
@@ -65,11 +64,11 @@ export function estimateCost(
 ): number {
   const inputTokens = Math.ceil(inputCharLength / 4);
   if (!artifactTypes || artifactTypes.length === 0) {
-    return computeCost(ESTIMATE_MODEL, inputTokens, DEFAULT_OUTPUT_TOKENS);
+    return computeCost(DEFAULT_ESTIMATE.model, inputTokens, DEFAULT_ESTIMATE.outputTokens);
   }
   return artifactTypes.reduce((sum, type) => {
     const endpoint = artifactEndpoint(type);
-    const outputTokens = MEDIAN_OUTPUT_TOKENS[endpoint] ?? DEFAULT_OUTPUT_TOKENS;
-    return sum + computeCost(ESTIMATE_MODEL, inputTokens, outputTokens);
+    const est = ENDPOINT_ESTIMATES[endpoint] ?? DEFAULT_ESTIMATE;
+    return sum + computeCost(est.model, inputTokens, est.outputTokens);
   }, 0);
 }
