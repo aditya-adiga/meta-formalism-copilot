@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { useCallback, useMemo } from "react";
 import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { fetchApi } from "@/app/lib/formalization/api";
 import {
@@ -11,6 +10,8 @@ import {
   type EvidenceIntegrateResponse,
   type IntegrationProposal,
 } from "@/app/lib/types/evidence";
+
+const EMPTY_PROPOSALS: IntegrationProposal[] = [];
 
 /**
  * Hook for generating and managing evidence-based integration proposals.
@@ -25,14 +26,13 @@ export function useEvidenceIntegration(
   elementId: string,
 ) {
   const key = serializeTargetKey({ artifactType, elementId });
-  const { slot, proposals, isIntegrating, error } = useEvidenceStore(
-    useShallow((s) => ({
-      slot: s.slots[key],
-      proposals: s.proposals[key] ?? [],
-      isIntegrating: s.integrating[key] ?? false,
-      error: s.errors[key] ?? null,
-    })),
-  );
+  // Individual selectors with stable defaults to avoid infinite re-render loops.
+  // useShallow + inline defaults (e.g. ?? []) creates new references every call.
+  const slot = useEvidenceStore((s) => s.slots[key]);
+  const rawProposals = useEvidenceStore((s) => s.proposals[key]);
+  const proposals = rawProposals ?? EMPTY_PROPOSALS;
+  const isIntegrating = useEvidenceStore((s) => s.integrating[key] ?? false);
+  const error = useEvidenceStore((s) => s.errors[key] ?? null);
 
   const integrate = useCallback(
     async (artifactContent: string) => {
