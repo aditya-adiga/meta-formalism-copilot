@@ -122,9 +122,9 @@ export default function NodeDetailPanel({
               </div>
             </section>
 
-            {/* Proof text */}
+            {/* Supporting reasoning from source decomposition */}
             {node.proofText && (
-              <CollapsibleSection title="Proof" defaultOpen={false}>
+              <CollapsibleSection title="Supporting Reasoning" defaultOpen={false}>
                 <div className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)]">
                   {node.proofText}
                 </div>

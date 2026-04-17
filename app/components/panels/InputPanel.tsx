@@ -16,7 +16,7 @@ type InputPanelProps = {
   onFormalise: () => void;
   loading: boolean;
   /** Decompose source into proposition nodes */
-  onDecompose?: () => void;
+  onDecompose?: (options?: { forceLlm?: boolean }) => void;
   decomposing?: boolean;
   /** Artifact type selection */
   selectedArtifactTypes: ArtifactType[];
@@ -68,7 +68,7 @@ export default function InputPanel({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={onDecompose}
+                onClick={() => onDecompose?.()}
                 disabled={decomposing || loading}
                 className="w-full rounded-full border border-[var(--ink-black)] bg-transparent px-6 py-2.5 text-sm font-medium text-[var(--ink-black)] shadow-sm transition-all duration-200 hover:bg-[var(--ink-black)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
               >

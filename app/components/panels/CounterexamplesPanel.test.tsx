@@ -15,7 +15,7 @@ vi.mock('./ArtifactPanelShell', () => ({
     hasData ? <div>{children}</div> : <div>empty</div>,
 }))
 
-function makeCx(overrides: Partial<CounterexamplesResponse["counterexamples"]["counterexamples"][0]> = {}) {
+function makeCx(overrides: Partial<CounterexamplesResponse["counterexamplesAnalysis"]["scenarios"][0]> = {}) {
   return {
     id: "cx-1",
     scenario: "A test scenario",
@@ -27,11 +27,11 @@ function makeCx(overrides: Partial<CounterexamplesResponse["counterexamples"]["c
 }
 
 function makeData(
-  cxOverrides: Partial<CounterexamplesResponse["counterexamples"]["counterexamples"][0]> = {},
-): CounterexamplesResponse["counterexamples"] {
+  cxOverrides: Partial<CounterexamplesResponse["counterexamplesAnalysis"]["scenarios"][0]> = {},
+): CounterexamplesResponse["counterexamplesAnalysis"] {
   return {
     claim: "Test claim",
-    counterexamples: [makeCx(cxOverrides)],
+    scenarios: [makeCx(cxOverrides)],
     robustnessAssessment: "Moderate",
     summary: "Test summary",
   };
@@ -39,7 +39,7 @@ function makeData(
 
 describe('CounterexamplesPanel', () => {
   const baseProps = {
-    counterexamples: null as CounterexamplesResponse["counterexamples"] | null,
+    counterexamples: null as CounterexamplesResponse["counterexamplesAnalysis"] | null,
     loading: false,
     onContentChange: vi.fn(),
   };

@@ -6,7 +6,7 @@ const SYSTEM_PROMPT = `You are an adversarial analyst specializing in finding co
 Return a JSON object with this exact shape:
 {
   "claim": "string (the core claim or thesis being tested)",
-  "counterexamples": [
+  "scenarios": [
     {
       "id": "string (short, lowercase, hyphenated)",
       "scenario": "string (concrete description of the counterexample)",
@@ -35,7 +35,7 @@ function mockResponse(sourceText: string) {
   const snippet = sourceText.slice(0, 60).replace(/\n/g, " ");
   return {
     claim: `Mock claim from: "${snippet}..."`,
-    counterexamples: [
+    scenarios: [
       {
         id: "cx-1",
         scenario: "A scenario where the stated conditions hold but the conclusion fails due to an unstated boundary condition.",

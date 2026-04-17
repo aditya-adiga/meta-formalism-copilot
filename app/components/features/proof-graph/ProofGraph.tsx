@@ -116,6 +116,25 @@ export default function ProofGraph({
     }
   }, []);
 
+  // Re-fit viewport when the node set stabilizes after streaming.
+  // Uses a debounced timer so rapid streaming updates don't trigger repeated fits,
+  // but the final node set (after streaming ends) gets a clean viewport adjustment.
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevNodeCountRef = useRef(propositions.length);
+  useEffect(() => {
+    if (!rfInstanceRef.current || !hasFitRef.current) return;
+    if (propositions.length !== prevNodeCountRef.current) {
+      prevNodeCountRef.current = propositions.length;
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = setTimeout(() => {
+        rfInstanceRef.current?.fitView({ padding: 0.2 });
+      }, 300);
+    }
+    return () => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+    };
+  }, [propositions.length]);
+
   const handleConnect: OnConnect = useCallback(
     (connection) => {
       if (!onConnectProp || !connection.source || !connection.target) return;

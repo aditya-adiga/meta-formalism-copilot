@@ -654,11 +654,12 @@ export default function Home() {
   }, [nodePipeline, setActivePanelId]);
 
   // Graph panel handlers
-  const handleDecompose = useCallback(() => {
+  const handleDecompose = useCallback((options?: { forceLlm?: boolean }) => {
     if (sourceDocuments.length > 0) {
-      extractPropositions(sourceDocuments, pdfFile);
+      setActivePanelId("decomposition");
+      extractPropositions(sourceDocuments, pdfFile, options);
     }
-  }, [sourceDocuments, pdfFile, extractPropositions]);
+  }, [sourceDocuments, pdfFile, extractPropositions, setActivePanelId]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);

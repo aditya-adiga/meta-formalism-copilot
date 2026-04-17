@@ -73,7 +73,7 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
           id="context-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g., Analyze this from a decision-making perspective, considering strategic interactions between actors..."
+          placeholder="What is the context in which you are analyzing this text? What's your relationship to it? e.g., 'I'm evaluating this policy proposal as a city planner'"
           rows={10}
           className="min-h-0 flex-1 resize-none rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-md transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-lg"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}

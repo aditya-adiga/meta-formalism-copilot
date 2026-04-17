@@ -56,7 +56,7 @@ export default function FormalizationControls({
         <textarea
           value={contextText}
           onChange={(e) => onContextChange(e.target.value)}
-          placeholder={contextPlaceholder ?? "e.g., Analyze this from a decision-making perspective, considering strategic interactions between actors..."}
+          placeholder={contextPlaceholder ?? "What is the context in which you are analyzing this text? What's your relationship to it? e.g., 'I'm evaluating this policy proposal as a city planner'"}
           rows={3}
           className="shrink-0 resize-none rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-sm transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-md"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
