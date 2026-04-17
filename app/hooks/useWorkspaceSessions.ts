@@ -18,6 +18,8 @@ type WorkspaceSnapshotFns = {
   clearWorkspace: () => PersistedDecomposition;
   clearAllSessions: () => void;
   resetDecomp: (data: PersistedDecomposition) => void;
+  cancelQueue: () => void;
+  resetQueue: () => void;
 };
 
 const DEBOUNCE_MS = 500;
@@ -135,6 +137,8 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     // Save current session before clearing
     saveCurrentSession();
 
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.clearWorkspace();
     fnsRef.current.clearAllSessions();
     fnsRef.current.resetDecomp(decompData);
@@ -165,7 +169,9 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     // Save current session
     saveCurrentSession();
 
-    // Load the target session's data
+    // Cancel any running queue and reset progress before loading new session's data
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.resetWorkspaceToSnapshot(target.workspace);
     fnsRef.current.resetSessionsToSnapshot(target.formalizationSessions);
     fnsRef.current.resetDecomp(decompData);
@@ -189,8 +195,10 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
         ? (remaining.length > 0 ? remaining[remaining.length - 1].id : null)
         : prev.activeSessionId;
 
-      // If we're deleting the active session, load the new active one (or clear)
+      // If we're deleting the active session, cancel queue and load the new active one (or clear)
       if (prev.activeSessionId === id) {
+        fnsRef.current.cancelQueue();
+        fnsRef.current.resetQueue();
         const newActive = remaining.find((s) => s.id === newActiveId);
         if (newActive) {
           const decompData = fnsRef.current.resetWorkspaceToSnapshot(newActive.workspace);
