@@ -115,7 +115,7 @@ export type DialecticalMapResponse = {
 export type CounterexamplesResponse = {
   counterexamples: {
     claim: string;
-    counterexamples: Array<{
+    scenarios: Array<{
       id: string;
       scenario: string;
       targetAssumption: string;
