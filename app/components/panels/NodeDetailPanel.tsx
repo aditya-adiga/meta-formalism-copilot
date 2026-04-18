@@ -80,11 +80,11 @@ export default function NodeDetailPanel({
               </div>
             </section>
 
-            {/* Proof text */}
+            {/* Supporting reasoning from source decomposition */}
             {node.proofText && (
               <section>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-                  Proof
+                  Supporting Reasoning
                 </h3>
                 <div className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)]">
                   {node.proofText}
