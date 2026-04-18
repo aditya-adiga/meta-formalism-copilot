@@ -32,7 +32,7 @@ type GraphPanelProps = {
   hasContent: boolean;
   sourceDocuments: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";
-  onDecompose: () => void;
+  onDecompose: (options?: { forceLlm?: boolean }) => void;
   queueProgress: QueueProgress;
   onFormalizeAll: (artifactTypes: ArtifactType[]) => void;
   globalArtifactTypes: ArtifactType[];
@@ -66,6 +66,12 @@ export default function GraphPanel({
   const [showArtifactPicker, setShowArtifactPicker] = useState(false);
   const [queueArtifactTypes, setQueueArtifactTypes] = useState<ArtifactType[]>([]);
   const sourceCount = sourceDocuments.length;
+  const hasStructuredSources = useMemo(
+    () => sourceDocuments.some(
+      (d) => d.sourceLabel.endsWith(".pdf") || d.sourceLabel.endsWith(".tex") || d.text.includes("\\begin{"),
+    ),
+    [sourceDocuments],
+  );
 
   const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
   const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
@@ -152,9 +158,19 @@ export default function GraphPanel({
               </button>
             </>
           )}
+          {hasContent && hasStructuredSources && hasNodes && extractionStatus === "done" && (
+            <button
+              onClick={() => onDecompose({ forceLlm: true })}
+              disabled={queueActive}
+              className="rounded-full border border-[#DDD9D5] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED] disabled:opacity-50"
+              title="Bypass the LaTeX/PDF parser and decompose with an LLM instead"
+            >
+              Re-extract with LLM
+            </button>
+          )}
           {hasContent && (
             <button
-              onClick={onDecompose}
+              onClick={() => onDecompose()}
               disabled={extractionStatus === "extracting" || queueActive}
               className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
