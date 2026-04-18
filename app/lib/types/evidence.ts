@@ -19,6 +19,9 @@ export type EvidenceTargetKey = {
 /** Element ID used when evidence applies to the whole artifact (not a sub-element) */
 export const WHOLE_ARTIFACT_ELEMENT_ID = "artifact";
 
+/** Max papers to send to the integration API */
+export const MAX_INTEGRATION_PAPERS = 8;
+
 /** Serializes a target key for use as a Record key */
 export function serializeTargetKey(target: EvidenceTargetKey): string {
   return `${target.artifactType}::${target.elementId}`;
@@ -201,4 +204,57 @@ export type EvidenceOverlapRequest = {
 /** API response shape for overlap analysis */
 export type EvidenceOverlapResponse = {
   analysis: OverlapAnalysis;
+};
+
+// ---------------------------------------------------------------------------
+// Integration proposals (Phase 4)
+// ---------------------------------------------------------------------------
+
+/** Edit category for UI grouping and styling */
+export type IntegrationEditType =
+  | "update-prior"        // Evidence suggests updating a numeric value or distribution
+  | "add-evidence"        // Evidence supports an existing claim (strengthen it)
+  | "flag-contradiction"  // Evidence contradicts an existing claim
+  | "refine-wording";     // Evidence suggests more precise language
+
+/** A single proposed edit to an artifact field, based on evidence papers */
+export type IntegrationProposal = {
+  /** Unique ID for this proposal (client-generated) */
+  id: string;
+  /** Dot-notation path to the field, e.g. "hypotheses[1].statement" or "summary" */
+  fieldPath: string;
+  /** Human-readable label, e.g. "Hypothesis H1 statement" */
+  fieldLabel: string;
+  /** The current value of the field (stringified for display) */
+  currentValue: string;
+  /** The proposed replacement value */
+  proposedValue: string;
+  /** 1-2 sentence explanation of why this edit is warranted */
+  rationale: string;
+  /** OpenAlex IDs of papers supporting this proposal */
+  paperIds: string[];
+  /** User decision: null = pending, true = approved, false = rejected */
+  decision: null | boolean;
+  /** Edit category */
+  editType: IntegrationEditType;
+};
+
+/** API request shape for evidence integration */
+export type EvidenceIntegrateRequest = {
+  artifactType: EvidenceArtifactType;
+  /** The full artifact content as JSON string */
+  artifactContent: string;
+  /** Top papers to generate proposals from */
+  papers: Pick<
+    EvidencePaper,
+    "openAlexId" | "title" | "authors" | "year" | "abstract" | "reliability" | "relatedness"
+  >[];
+};
+
+/** Shape returned by the LLM (before client adds id + decision) */
+export type RawIntegrationProposal = Omit<IntegrationProposal, "id" | "decision">;
+
+/** API response shape for evidence integration */
+export type EvidenceIntegrateResponse = {
+  proposals: RawIntegrationProposal[];
 };
