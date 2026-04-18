@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
@@ -127,6 +127,14 @@ export default function CausalGraphPanel({
     (d) => (d.variables?.length ?? 0) > 0,
   );
 
+  const handleAddVariable = useCallback(() => {
+    if (!displayGraph || !onContentChange) return;
+    const id = `var-${crypto.randomUUID().slice(0, 8)}`;
+    const nextNum = displayGraph.variables.length + 1;
+    const newVar = { id, label: `New factor ${nextNum}`, description: "" };
+    onContentChange(JSON.stringify({ ...displayGraph, variables: [...displayGraph.variables, newVar] }));
+  }, [displayGraph, onContentChange]);
+
   return (
     <ArtifactPanelShell
       title="Causal Graph"
@@ -140,8 +148,8 @@ export default function CausalGraphPanel({
     >
       {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
-          {/* View toggle */}
-          <div className="flex gap-1 mb-3">
+          {/* View toggle — sticky so it doesn't scroll away with graph content */}
+          <div className="sticky top-0 z-10 flex items-center gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
             <button
               onClick={() => setViewMode("graph")}
               className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
@@ -162,6 +170,15 @@ export default function CausalGraphPanel({
             >
               Details
             </button>
+            {onContentChange && (
+              <button
+                onClick={handleAddVariable}
+                className="ml-auto rounded-full border border-[#DDD9D5] bg-white px-3 py-1 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+                title="Add a new factor to the graph"
+              >
+                + Factor
+              </button>
+            )}
           </div>
 
           {viewMode === "graph" ? (
