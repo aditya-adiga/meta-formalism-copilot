@@ -1,6 +1,7 @@
 import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { VerificationStatus } from "@/app/lib/types/session";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import { WORKSPACE_VERSION, WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
 const LEGACY_WORKSPACE_KEY = "workspace-v1";
@@ -105,6 +106,17 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
   } catch {
     return false;
   }
+}
+
+export function isValidCustomTypeDef(v: unknown): v is CustomArtifactTypeDefinition {
+  if (!isObject(v)) return false;
+  return (
+    typeof v.id === "string" && (v.id as string).startsWith("custom-") &&
+    typeof v.name === "string" && (v.name as string).length > 0 &&
+    typeof v.chipLabel === "string" && (v.chipLabel as string).length > 0 &&
+    typeof v.systemPrompt === "string" && (v.systemPrompt as string).length > 0 &&
+    (v.outputFormat === "json" || v.outputFormat === "text")
+  );
 }
 
 export function isObject(v: unknown): v is Record<string, unknown> {

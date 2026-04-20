@@ -19,7 +19,8 @@ import type { PersistedDecomposition, PersistedWorkspace } from "@/app/lib/types
 import type { ArtifactKey, ArtifactVersion, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { MAX_VERSIONS } from "@/app/lib/types/artifactStore";
 import type { GenerationProvenance } from "@/app/lib/utils/provenance";
-import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject } from "@/app/lib/utils/workspacePersistence";
+import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
+import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject, isValidCustomTypeDef } from "@/app/lib/utils/workspacePersistence";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 
@@ -145,6 +146,17 @@ function coercePersistedState(persisted: Record<string, unknown>): Partial<Works
     result.decomposition = coerceDecomposition(persisted.decomposition);
   }
 
+  if (Array.isArray(persisted.customArtifactTypes)) {
+    result.customArtifactTypes = (persisted.customArtifactTypes as unknown[]).filter(isValidCustomTypeDef);
+  }
+  if (isObject(persisted.customArtifactData)) {
+    const data: Record<string, string | null> = {};
+    for (const [k, v] of Object.entries(persisted.customArtifactData as Record<string, unknown>)) {
+      if (typeof v === "string" || v === null) data[k] = v;
+    }
+    result.customArtifactData = data;
+  }
+
   return result;
 }
 
@@ -205,6 +217,10 @@ export interface WorkspaceState {
 
   // --- Decomposition ---
   decomposition: PersistedDecomposition;
+
+  // --- Custom artifact types (user-defined via LLM-assisted designer) ---
+  customArtifactTypes: CustomArtifactTypeDefinition[];
+  customArtifactData: Record<string, string | null>;
 }
 
 export interface WorkspaceActions {
@@ -234,6 +250,13 @@ export interface WorkspaceActions {
   // Decomposition
   setDecomposition: (d: PersistedDecomposition) => void;
 
+  // Custom artifact types
+  setCustomArtifactTypes: (v: CustomArtifactTypeDefinition[]) => void;
+  addCustomArtifactType: (def: CustomArtifactTypeDefinition) => void;
+  updateCustomArtifactType: (id: string, updates: Partial<CustomArtifactTypeDefinition>) => void;
+  removeCustomArtifactType: (id: string) => void;
+  setCustomArtifactContent: (id: CustomArtifactTypeId, content: string | null) => void;
+
   // Snapshot/restore (for workspace sessions)
   getSnapshot: () => WorkspaceState;
   resetToSnapshot: (data: WorkspaceState) => void;
@@ -261,6 +284,8 @@ const DEFAULT_STATE: WorkspaceState = {
     paperText: "",
     sources: [],
   },
+  customArtifactTypes: [],
+  customArtifactData: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -309,6 +334,8 @@ export function migrateFromV2(): boolean {
     verificationErrors: old.verificationErrors,
     decomposition: old.decomposition,
     artifacts,
+    customArtifactTypes: old.customArtifactTypes ?? [],
+    customArtifactData: old.customArtifactData ?? {},
   });
 
   return true;
@@ -470,6 +497,37 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
       // --- Decomposition ---
       setDecomposition: (d) => set({ decomposition: d }),
 
+      // --- Custom artifact types ---
+      setCustomArtifactTypes: (v) => set({ customArtifactTypes: v }),
+      addCustomArtifactType: (def) =>
+        set((s) => ({ customArtifactTypes: [...s.customArtifactTypes, def] })),
+      updateCustomArtifactType: (id, updates) =>
+        set((s) => {
+          const old = s.customArtifactTypes.find((ct) => ct.id === id);
+          // Clear generated output if the system prompt changed — the stored
+          // output is now stale w.r.t. the new prompt.
+          const promptChanged = updates.systemPrompt != null && old && updates.systemPrompt !== old.systemPrompt;
+          return {
+            customArtifactTypes: s.customArtifactTypes.map((ct) =>
+              ct.id === id ? { ...ct, ...updates, updatedAt: new Date().toISOString() } : ct,
+            ),
+            ...(promptChanged ? { customArtifactData: { ...s.customArtifactData, [id]: null } } : {}),
+          };
+        }),
+      removeCustomArtifactType: (id) =>
+        set((s) => ({
+          customArtifactTypes: s.customArtifactTypes.filter((ct) => ct.id !== id),
+          customArtifactData: Object.fromEntries(
+            Object.entries(s.customArtifactData).filter(([k]) => k !== id),
+          ),
+        })),
+      setCustomArtifactContent: (id, content) =>
+        set((s) =>
+          s.customArtifactData[id] === content
+            ? s
+            : { customArtifactData: { ...s.customArtifactData, [id]: content } },
+        ),
+
       // --- Snapshot/restore ---
       getSnapshot: () => {
         const s = get();
@@ -485,6 +543,8 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
           verificationErrors: s.verificationErrors,
           artifacts: structuredClone(s.artifacts),
           decomposition: structuredClone(s.decomposition),
+          customArtifactTypes: structuredClone(s.customArtifactTypes),
+          customArtifactData: { ...s.customArtifactData },
         };
       },
 
@@ -520,6 +580,8 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
         verificationErrors: state.verificationErrors,
         artifacts: state.artifacts,
         decomposition: sanitizeDecomposition(state.decomposition),
+        customArtifactTypes: state.customArtifactTypes,
+        customArtifactData: state.customArtifactData,
       }),
       // On rehydrate, check if we need to migrate from workspace-v2
       onRehydrateStorage: () => {
