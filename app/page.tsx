@@ -20,9 +20,12 @@ import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
+import CustomArtifactPanel from "@/app/components/panels/CustomArtifactPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
+import { isCustomType } from "@/app/lib/types/customArtifact";
+import type { CustomArtifactTypeId, CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspaceStore, makeVersion, resolveArtifactContent, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
 import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
@@ -105,6 +108,13 @@ export default function Home() {
   const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
   const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
 
+  // Custom artifact types (user-defined)
+  const customArtifactTypes = useWorkspaceStore((s) => s.customArtifactTypes);
+  const customArtifactData = useWorkspaceStore((s) => s.customArtifactData);
+  const addCustomArtifactType = useWorkspaceStore((s) => s.addCustomArtifactType);
+  const updateCustomArtifactType = useWorkspaceStore((s) => s.updateCustomArtifactType);
+  const removeCustomArtifactType = useWorkspaceStore((s) => s.removeCustomArtifactType);
+
   // Decomposition persistence bridge
   const persistDecompState = useCallback((d: PersistedDecomposition) => {
     useWorkspaceStore.getState().setDecomposition(d);
@@ -129,6 +139,8 @@ export default function Home() {
       propertyTests: s.getArtifactContent("property-tests"),
       balancedPerspectives: s.getArtifactContent("balanced-perspectives"),
       counterexamples: s.getArtifactContent("counterexamples"),
+      customArtifactTypes: structuredClone(s.customArtifactTypes),
+      customArtifactData: { ...s.customArtifactData },
     };
   }, []);
 
@@ -158,6 +170,8 @@ export default function Home() {
       verificationErrors: data.verificationErrors,
       decomposition: data.decomposition,
       artifacts,
+      customArtifactTypes: data.customArtifactTypes ?? [],
+      customArtifactData: data.customArtifactData ?? {},
     });
     return data.decomposition;
   }, []);
@@ -240,6 +254,24 @@ export default function Home() {
   // --- Artifact type selection + parallel generation ---
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
+
+  // Drop selections referring to deleted custom types (e.g., after persistence load)
+  useEffect(() => {
+    setSelectedArtifactTypes((prev) =>
+      prev.filter((t) => !isCustomType(t) || customArtifactTypes.some((ct) => ct.id === t)),
+    );
+  }, [customArtifactTypes]);
+
+  // Deleting a custom type also clears it from the current selection
+  const handleDeleteCustomType = useCallback((id: string) => {
+    removeCustomArtifactType(id);
+    setSelectedArtifactTypes((prev) => prev.filter((t) => t !== id));
+  }, [removeCustomArtifactType]);
+
+  const handleEditCustomType = useCallback(
+    (def: CustomArtifactTypeDefinition) => updateCustomArtifactType(def.id, def),
+    [updateCustomArtifactType],
+  );
 
   // --- Analytics ---
   const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
@@ -337,6 +369,10 @@ export default function Home() {
         case "counterexamples":
           useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
           break;
+        default:
+          if (isCustomType(artifact.type)) {
+            useWorkspaceStore.getState().setCustomArtifactContent(artifact.type as CustomArtifactTypeId, artifact.content);
+          }
       }
     }
   }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
@@ -396,6 +432,13 @@ export default function Home() {
       }));
     if (entries.length > 0) {
       useWorkspaceStore.getState().setArtifactsBatchGenerated(entries);
+    }
+
+    // Persist custom artifact results
+    for (const [type, value] of Object.entries(results)) {
+      if (value == null || !isCustomType(type)) continue;
+      const content = typeof value === "string" ? value : JSON.stringify(value);
+      useWorkspaceStore.getState().setCustomArtifactContent(type as CustomArtifactTypeId, content);
     }
   }, [updateSessionArtifact, updateNode, decomp.nodes]);
 
@@ -570,7 +613,10 @@ export default function Home() {
     // Clear persisted data for types being regenerated so streaming previews
     // are visible via mergeStreamingPreview (which prefers finalData over preview)
     for (const type of artifactTypes) {
-      if (type !== "semiformal") {
+      if (type === "semiformal") continue;
+      if (isCustomType(type)) {
+        useWorkspaceStore.getState().setCustomArtifactContent(type as CustomArtifactTypeId, null);
+      } else {
         useWorkspaceStore.getState().setArtifactGenerated(type as ArtifactKey, "");
       }
     }
@@ -588,14 +634,14 @@ export default function Home() {
         ? pipeline.handleGenerateSemiformal(text)
         : Promise.resolve(),
       nonSemiformalTypes.length > 0
-        ? generateArtifacts(nonSemiformalTypes, request)
+        ? generateArtifacts(nonSemiformalTypes, request, customArtifactTypes)
         : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
     ]);
 
     if (artifactResults) {
       storeArtifactResults(artifactResults, nodeId);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId, customArtifactTypes]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -716,6 +762,9 @@ export default function Home() {
     balancedPerspectivesLoading: dialecticalMapLoading,
     hasCounterexamples: activeCounterexamples !== null,
     counterexamplesLoading,
+    customArtifactTypes,
+    customArtifactData,
+    artifactLoadingState,
   });
 
   // --- Export All handler ---
@@ -767,6 +816,10 @@ export default function Home() {
             onArtifactTypesChange={setSelectedArtifactTypes}
             loadingState={artifactLoadingState}
             waitEstimate={waitEstimate}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={addCustomArtifactType}
+            onEditCustomType={handleEditCustomType}
+            onDeleteCustomType={handleDeleteCustomType}
           />
         );
       case "semiformal":
@@ -904,6 +957,13 @@ export default function Home() {
       case "analytics":
         return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
       default:
+        if (isCustomType(panelId)) {
+          const def = customArtifactTypes.find((ct) => ct.id === panelId);
+          if (!def) return undefined;
+          const content = customArtifactData[panelId] ?? null;
+          const isLoading = artifactLoadingState[panelId] === "generating";
+          return <CustomArtifactPanel definition={def} content={content} loading={isLoading} />;
+        }
         return undefined;
     }
   }, [
@@ -933,6 +993,8 @@ export default function Home() {
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     streamingNodes,
+    customArtifactTypes, customArtifactData,
+    addCustomArtifactType, handleEditCustomType, handleDeleteCustomType,
   ]);
 
   return (
