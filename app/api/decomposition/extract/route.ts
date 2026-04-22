@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { removeCachedResult } from "@/app/lib/llm/cache";
-import { decompositionSchema } from "@/app/lib/llm/schemas";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { transformSseStream } from "@/app/lib/llm/transformSseStream";
 import type { SourceDocument } from "@/app/lib/types/decomposition";
-import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
 const SYSTEM_PROMPT = `You are a document structure analyzer. Given one or more source documents, decompose the content into its key structural units and their dependency/support relationships.
@@ -109,49 +107,22 @@ export async function POST(request: NextRequest) {
 
   const userMessage = formatDocuments(documents);
 
-  try {
-    const { text: responseText, usage, cacheKey } = await callLlm({
-      endpoint: "decomposition/extract",
-      systemPrompt: SYSTEM_PROMPT,
-      userContent: userMessage,
-      maxTokens: 16384,
-      openRouterModel: OPENROUTER_MODEL,
-      responseFormat: decompositionSchema,
-    });
+  // Always stream — all callers use fetchStreamingApi which handles SSE parsing.
+  const rawStream = streamLlm({
+    endpoint: "decomposition/extract",
+    systemPrompt: SYSTEM_PROMPT,
+    userContent: userMessage,
+    maxTokens: 16384,
+    openRouterModel: OPENROUTER_MODEL,
+  });
 
-    if (usage.provider === "mock") {
-      return NextResponse.json({ propositions: mockResponse(documents) });
+  // Transform the `done` event to substitute mock content when no API key is set.
+  const transformed = rawStream.pipeThrough(transformSseStream((data) => {
+    if (data.usage?.provider === "mock") {
+      data.text = JSON.stringify(mockResponse(documents));
     }
+  }));
 
-    try {
-      const parsed = JSON.parse(stripCodeFences(responseText));
-      // Support both wrapped { propositions: [...] } and legacy bare array formats
-      const propositions = Array.isArray(parsed) ? parsed : parsed.propositions;
-      return NextResponse.json({ propositions });
-    } catch {
-      // JSON parse failed — invalidate the cached bad response
-      if (cacheKey) {
-        try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
-      }
-      const preview = responseText.slice(0, 500);
-      console.error("[decomposition/extract] Failed to parse LLM response as JSON:", preview);
-      return NextResponse.json(
-        { error: "LLM response was not valid JSON", details: preview },
-        { status: 502 },
-      );
-    }
-  } catch (err) {
-    if (err instanceof OpenRouterError) {
-      return NextResponse.json(
-        { error: err.message, details: err.details },
-        { status: 502 },
-      );
-    }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[decomposition/extract] Unexpected error:", message);
-    return NextResponse.json(
-      { error: `LLM call failed: ${message}` },
-      { status: 502 },
-    );
-  }
+  // Next.js route handlers accept Response; cast avoids a type mismatch with NextResponse
+  return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
 }

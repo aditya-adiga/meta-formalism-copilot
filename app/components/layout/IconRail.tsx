@@ -34,7 +34,7 @@ export default function IconRail({
       {/* Toggle expand/collapse */}
       <button
         onClick={() => setExpanded((prev) => !prev)}
-        className="flex items-center justify-center border-b border-[#DDD9D5] px-3 py-2 text-[#6B6560] hover:text-[var(--ink-black)] transition-colors"
+        className="flex items-center justify-center border-b border-[#DDD9D5] px-3 py-3 text-[#6B6560] hover:text-[var(--ink-black)] transition-colors"
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
