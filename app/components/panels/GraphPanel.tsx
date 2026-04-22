@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import CostTooltip from "@/app/components/ui/CostTooltip";
@@ -26,12 +27,13 @@ const SOURCE_COLORS = [
 
 type GraphPanelProps = {
   propositions: PropositionNode[];
+  streamingPropositions?: PropositionNode[] | null;
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
   hasContent: boolean;
   sourceDocuments: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";
-  onDecompose: () => void;
+  onDecompose: (options?: { forceLlm?: boolean }) => void;
   queueProgress: QueueProgress;
   onFormalizeAll: (artifactTypes: ArtifactType[]) => void;
   globalArtifactTypes: ArtifactType[];
@@ -42,6 +44,7 @@ type GraphPanelProps = {
 
 export default function GraphPanel({
   propositions,
+  streamingPropositions,
   selectedNodeId,
   onSelectNode,
   hasContent,
@@ -55,11 +58,21 @@ export default function GraphPanel({
   onResumeQueue,
   onCancelQueue,
 }: GraphPanelProps) {
-  const hasNodes = propositions.length > 0;
+  const { displayData: displayPropositions, hasDisplayData: hasNodes } = useStreamingMerge(
+    propositions.length > 0 ? propositions : null,
+    streamingPropositions,
+    (data: PropositionNode[]) => data.length > 0,
+  );
   const [exporting, setExporting] = useState(false);
   const [showArtifactPicker, setShowArtifactPicker] = useState(false);
   const [queueArtifactTypes, setQueueArtifactTypes] = useState<ArtifactType[]>([]);
   const sourceCount = sourceDocuments.length;
+  const hasStructuredSources = useMemo(
+    () => sourceDocuments.some(
+      (d) => d.sourceLabel.endsWith(".pdf") || d.sourceLabel.endsWith(".tex") || d.text.includes("\\begin{"),
+    ),
+    [sourceDocuments],
+  );
 
   const queueActive = queueProgress.status === "running" || queueProgress.status === "paused";
   const processed = queueProgress.completed + queueProgress.failed + queueProgress.skipped;
@@ -151,6 +164,16 @@ export default function GraphPanel({
               </button>
             </>
           )}
+          {hasContent && hasStructuredSources && hasNodes && extractionStatus === "done" && (
+            <button
+              onClick={() => onDecompose({ forceLlm: true })}
+              disabled={queueActive}
+              className="rounded-full border border-[#DDD9D5] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED] disabled:opacity-50"
+              title="Bypass the LaTeX/PDF parser and decompose with an LLM instead"
+            >
+              Re-extract with LLM
+            </button>
+          )}
           {hasContent && (
             <CostTooltip
               inputCharLength={totalInputCharLength}
@@ -158,7 +181,7 @@ export default function GraphPanel({
               position="below"
             >
               <button
-                onClick={onDecompose}
+                onClick={() => onDecompose()}
                 disabled={extractionStatus === "extracting" || queueActive}
                 className="rounded-full bg-[var(--ink-black)] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
               >
@@ -266,9 +289,9 @@ export default function GraphPanel({
           </div>
         )}
 
-        {hasNodes && (
+        {hasNodes && displayPropositions && (
           <ProofGraph
-            propositions={propositions}
+            propositions={displayPropositions}
             selectedNodeId={selectedNodeId}
             onSelectNode={onSelectNode}
             sourceColorMap={sourceColorMap}

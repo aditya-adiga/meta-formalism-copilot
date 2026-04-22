@@ -14,6 +14,10 @@ export function useGraphLayout(propositions: PropositionNode[]) {
   return useMemo(() => {
     if (propositions.length === 0) return { nodes: [], edges: [] };
 
+    // Single Set for edge validation — during streaming, partial-JSON may
+    // produce truncated dependency IDs that reference non-existent nodes.
+    const nodeIds = new Set(propositions.map((p) => p.id));
+
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: "TB", nodesep: 40, ranksep: 60 });
@@ -25,14 +29,16 @@ export function useGraphLayout(propositions: PropositionNode[]) {
     const edges: Edge[] = [];
     for (const prop of propositions) {
       for (const depId of prop.dependsOn) {
-        const edgeId = `${depId}->${prop.id}`;
-        g.setEdge(depId, prop.id);
-        edges.push({
-          id: edgeId,
-          source: depId,
-          target: prop.id,
-          style: { stroke: "#9A9590", strokeWidth: 1.5 },
-        });
+        if (nodeIds.has(depId)) {
+          const edgeId = `${depId}->${prop.id}`;
+          g.setEdge(depId, prop.id);
+          edges.push({
+            id: edgeId,
+            source: depId,
+            target: prop.id,
+            style: { stroke: "#9A9590", strokeWidth: 1.5 },
+          });
+        }
       }
     }
 
