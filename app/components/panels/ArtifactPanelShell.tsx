@@ -60,7 +60,7 @@ export default function ArtifactPanelShell({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Edit progress banner */}
       {editing && (
         <div className="absolute inset-x-0 top-0 z-40 overflow-hidden bg-[var(--ink-black)] px-4 py-1.5 text-center text-xs text-white/90">

@@ -141,7 +141,7 @@ export default function Home() {
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp } = useDecomposition();
+  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
 
   // --- Auto-formalize queue ---
@@ -503,11 +503,12 @@ export default function Home() {
   }, [nodePipeline, setActivePanelId]);
 
   // Graph panel handlers
-  const handleDecompose = useCallback(() => {
+  const handleDecompose = useCallback((options?: { forceLlm?: boolean }) => {
     if (sourceDocuments.length > 0) {
-      extractPropositions(sourceDocuments, pdfFile);
+      setActivePanelId("decomposition");
+      extractPropositions(sourceDocuments, pdfFile, options);
     }
-  }, [sourceDocuments, pdfFile, extractPropositions]);
+  }, [sourceDocuments, pdfFile, extractPropositions, setActivePanelId]);
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
@@ -632,6 +633,7 @@ export default function Home() {
         return (
           <GraphPanel
             propositions={decomp.nodes}
+            streamingPropositions={streamingNodes}
             selectedNodeId={decomp.selectedNodeId}
             onSelectNode={handleSelectNode}
             hasContent={sourceDocuments.length > 0}
@@ -751,6 +753,7 @@ export default function Home() {
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
+    streamingNodes,
   ]);
 
   return (
