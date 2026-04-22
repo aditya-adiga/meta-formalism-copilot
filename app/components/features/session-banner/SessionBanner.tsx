@@ -65,7 +65,7 @@ export default function SessionBanner({ currentSession, sessions, onSelectSessio
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-md border border-[#DDD9D5] bg-white py-1 shadow-md">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[200px] max-h-[50vh] overflow-y-auto rounded-md border border-[#DDD9D5] bg-white py-1 shadow-md">
           {sessions.map((s) => (
             <button
               key={s.id}
