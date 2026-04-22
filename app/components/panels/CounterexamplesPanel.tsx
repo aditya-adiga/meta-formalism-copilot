@@ -26,6 +26,11 @@ export default function CounterexamplesPanel({
 }: CounterexamplesPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
 
+  const artifactJson = useMemo(
+    () => counterexamples ? JSON.stringify(counterexamples) : undefined,
+    [counterexamples],
+  );
+
   // Build search description from claim + top counterexample scenarios
   const evidenceSearchContent = useMemo(() => {
     if (!counterexamples) return "";
@@ -111,6 +116,8 @@ export default function CounterexamplesPanel({
                 artifactType="counterexamples"
                 elementId={WHOLE_ARTIFACT_ELEMENT_ID}
                 elementContent={evidenceSearchContent}
+                artifactJson={artifactJson}
+                onContentChange={onContentChange}
               />
             </section>
           )}
