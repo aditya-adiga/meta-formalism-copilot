@@ -1,8 +1,8 @@
 "use client";
 
 import type { PropertyTestsResponse } from "@/app/lib/types/artifacts";
-import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
@@ -12,15 +12,16 @@ type PropertyTestsPanelProps = {
   streamingPreview?: PropertyTestsResponse["propertyTests"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 export default function PropertyTestsPanel({
   propertyTests, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: PropertyTestsPanelProps) {
   const { updateField, updateArrayItem } = useFieldUpdaters(propertyTests, onContentChange);
 
-  const { displayData, hasDisplayData } = mergeStreamingPreview(
+  const { displayData, hasDisplayData } = useStreamingMerge(
     propertyTests, streamingPreview,
     (d) => (d.properties?.length ?? 0) > 0,
   );
@@ -35,6 +36,8 @@ export default function PropertyTestsPanel({
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {hasDisplayData && displayData && (
         <>
