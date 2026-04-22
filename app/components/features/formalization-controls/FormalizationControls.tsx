@@ -50,7 +50,7 @@ export default function FormalizationControls({
 
         {/* Artifact type chips */}
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4A4540]">
             Artifact Types
           </h3>
           <ArtifactChipSelector
@@ -68,7 +68,7 @@ export default function FormalizationControls({
           type="button"
           onClick={onGenerate}
           disabled={loading || selectedArtifactTypes.length === 0}
-          className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          className="w-full rounded-full bg-[var(--ink-black)] px-6 py-3 text-base font-semibold text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
         >
           {buttonLabel}
         </button>

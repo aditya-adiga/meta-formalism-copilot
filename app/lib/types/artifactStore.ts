@@ -26,4 +26,12 @@ export type ArtifactRecord = {
   versions: ArtifactVersion[]; // oldest-first, capped at MAX_VERSIONS
 };
 
+/** Provenance tracks which inputs produced a given artifact version.
+ *  Used for staleness detection (Phase 3). */
+export type GenerationProvenance = {
+  sourceHash: string;
+  contextHash: string;
+  generatedAt: string;
+};
+
 export const MAX_VERSIONS = 20;
