@@ -109,7 +109,7 @@ export default function IconRail({
           title={expanded ? undefined : "Export All"}
           className={`
             group flex items-center gap-3 px-3 py-3 text-left transition-colors border-t border-[#DDD9D5]
-            text-[#6B6560] hover:bg-[var(--rail-hover)] hover:text-[var(--ink-black)]
+            text-[var(--ink-black)] hover:bg-[var(--rail-hover)]
             disabled:opacity-40 disabled:pointer-events-none
           `}
         >
