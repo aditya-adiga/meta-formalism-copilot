@@ -53,7 +53,7 @@ function DetailsView({
       {/* Variables */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Variables ({causalGraph.variables.length})
+          Factors ({causalGraph.variables.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.variables.map((v, i) => (
@@ -73,7 +73,7 @@ function DetailsView({
       {/* Edges */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Causal Edges ({causalGraph.edges.length})
+          Relationships ({causalGraph.edges.length})
         </h3>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
@@ -96,7 +96,7 @@ function DetailsView({
       {causalGraph.confounders.length > 0 && (
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-            Confounders ({causalGraph.confounders.length})
+            Hidden Factors ({causalGraph.confounders.length})
           </h3>
           <div className="space-y-2">
             {causalGraph.confounders.map((c, i) => (
@@ -129,11 +129,11 @@ export default function CausalGraphPanel({
 
   return (
     <ArtifactPanelShell
-      title="Causal Graph"
+      title="Cause & Effect Map"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      emptyMessage="No cause & effect map yet. Generate one from the Source panel or component detail."
+      loadingMessage={`Generating cause & effect map...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}

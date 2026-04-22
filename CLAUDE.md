@@ -57,7 +57,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - **Feature-based folder structure**: components grouped by feature domain, not by type
 - **Import alias**: `@/*` maps to the project root (configured in `tsconfig.json`)
 - **Client components**: Panel components use `"use client"` since they manage state
-- **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map — each with a dedicated panel and API route
+- **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, balanced-perspectives — each with a dedicated panel and API route
 - **Decomposition workflow**: extract propositions from sources into a dependency graph, then formalize per-node
 - **Session management**: workspace sessions (global) and formalization sessions (per-scope) for tracking artifact history
 

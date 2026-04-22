@@ -135,46 +135,46 @@ export const ARTIFACT_META: Record<ArtifactType, {
   whenToUse: string;
 }> = {
   semiformal: {
-    label: "Semiformal Proof",
+    label: "Step-by-Step Proof",
     chipLabel: "Mathematical Proof",
-    description: "Creates a formally structured proof with mathematical notation. Spells out many individual logical steps appropriate for machine-checked proof verification via Lean4 theorem proving code.",
-    whenToUse: "Claims that already have a precise statement, where the accuracy of specific equations and applications of supporting theorems need precise validation",
+    description: "Creates a structured proof with mathematical notation. Spells out individual logical steps, building toward a computer-checkable Lean 4 proof.",
+    whenToUse: "Claims that already have a precise statement, where the accuracy of specific equations and reasoning steps needs rigorous validation.",
   },
   lean: {
-    label: "Lean4 Code",
-    chipLabel: "Lean4 Code",
-    description: "Raw Lean 4 theorem prover code.",
-    whenToUse: "Generated automatically as step 2 of the deductive pipeline.",
+    label: "Proof Code",
+    chipLabel: "Proof Code",
+    description: "Computer-checkable proof code (Lean 4) that can be automatically verified for correctness.",
+    whenToUse: "Generated automatically as step 2 of the proof process.",
   },
   "causal-graph": {
-    label: "Causal Graph",
-    chipLabel: "Causal Graph",
-    description: "Directed graph of variables. Nodes will be component ideas or effects, edges will be positively or negatively weighted relationships between nodes.",
-    whenToUse: "Reasoning about cause-and-effect, interventions, or counterfactual questions. Text with multiple inter-related ideas that should be considered simultaneously.",
+    label: "Cause & Effect Map",
+    chipLabel: "Cause & Effect Map",
+    description: "A visual map of factors and how they influence each other. Each connection is positively or negatively weighted to show strength and direction of the relationship.",
+    whenToUse: "Reasoning about cause-and-effect or ‘what if’ questions. Text with multiple inter-related ideas that should be considered simultaneously.",
   },
   "statistical-model": {
     label: "Statistical Model",
     chipLabel: "Statistical Model",
-    description: "Extracts variables with roles and testable hypotheses with null hypotheses.  Suggests statistical tests appropriate to the structure of the hypotheses and data to be collected.",
-    whenToUse: "Claims involving quantities, correlations, or empirical evidence testable with data. When designing a study, to pre-register hypotheses and ensure data collection matches specific tests. When multiple sources of evidence need to be weighed against one another. When level of statistical confidence in a hypothesis is important.",
+    description: "Identifies key factors and their roles, generates testable predictions with baseline assumptions, and suggests appropriate data tests matched to the structure of the predictions.",
+    whenToUse: "Claims involving measurable quantities or evidence testable with data. When designing a study and choosing what data to collect. When multiple sources of evidence need to be weighed against one another. When the level of confidence in a claim matters.",
   },
   "property-tests": {
-    label: "Property Tests",
-    chipLabel: "Property Tests",
-    description: "Isolates features or variables that are required or expected to remain consistent. States them in terms of invariants, preconditions, postconditions, and data generators. Generates pseudo-code to adapt into executable test specs for a project.",
-    whenToUse: "Rules that should always hold, especially for computational or algorithmic claims. Test-driven software development.",
+    label: "Consistency Checks",
+    chipLabel: "Consistency Checks",
+    description: "Isolates rules or features that should always remain true. States them as checkable conditions (what must be true before, what’s guaranteed after) and generates test code you can adapt for a project.",
+    whenToUse: "Rules or guarantees that should never be violated, especially for software or algorithmic claims. Test-driven development.",
   },
-  "dialectical-map": {
-    label: "Dialectical Map",
-    chipLabel: "Dialectical Map",
-    description: "Identifies distinct perspectives present in the source text. Hypothesizes tensions between those perspectives. Proposes a synthesis perspective attempting to resolve all tensions.",
-    whenToUse: "Topics with multiple legitimate viewpoints where you want the full argumentative terrain. Decisions with many stakeholders who may have different values. When you have an established opinion and want to understand disagreements or reduce bias.",
+  "balanced-perspectives": {
+    label: "Balanced Perspectives",
+    chipLabel: "Balanced Perspectives",
+    description: "Identifies distinct viewpoints in the source text, highlights tensions between them, and proposes a balanced resolution that addresses each perspective.",
+    whenToUse: "Topics with multiple valid viewpoints where you want the full landscape of opinions. Decisions with many stakeholders who may have different values. When you want to understand disagreements or reduce bias.",
   },
   counterexamples: {
     label: "Counterexamples",
     chipLabel: "Counterexamples",
-    description: "Adversarial analysis identifying specific scenarios that could falsify the claim, with plausibility ratings.",
-    whenToUse: "Testing the robustness of a claim by finding edge cases, exceptions, or conditions under which it breaks down. When a proof fails and you don’t understand why. When statistical evidence is strong but doesn’t create certainty or agreement. When you need to challenge a specific perspective.",
+    description: "Searches for specific scenarios that could challenge or disprove the claim, each rated by how plausible it is.",
+    whenToUse: "Stress-testing a claim by looking for exceptions or conditions where it breaks down. When a proof fails and you don’t understand why. When statistical evidence is strong but doesn’t create certainty. When you need to challenge a specific perspective.",
   },
 };
 
@@ -184,7 +184,7 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "balanced-perspectives",
   "counterexamples",
 ];
 
@@ -193,7 +193,7 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
-  "dialectical-map": "/api/formalization/dialectical-map",
+  "balanced-perspectives": "/api/formalization/balanced-perspectives",
   counterexamples: "/api/formalization/counterexamples",
 };
 
@@ -204,6 +204,6 @@ export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
   "causal-graph": "causalGraph",
   "statistical-model": "statisticalModel",
   "property-tests": "propertyTests",
-  "dialectical-map": "dialecticalMap",
+  "balanced-perspectives": "balancedPerspectives",
   counterexamples: "counterexamples",
 };

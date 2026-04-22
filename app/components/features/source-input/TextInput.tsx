@@ -9,7 +9,7 @@ export default function TextInput({ value, onChange }: TextInputProps) {
   return (
     <div className="flex flex-col gap-1">
       <p className="text-sm text-[#4A4540]">
-        Paste the argument, claim, or insight you want to formalize
+        Paste or type source material (file uploads below are treated the same way)
       </p>
       <textarea
         id="text-input"
