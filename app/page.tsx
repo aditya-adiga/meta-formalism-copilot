@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
-import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -929,15 +929,15 @@ export default function Home() {
     causalGraph, causalGraphLoading, causalGraphWaitEstimate,
     statisticalModel, statisticalModelLoading,
     propertyTests, propertyTestsLoading,
-    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
     setPersistedDialecticalMap,
+    artifactEditing,
     counterexamples, counterexamplesLoading,
     semiformalIsStale, causalGraphIsStale, statisticalModelIsStale,
     propertyTestsIsStale, dialecticalMapIsStale, counterexamplesIsStale,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
-    streamingNodes,
+    streamingNodes, streamingJsonPreview,
     addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
   ]);
 
