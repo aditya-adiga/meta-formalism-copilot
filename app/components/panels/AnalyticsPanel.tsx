@@ -58,7 +58,7 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto p-6">
         {/* Summary cards */}
-        <div className="mb-6 grid grid-cols-4 gap-3">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <SummaryCard label="API Calls" value={String(summary.totalCalls)} />
           <SummaryCard
             label="Total Tokens"
