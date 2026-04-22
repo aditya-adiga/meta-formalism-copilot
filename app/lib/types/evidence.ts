@@ -144,3 +144,61 @@ export type PaperScore = {
 export type EvidenceScoreResponse = {
   scores: PaperScore[];
 };
+
+// ---------------------------------------------------------------------------
+// Overlap and subsumption detection (Phase 3)
+// ---------------------------------------------------------------------------
+
+/** A detected containment relationship between a review paper and an individual study */
+export type SubsumptionRelation = {
+  /** OpenAlex ID of the review/meta-analysis */
+  reviewId: string;
+  /** OpenAlex ID of the individual study */
+  studyId: string;
+  /** How the relationship was detected */
+  detectionMethod: "citation-graph" | "llm-fallback";
+  /** Confidence in the relationship (0-1) */
+  confidence: number;
+};
+
+/** Status of a paper relative to reviews in the same evidence slot */
+export type PaperOverlapStatus =
+  | "subsumed"    // Study is included in a review within the result set
+  | "novel"       // Study is newer than the review(s) or not included
+  | "review"      // This paper IS a review/meta-analysis
+  | "no-reviews"; // No reviews in the set to compare against
+
+/** Study types that count as "review" papers for overlap detection */
+export const REVIEW_STUDY_TYPES: readonly StudyType[] = [
+  "meta-analysis",
+  "systematic-review",
+] as const;
+
+/** Check whether a study type is a review type (meta-analysis or systematic-review) */
+export function isReviewType(studyType: string | undefined | null): boolean {
+  return !!studyType && (REVIEW_STUDY_TYPES as readonly string[]).includes(studyType);
+}
+
+/** Overlap analysis result for an evidence slot */
+export type OverlapAnalysis = {
+  /** All detected containment relationships */
+  relations: SubsumptionRelation[];
+  /** Per-paper status keyed by openAlexId */
+  paperStatus: Record<string, PaperOverlapStatus>;
+  /** When analysis was performed */
+  analyzedAt: string;
+};
+
+/** API request shape for overlap analysis */
+export type EvidenceOverlapRequest = {
+  /** Papers to analyze — must have reliability scores with studyType */
+  papers: Pick<
+    EvidencePaper,
+    "openAlexId" | "title" | "year" | "abstract" | "reliability"
+  >[];
+};
+
+/** API response shape for overlap analysis */
+export type EvidenceOverlapResponse = {
+  analysis: OverlapAnalysis;
+};
