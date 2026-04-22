@@ -12,7 +12,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.88.0",
+    "@anthropic-ai/sdk": "^0.90.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dagre": "^0.7.54",
     "dagre": "^0.8.5",
@@ -20,7 +20,7 @@
     "jszip": "^3.10.1",
     "katex": "^0.16.45",
     "mammoth": "^1.12.0",
-    "next": "16.2.3",
+    "next": "16.2.4",
     "partial-json": "^0.1.7",
     "pdfjs-dist": "^5.6.205",
     "react": "19.2.5",
