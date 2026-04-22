@@ -66,7 +66,7 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       {/* Scrollable content */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-auto p-6">
-        <p className="text-sm text-[#6B6560]">
+        <p className="text-sm text-[#4A4540]">
           Describe the theoretical direction, domain, or framework for formalizing your insight
         </p>
         <textarea
