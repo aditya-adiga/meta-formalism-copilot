@@ -149,7 +149,7 @@ export default function WorkspaceSessionBar({
 
         {/* Dropdown */}
         {dropdownOpen && (
-          <div className="absolute left-0 top-full z-50 mt-0.5 w-full min-w-[280px] rounded-b-md border border-t-0 border-[#DDD9D5] bg-white py-1 shadow-md">
+          <div className="absolute left-0 top-full z-50 mt-0.5 w-full min-w-[280px] max-h-[60vh] overflow-y-auto rounded-b-md border border-t-0 border-[#DDD9D5] bg-white py-1 shadow-md">
             {sessions.map((s) => {
               const isActive = s.id === activeSession?.id;
               return (
