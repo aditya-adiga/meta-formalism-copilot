@@ -2,7 +2,7 @@
 
 Date: 2026-04-02
 Last verified: 2026-04-02
-Relevant paths: app/page.tsx, app/hooks/useWorkspacePersistence.ts, app/hooks/useFormalizationPipeline.ts, app/hooks/useStreamingMerge.ts
+Relevant paths: app/page.tsx, app/lib/stores/workspaceStore.ts, app/hooks/useFormalizationPipeline.ts
 Branch: spike/zustand-state-management-2026-04-02 (can be deleted)
 Time spent: ~20 minutes
 
