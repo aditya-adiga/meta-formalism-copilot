@@ -5,6 +5,7 @@ import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { ArtifactKey } from "@/app/lib/types/artifactStore";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -23,6 +24,7 @@ import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
+import { useWorkspaceStore } from "@/app/lib/stores/workspaceStore";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -98,17 +100,36 @@ export default function Home() {
   const counterexamples = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]>(persistedCounterexamples), [persistedCounterexamples]);
 
   // --- Artifact editing ---
+  // Manual saves (panel onContentChange) and AI edits (useAllArtifactEditing setters)
+  // both mutate an existing artifact, so they go through setArtifactEdited — but with
+  // distinct sources so the version history records *how* the edit happened. The shim's
+  // setPersistedXxx callbacks use setArtifactGenerated, which is the wrong source for
+  // these paths. Keep the shim for restore/generation paths (see handleRestoreSession
+  // and storeArtifactResults below), and use these for edits.
+  //
+  // A single empty-deps useMemo gives every inner handler stable identity for the
+  // component's lifetime, so listing `artifactEditHandlers` once in the render memo's
+  // deps array is equivalent to listing all 10 callbacks individually.
+  const artifactEditHandlers = useMemo(() => {
+    const makeHandler = (key: ArtifactKey, source: "manual-edit" | "ai-edit") =>
+      (v: string) => useWorkspaceStore.getState().setArtifactEdited(key, v, source);
+    const keys = ["causal-graph", "statistical-model", "property-tests", "dialectical-map", "counterexamples"] as const satisfies readonly ArtifactKey[];
+    return Object.fromEntries(
+      keys.map((k) => [k, { onSave: makeHandler(k, "manual-edit"), onAiEdited: makeHandler(k, "ai-edit") }]),
+    ) as Record<ArtifactKey, { onSave: (v: string) => void; onAiEdited: (v: string) => void }>;
+  }, []);
+
   const artifactEditing = useAllArtifactEditing({
     causalGraph: persistedCausalGraph,
-    setCausalGraph: setPersistedCausalGraph,
+    setCausalGraph: artifactEditHandlers["causal-graph"].onAiEdited,
     statisticalModel: persistedStatisticalModel,
-    setStatisticalModel: setPersistedStatisticalModel,
+    setStatisticalModel: artifactEditHandlers["statistical-model"].onAiEdited,
     propertyTests: persistedPropertyTests,
-    setPropertyTests: setPersistedPropertyTests,
+    setPropertyTests: artifactEditHandlers["property-tests"].onAiEdited,
     dialecticalMap: persistedDialecticalMap,
-    setDialecticalMap: setPersistedDialecticalMap,
+    setDialecticalMap: artifactEditHandlers["dialectical-map"].onAiEdited,
     counterexamples: persistedCounterexamples,
-    setCounterexamples: setPersistedCounterexamples,
+    setCounterexamples: artifactEditHandlers.counterexamples.onAiEdited,
   });
 
   // --- Artifact type selection + parallel generation ---
@@ -658,7 +679,7 @@ export default function Home() {
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
 
-            onContentChange={setPersistedCausalGraph}
+            onContentChange={artifactEditHandlers["causal-graph"].onSave}
             onAiEdit={artifactEditing.causalGraph.handleAiEdit}
             editing={artifactEditing.causalGraph.editing}
             editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
@@ -671,7 +692,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
 
-            onContentChange={setPersistedStatisticalModel}
+            onContentChange={artifactEditHandlers["statistical-model"].onSave}
             onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
             editing={artifactEditing.statisticalModel.editing}
             editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
@@ -684,7 +705,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
 
-            onContentChange={setPersistedPropertyTests}
+            onContentChange={artifactEditHandlers["property-tests"].onSave}
             onAiEdit={artifactEditing.propertyTests.handleAiEdit}
             editing={artifactEditing.propertyTests.editing}
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
@@ -697,7 +718,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
 
-            onContentChange={setPersistedDialecticalMap}
+            onContentChange={artifactEditHandlers["dialectical-map"].onSave}
             onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
             editing={artifactEditing.dialecticalMap.editing}
             editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
@@ -709,7 +730,7 @@ export default function Home() {
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
 
-            onContentChange={setPersistedCounterexamples}
+            onContentChange={artifactEditHandlers.counterexamples.onSave}
             onAiEdit={artifactEditing.counterexamples.handleAiEdit}
             editing={artifactEditing.counterexamples.editing}
             editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
@@ -733,15 +754,11 @@ export default function Home() {
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
-    setPersistedCausalGraph,
     statisticalModel, statisticalModelLoading,
-    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
-    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
-    setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
-    setPersistedCounterexamples,
+    artifactEditHandlers,
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
