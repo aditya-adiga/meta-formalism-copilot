@@ -114,7 +114,8 @@ export function useArtifactGeneration() {
     }
 
     setLoadingState(finalState);
-    setStreamingJsonPreview({});
+    // Preview is cleared at the start of the next generation (not here) to
+    // avoid a flash between preview clear and final data store write.
     return results;
   }, []);
 
