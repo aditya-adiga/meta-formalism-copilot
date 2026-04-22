@@ -36,6 +36,13 @@ import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
+/** Safely parse a JSON string, returning null on failure */
+function parseJson<T>(json: string | null): T | null {
+  if (!json) return null;
+  try { return JSON.parse(json) as T; }
+  catch { return null; }
+}
+
 function phaseToEndpoint(phase: LoadingPhase): string | null {
   switch (phase) {
     case "semiformal":
@@ -55,7 +62,6 @@ function phaseToEndpoint(phase: LoadingPhase): string | null {
 export default function Home() {
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
-
 
   // --- Persisted state (survives page refresh) ---
   const {
@@ -85,35 +91,11 @@ export default function Home() {
   } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
-  const causalGraph = useMemo(() => {
-    if (!persistedCausalGraph) return null;
-    try { return JSON.parse(persistedCausalGraph) as CausalGraphResponse["causalGraph"]; }
-    catch { return null; }
-  }, [persistedCausalGraph]);
-
-  const statisticalModel = useMemo(() => {
-    if (!persistedStatisticalModel) return null;
-    try { return JSON.parse(persistedStatisticalModel) as StatisticalModelResponse["statisticalModel"]; }
-    catch { return null; }
-  }, [persistedStatisticalModel]);
-
-  const propertyTests = useMemo(() => {
-    if (!persistedPropertyTests) return null;
-    try { return JSON.parse(persistedPropertyTests) as PropertyTestsResponse["propertyTests"]; }
-    catch { return null; }
-  }, [persistedPropertyTests]);
-
-  const dialecticalMap = useMemo(() => {
-    if (!persistedDialecticalMap) return null;
-    try { return JSON.parse(persistedDialecticalMap) as DialecticalMapResponse["dialecticalMap"]; }
-    catch { return null; }
-  }, [persistedDialecticalMap]);
-
-  const counterexamples = useMemo(() => {
-    if (!persistedCounterexamples) return null;
-    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
-    catch { return null; }
-  }, [persistedCounterexamples]);
+  const causalGraph = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]>(persistedCausalGraph), [persistedCausalGraph]);
+  const statisticalModel = useMemo(() => parseJson<import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]>(persistedStatisticalModel), [persistedStatisticalModel]);
+  const propertyTests = useMemo(() => parseJson<import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]>(persistedPropertyTests), [persistedPropertyTests]);
+  const dialecticalMap = useMemo(() => parseJson<import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]>(persistedDialecticalMap), [persistedDialecticalMap]);
+  const counterexamples = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]>(persistedCounterexamples), [persistedCounterexamples]);
 
   // --- Artifact editing ---
   const artifactEditing = useAllArtifactEditing({
@@ -196,11 +178,15 @@ export default function Home() {
     }
 
     // Restore artifact data from session's artifacts[]
+    const restoreSetters: Partial<Record<ArtifactType, (v: string | null) => void>> = {
+      "causal-graph": setPersistedCausalGraph,
+      "statistical-model": setPersistedStatisticalModel,
+      "property-tests": setPersistedPropertyTests,
+      "dialectical-map": setPersistedDialecticalMap,
+      counterexamples: setPersistedCounterexamples,
+    };
     for (const artifact of session.artifacts) {
-      const setter = artifactSetters[artifact.type as keyof typeof artifactSetters];
-      if (setter) setter(artifact.content);
-      // Handle counterexamples separately (not in artifactSetters)
-      if (artifact.type === "counterexamples") setPersistedCounterexamples(artifact.content);
+      restoreSetters[artifact.type]?.(artifact.content);
     }
   }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, artifactSetters, setPersistedCounterexamples]);
 
@@ -251,13 +237,18 @@ export default function Home() {
     }
 
     // Also update persisted display state (JSON strings)
-    for (const [type, setter] of Object.entries(artifactSetters)) {
-      const value = results[type as ArtifactType];
-      if (value) setter(JSON.stringify(value));
-    }
-    // Handle counterexamples separately (not in artifactSetters)
-    if (results["counterexamples"]) {
-      setPersistedCounterexamples(JSON.stringify(results["counterexamples"]));
+    const persistSetters: Partial<Record<ArtifactType, (v: string | null) => void>> = {
+      "causal-graph": setPersistedCausalGraph,
+      "statistical-model": setPersistedStatisticalModel,
+      "property-tests": setPersistedPropertyTests,
+      "dialectical-map": setPersistedDialecticalMap,
+      counterexamples: setPersistedCounterexamples,
+    };
+    for (const [type, value] of Object.entries(results)) {
+      const setter = persistSetters[type as ArtifactType];
+      if (setter && value != null) {
+        setter(JSON.stringify(value));
+      }
     }
   }, [updateSessionArtifact, updateNode, decomp.nodes, artifactSetters, setPersistedCounterexamples]);
 
@@ -270,10 +261,10 @@ export default function Home() {
     renameSession: renameWorkspaceSession,
     deleteSession: deleteWorkspaceSession,
   } = useWorkspaceSessions({
-    getWorkspaceSnapshot: getWorkspaceSnapshot,
-    getSessionsSnapshot: getSessionsSnapshot,
-    resetWorkspaceToSnapshot: resetWorkspaceToSnapshot,
-    resetSessionsToSnapshot: resetSessionsToSnapshot,
+    getWorkspaceSnapshot,
+    getSessionsSnapshot,
+    resetWorkspaceToSnapshot,
+    resetSessionsToSnapshot,
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
@@ -299,14 +290,11 @@ export default function Home() {
   // --- Source documents for decomposition (each input as a separate document) ---
   const sourceDocuments: SourceDocument[] = useMemo(() => {
     const docs: SourceDocument[] = [];
-    let idx = 0;
     if (sourceText.trim()) {
-      docs.push({ sourceId: `doc-${idx}`, sourceLabel: "Text Input", text: sourceText });
-      idx++;
+      docs.push({ sourceId: "doc-0", sourceLabel: "Text Input", text: sourceText });
     }
     for (const f of extractedFiles) {
-      docs.push({ sourceId: `doc-${idx}`, sourceLabel: f.name, text: f.text });
-      idx++;
+      docs.push({ sourceId: `doc-${docs.length}`, sourceLabel: f.name, text: f.text });
     }
     return docs;
   }, [sourceText, extractedFiles]);

@@ -12,24 +12,25 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.88.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dagre": "^0.7.54",
     "dagre": "^0.8.5",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
-    "katex": "^0.16.44",
+    "katex": "^0.16.45",
     "mammoth": "^1.12.0",
-    "next": "16.2.1",
+    "next": "16.2.3",
     "partial-json": "^0.1.7",
     "pdfjs-dist": "^5.6.205",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
     "react-markdown": "^10.1.0",
     "reactflow": "^11.11.4",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
