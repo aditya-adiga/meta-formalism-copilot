@@ -122,7 +122,7 @@ export default function EditableOutput({ value, onChange, onInlineEdit, renderMo
       {(value || renderMode === "raw") && (
         <button
           onClick={onToggleEdit}
-          className="absolute right-4 top-4 z-30 rounded-md border border-[#DDD9D5] bg-[var(--ivory-cream)] px-3 py-1 text-xs text-[#6B6560] shadow-sm transition-shadow hover:shadow-md hover:text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
+          className="absolute right-4 top-4 z-30 rounded-md border border-[var(--ink-black)] bg-[var(--ivory-cream)] px-3 py-1.5 text-xs font-medium text-[var(--ink-black)] shadow-sm transition-shadow hover:bg-[var(--ink-black)] hover:text-white hover:shadow-md focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"
           aria-label={renderMode === "rendered" ? "Edit raw text" : "Show rendered view"}
         >
           {renderMode === "rendered" ? "Edit" : "Done editing"}

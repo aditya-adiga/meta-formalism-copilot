@@ -92,23 +92,24 @@ export default function ArtifactChipSelector({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="self-start text-xs text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer"
+          className="self-start text-sm text-[var(--ink-black)] hover:text-[var(--ink-black)] underline decoration-[#9A9590] underline-offset-2 transition-colors cursor-pointer font-medium"
         >
-          Browse types
+          Browse types &rarr;
         </button>
 
-        {selectedSelectable.length > 0 && (
-          <ul className="flex flex-col gap-0.5 mt-0.5">
-            {selectedSelectable.map((type) => (
-              <li key={type} className="text-xs text-[#6B6560]">
-                <span className="font-medium text-[var(--ink-black)]">
-                  {ARTIFACT_META[type].chipLabel}:
-                </span>{" "}
-                {ARTIFACT_META[type].description}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="flex flex-col gap-0.5 mt-0.5">
+          {(selectedSelectable.length > 0
+            ? selectedSelectable
+            : SELECTABLE_ARTIFACT_TYPES
+          ).map((type) => (
+            <li key={type} className="text-xs text-[#4A4540]">
+              <span className="font-medium text-[var(--ink-black)]">
+                {ARTIFACT_META[type].chipLabel}:
+              </span>{" "}
+              {ARTIFACT_META[type].description}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {modalOpen && (
