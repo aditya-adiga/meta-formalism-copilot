@@ -5,7 +5,7 @@ import type { PanelId } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
-import type { ArtifactKey } from "@/app/lib/types/artifactStore";
+import { buildArtifactEditHandlers } from "@/app/lib/stores/artifactEditHandlers";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -24,7 +24,6 @@ import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
-import { useWorkspaceStore } from "@/app/lib/stores/workspaceStore";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -100,24 +99,14 @@ export default function Home() {
   const counterexamples = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]>(persistedCounterexamples), [persistedCounterexamples]);
 
   // --- Artifact editing ---
-  // Manual saves (panel onContentChange) and AI edits (useAllArtifactEditing setters)
-  // both mutate an existing artifact, so they go through setArtifactEdited — but with
-  // distinct sources so the version history records *how* the edit happened. The shim's
-  // setPersistedXxx callbacks use setArtifactGenerated, which is the wrong source for
-  // these paths. Keep the shim for restore/generation paths (see handleRestoreSession
-  // and storeArtifactResults below), and use these for edits.
-  //
-  // A single empty-deps useMemo gives every inner handler stable identity for the
-  // component's lifetime, so listing `artifactEditHandlers` once in the render memo's
-  // deps array is equivalent to listing all 10 callbacks individually.
-  const artifactEditHandlers = useMemo(() => {
-    const makeHandler = (key: ArtifactKey, source: "manual-edit" | "ai-edit") =>
-      (v: string) => useWorkspaceStore.getState().setArtifactEdited(key, v, source);
-    const keys = ["causal-graph", "statistical-model", "property-tests", "dialectical-map", "counterexamples"] as const satisfies readonly ArtifactKey[];
-    return Object.fromEntries(
-      keys.map((k) => [k, { onSave: makeHandler(k, "manual-edit"), onAiEdited: makeHandler(k, "ai-edit") }]),
-    ) as Record<ArtifactKey, { onSave: (v: string) => void; onAiEdited: (v: string) => void }>;
-  }, []);
+  // Handlers split by intent: `onSave` wires panel onContentChange (manual-edit
+  // source); `onAiEdited` is passed into useAllArtifactEditing so Cmd+K/whole-doc
+  // rewrites record ai-edit. Both go through setArtifactEdited, keeping undo/redo
+  // and version history intact. The shim's setPersistedXxx callbacks stay on
+  // restore/generation paths (setArtifactGenerated is the correct source there).
+  // Empty deps → stable identity for the component's lifetime, so the render
+  // memo below can list `artifactEditHandlers` once instead of every inner callback.
+  const artifactEditHandlers = useMemo(() => buildArtifactEditHandlers(), []);
 
   const artifactEditing = useAllArtifactEditing({
     causalGraph: persistedCausalGraph,
