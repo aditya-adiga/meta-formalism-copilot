@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
-import { streamLlm, sseEvent, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { streamLlm, SSE_HEADERS } from "@/app/lib/llm/streamLlm";
+import { transformSseStream } from "@/app/lib/llm/transformSseStream";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { CLAUDE_OPUS as OPENROUTER_MODEL } from "@/app/lib/llm/models";
 
@@ -104,42 +105,15 @@ export async function POST(request: NextRequest) {
     });
 
     // Transform the `done` event to apply stripCodeFences and import stripping.
-    // Decoders are created once outside the transform callback to avoid
-    // per-chunk allocation and to preserve multi-byte character state.
-    const decoder = new TextDecoder();
-    const textEncoder = new TextEncoder();
-    const transformed = rawStream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true });
-        const events = text.split("\n\n").filter(Boolean);
-        for (const eventBlock of events) {
-          const eventMatch = eventBlock.match(/^event: (\w+)\ndata: ([\s\S]+)$/);
-          if (!eventMatch) {
-            controller.enqueue(chunk);
-            continue;
-          }
-          const [, eventType, dataStr] = eventMatch;
-          if (eventType === "done") {
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.usage?.provider === "mock") {
-                data.text = mockResponse(informalProof, isRetry);
-              } else {
-                data.text = stripCodeFences(data.text);
-              }
-              if (hasContext) {
-                data.text = stripImports(data.text);
-              }
-              controller.enqueue(sseEvent("done", data));
-            } catch {
-              controller.enqueue(chunk);
-            }
-          } else {
-            // Pass through token and error events unchanged
-            controller.enqueue(textEncoder.encode(eventBlock + "\n\n"));
-          }
-        }
-      },
+    const transformed = rawStream.pipeThrough(transformSseStream((data) => {
+      if (data.usage?.provider === "mock") {
+        data.text = mockResponse(informalProof, isRetry);
+      } else {
+        data.text = stripCodeFences(data.text);
+      }
+      if (hasContext) {
+        data.text = stripImports(data.text);
+      }
     }));
 
     return new Response(transformed, { headers: SSE_HEADERS }) as unknown as NextResponse;
