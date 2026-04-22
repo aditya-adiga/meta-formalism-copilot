@@ -182,7 +182,7 @@ export default function Home() {
       "causal-graph": setPersistedCausalGraph,
       "statistical-model": setPersistedStatisticalModel,
       "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
+      "balanced-perspectives": setPersistedDialecticalMap,
       counterexamples: setPersistedCounterexamples,
     };
     for (const artifact of session.artifacts) {
@@ -241,7 +241,7 @@ export default function Home() {
       "causal-graph": setPersistedCausalGraph,
       "statistical-model": setPersistedStatisticalModel,
       "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
+      "balanced-perspectives": setPersistedDialecticalMap,
       counterexamples: setPersistedCounterexamples,
     };
     for (const [type, value] of Object.entries(results)) {
