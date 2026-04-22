@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { fetchApi } from "@/app/lib/formalization/api";
 import {
