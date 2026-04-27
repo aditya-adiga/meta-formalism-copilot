@@ -68,7 +68,10 @@ async function recordAndCache(
  * SSE protocol:
  *   event: token   — { text: "partial chunk" }
  *   event: done    — { text: "full accumulated text", usage: LlmCallUsage }
- *   event: error   — { error: "message", details: "..." }
+ *   event: error   — { error: "message" }
+ *     The error event carries the message only; provider details are
+ *     deliberately not forwarded over SSE because their bodies can echo
+ *     request content (see errorWithDetails for the in-process channel).
  *
  * Provider chain mirrors callLlm(): Anthropic → OpenRouter → mock.
  * Cache hits emit a single `done` event.
