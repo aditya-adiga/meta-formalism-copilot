@@ -9,14 +9,16 @@ import type { NextRequest } from "next/server";
  * This keeps a hypothetical injected `<script>` tag from executing even if
  * something slipped past markdown sanitization.
  *
- * Why `style-src 'unsafe-inline'`: Tailwind v4 emits inline styles. Tightening
- * to nonces would require rebuilding how Tailwind ships styles in dev and
- * SSR. Documented as a deliberate carve-out, not an oversight.
+ * Why `style-src 'unsafe-inline'`: many React components use inline
+ * `style={{...}}` props (e.g. proof-graph node positioning, refinement
+ * preview, collapsible sections), and Next.js's SSR style injection also
+ * emits inline <style> tags. Tightening to nonces would require auditing
+ * every such site. Documented as a deliberate carve-out, not an oversight.
  *
  * `connect-src 'self'` is sufficient because Anthropic / OpenAlex / OpenRouter
  * calls are server-to-server (Next API routes), not browser-to-third-party.
  */
-function buildCsp(nonce: string): string {
+export function buildCsp(nonce: string): string {
   const directives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
@@ -27,20 +29,25 @@ function buildCsp(nonce: string): string {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
+    // form-action does NOT fall back to default-src (CSP3); set explicitly.
+    "form-action 'self'",
   ];
   return directives.join("; ");
 }
 
-export function proxy(request: NextRequest) {
-  // Generate a fresh nonce per request. crypto.randomUUID is available in the
-  // Edge runtime that Next proxy runs in.
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+export function proxy(request: NextRequest): NextResponse {
+  // Generate a fresh 128-bit nonce per request. crypto.getRandomValues + Buffer
+  // are both available in the Node.js runtime Next 16 Proxy runs on by default.
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
   const csp = buildCsp(nonce);
 
   // Forward the nonce to server components via a request header so layouts
   // can read it via `headers()` and pass it to <Script> tags they render.
+  // Setting CSP on both the forwarded request and the response matches the
+  // canonical Next.js docs example.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },
