@@ -1,5 +1,6 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
 import CostTooltip from "@/app/components/ui/CostTooltip";
 
@@ -15,6 +16,13 @@ type FormalizationControlsProps = {
   contextPlaceholder?: string;
   /** Source text character count, used for cost estimation tooltip. */
   sourceCharLength?: number;
+  /** Custom artifact type support */
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  onCreateCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onEditCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onDeleteCustomType?: (id: string) => void;
+  /** Source text for the test preview in the designer */
+  sourceText?: string;
 };
 
 export default function FormalizationControls({
@@ -27,6 +35,11 @@ export default function FormalizationControls({
   loadingState = {},
   contextPlaceholder,
   sourceCharLength,
+  customArtifactTypes,
+  onCreateCustomType,
+  onEditCustomType,
+  onDeleteCustomType,
+  sourceText,
 }: FormalizationControlsProps) {
   // Derive per-chip loading booleans from loadingState
   const chipLoading: Partial<Record<ArtifactType, boolean>> = {};
@@ -62,6 +75,12 @@ export default function FormalizationControls({
             onChange={onArtifactTypesChange}
             loading={chipLoading}
             disabled={loading}
+            customTypes={customArtifactTypes}
+            onCreateCustomType={onCreateCustomType}
+            onEditCustomType={onEditCustomType}
+            onDeleteCustomType={onDeleteCustomType}
+            sourceText={sourceText}
+            contextText={contextText}
           />
         </div>
       </div>
