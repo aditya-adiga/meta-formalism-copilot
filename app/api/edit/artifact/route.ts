@@ -74,7 +74,11 @@ export async function POST(request: NextRequest) {
         JSON.parse(responseText);
         return NextResponse.json({ content: responseText });
       } catch {
-        console.error("[edit/artifact] LLM returned invalid JSON:", responseText.slice(0, 300));
+        // Log only length, not content — `responseText` is a function of the
+        // user's source material and shouldn't end up in server logs.
+        // The response payload still echoes a slice back to the caller, since
+        // they originated the request and need it to debug their input.
+        console.error(`[edit/artifact] LLM returned invalid JSON: ${responseText.length} chars`);
         return NextResponse.json(
           { error: "LLM response was not valid JSON", details: responseText.slice(0, 500) },
           { status: 502 },
