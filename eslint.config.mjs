@@ -47,15 +47,21 @@ const eslintConfig = defineConfig([
       // rehype-katex's options where it re-enables active links and HTML in
       // math, defeating KaTeX's default-safe rendering. Broad enough to
       // catch `{ trust: true }` elsewhere too; that's intended.
+      // Known gaps (ESLint AST limitations): does NOT catch the string-quoted
+      // form `{ "trust": true }`, the shorthand form `{ trust }` where `trust`
+      // is bound to `true`, or computed keys. Treat the rule as best-effort
+      // tripwire, not a hard guarantee — code review still matters here.
       "no-restricted-syntax": [
         "error",
         {
           selector: "Property[key.name='trust'][value.value=true]",
-          message: "trust: true on KaTeX/rehype-katex (or anywhere similar) re-enables active links and raw HTML in math output. Don't enable this; if you must, write an ADR and disable this rule explicitly.",
+          message: "trust: true on KaTeX/rehype-katex (or anywhere similar) re-enables active links and raw HTML in math output. If you genuinely need it, write an ADR and disable this rule explicitly.",
         },
       ],
-      // Currently zero usages — keep it that way.
-      "react/no-danger": "warn",
+      // Currently zero usages — keep it that way. `error` (not `warn`) so a
+      // future PR introducing `dangerouslySetInnerHTML` fails CI rather than
+      // logging a warning that nobody reads.
+      "react/no-danger": "error",
     },
   },
 ]);
