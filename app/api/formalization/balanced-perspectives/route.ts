@@ -80,7 +80,7 @@ function mockResponse(sourceText: string) {
 
 export async function POST(request: NextRequest) {
   return handleArtifactRoute(request, {
-    endpoint: "formalization/dialectical-map",
+    endpoint: "formalization/balanced-perspectives",
     systemPrompt: SYSTEM_PROMPT,
     responseKey: "dialecticalMap",
     mockResponse,

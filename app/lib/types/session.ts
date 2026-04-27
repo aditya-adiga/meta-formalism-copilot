@@ -14,7 +14,7 @@ export type BuiltinArtifactType =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map"
+  | "balanced-perspectives"
   | "counterexamples";
 
 /** Any artifact type — built-in or user-defined custom type. */

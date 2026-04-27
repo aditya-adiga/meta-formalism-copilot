@@ -86,7 +86,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Semiformal Proof
+            Step-by-Step Proof
           </h2>
           {!semiformalText && waitEstimate && (
             <span className="text-xs text-[#6B6560]">
@@ -119,7 +119,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       {showGenerateLean && (
         <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
           <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800">
-            Review and edit the semiformal proof above, then generate Lean4 code when ready.
+            Review and edit the proof above, then generate computer-checkable code when ready.
           </div>
           <CostTooltip
             inputCharLength={semiformalText.length}

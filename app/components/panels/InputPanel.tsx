@@ -72,7 +72,7 @@ export default function InputPanel({
                 disabled={decomposing || loading}
                 className="w-full rounded-full border border-[var(--ink-black)] bg-transparent px-6 py-2.5 text-sm font-medium text-[var(--ink-black)] shadow-sm transition-all duration-200 hover:bg-[var(--ink-black)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
               >
-                {decomposing ? "Decomposing..." : "Decompose into nodes"}
+                {decomposing ? "Breaking down..." : "Break down into parts"}
               </button>
             </div>
           )}
@@ -83,7 +83,7 @@ export default function InputPanel({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Direct Formalization
+            Generate Analysis
           </h2>
         </div>
         <FormalizationControls

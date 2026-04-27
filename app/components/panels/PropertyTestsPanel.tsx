@@ -28,11 +28,11 @@ export default function PropertyTestsPanel({
 
   return (
     <ArtifactPanelShell
-      title="Property Tests"
+      title="Consistency Checks"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No property tests yet. Generate them from the source panel or node detail."
-      loadingMessage="Generating property tests..."
+      emptyMessage="No consistency checks yet. Generate them from the Source panel or component detail."
+      loadingMessage="Generating consistency checks..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
@@ -62,10 +62,10 @@ export default function PropertyTestsPanel({
                     </div>
                     <p className="text-xs text-[#6B6560]">{p.description}</p>
                     <div className="text-xs text-[#6B6560]">
-                      <span className="font-semibold">Pre:</span> {p.preconditions}
+                      <span className="font-semibold">Requires:</span> {p.preconditions}
                     </div>
                     <div className="text-xs text-[#6B6560]">
-                      <span className="font-semibold">Post:</span> {p.postcondition}
+                      <span className="font-semibold">Guarantees:</span> {p.postcondition}
                     </div>
                     <pre className="rounded bg-[#F5F1ED] px-3 py-2 text-xs font-mono text-[var(--ink-black)] overflow-x-auto whitespace-pre-wrap">
                       {p.pseudocode}

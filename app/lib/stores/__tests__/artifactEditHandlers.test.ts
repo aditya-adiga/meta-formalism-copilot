@@ -7,7 +7,7 @@ const KEYS: readonly ArtifactKey[] = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "balanced-perspectives",
   "counterexamples",
 ];
 

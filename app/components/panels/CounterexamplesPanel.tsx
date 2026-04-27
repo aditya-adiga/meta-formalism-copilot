@@ -36,7 +36,7 @@ export default function CounterexamplesPanel({
       title="Counterexamples"
       loading={loading}
       hasData={counterexamples !== null}
-      emptyMessage="No counterexamples yet. Generate them from the source panel or node detail."
+      emptyMessage="No counterexamples yet. Generate them from the Source panel or component detail."
       loadingMessage="Generating counterexamples..."
       onAiEdit={onAiEdit}
       editing={editing}
@@ -54,7 +54,7 @@ export default function CounterexamplesPanel({
 
           {/* Claim under test */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Under Test</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Being Challenged</h3>
             <EditableSection value={counterexamples.claim} onChange={(v) => updateField("claim", v)}>
               <p className="text-sm text-[var(--ink-black)] leading-relaxed italic">{counterexamples.claim}</p>
             </EditableSection>
@@ -74,7 +74,7 @@ export default function CounterexamplesPanel({
                     </div>
                     <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
                     <div className="text-xs text-[#6B6560]">
-                      <span className="font-semibold">Targets:</span> {cx.targetAssumption}
+                      <span className="font-semibold">Challenges:</span> {cx.targetAssumption}
                     </div>
                     <div className="text-xs text-[#6B6560]">
                       <span className="font-semibold">Why it works:</span> {cx.explanation}
@@ -87,7 +87,7 @@ export default function CounterexamplesPanel({
 
           {/* Robustness Assessment */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Robustness Assessment</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Overall Strength</h3>
             <EditableSection value={counterexamples.robustnessAssessment} onChange={(v) => updateField("robustnessAssessment", v)}>
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
             </EditableSection>

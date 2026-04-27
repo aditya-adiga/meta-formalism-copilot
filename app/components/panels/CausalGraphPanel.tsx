@@ -125,11 +125,11 @@ export default function CausalGraphPanel({
 
   return (
     <ArtifactPanelShell
-      title="Causal Graph"
+      title="Cause & Effect Map"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      emptyMessage="No cause & effect map yet. Generate one from the Source panel or component detail."
+      loadingMessage={`Generating cause & effect map...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}

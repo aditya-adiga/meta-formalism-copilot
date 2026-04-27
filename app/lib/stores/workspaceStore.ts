@@ -137,7 +137,7 @@ const V2_ARTIFACT_FIELDS: Record<string, ArtifactKey> = {
   causalGraph: "causal-graph",
   statisticalModel: "statistical-model",
   propertyTests: "property-tests",
-  dialecticalMap: "dialectical-map",
+  dialecticalMap: "balanced-perspectives",
   counterexamples: "counterexamples",
 };
 

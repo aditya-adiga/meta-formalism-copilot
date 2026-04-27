@@ -28,11 +28,11 @@ export default function DialecticalMapPanel({
 
   return (
     <ArtifactPanelShell
-      title="Dialectical Map"
+      title="Balanced Perspectives"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
-      loadingMessage="Generating dialectical map..."
+      emptyMessage="No balanced perspectives yet. Generate them from the Source panel or component detail."
+      loadingMessage="Generating balanced perspectives..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
@@ -85,7 +85,7 @@ export default function DialecticalMapPanel({
 
                     {(p.vulnerabilities?.length ?? 0) > 0 && (
                       <div>
-                        <span className="text-xs font-semibold text-amber-700">Vulnerabilities:</span>
+                        <span className="text-xs font-semibold text-amber-700">Weaknesses:</span>
                         <ul className="list-disc pl-5 mt-1 space-y-0.5">
                           {p.vulnerabilities.map((v, j) => (
                             <li key={j} className="text-xs text-amber-700">{v}</li>

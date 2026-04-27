@@ -47,7 +47,7 @@ export function useWorkspacePersistence() {
   const causalGraph = useWorkspaceStore((s) => s.getArtifactContent("causal-graph"));
   const statisticalModel = useWorkspaceStore((s) => s.getArtifactContent("statistical-model"));
   const propertyTests = useWorkspaceStore((s) => s.getArtifactContent("property-tests"));
-  const dialecticalMap = useWorkspaceStore((s) => s.getArtifactContent("dialectical-map"));
+  const dialecticalMap = useWorkspaceStore((s) => s.getArtifactContent("balanced-perspectives"));
   const counterexamples = useWorkspaceStore((s) => s.getArtifactContent("counterexamples"));
 
   // Stable setter references from the store
@@ -90,7 +90,7 @@ export function useWorkspacePersistence() {
   );
   const setDialecticalMap = useCallback(
     (v: string | null) => {
-      if (v) useWorkspaceStore.getState().setArtifactGenerated("dialectical-map", v);
+      if (v) useWorkspaceStore.getState().setArtifactGenerated("balanced-perspectives", v);
     },
     [],
   );
@@ -131,7 +131,7 @@ export function useWorkspacePersistence() {
       causalGraph: s.getArtifactContent("causal-graph"),
       statisticalModel: s.getArtifactContent("statistical-model"),
       propertyTests: s.getArtifactContent("property-tests"),
-      dialecticalMap: s.getArtifactContent("dialectical-map"),
+      dialecticalMap: s.getArtifactContent("balanced-perspectives"),
       counterexamples: s.getArtifactContent("counterexamples"),
       customArtifactTypes: structuredClone(s.customArtifactTypes),
       customArtifactData: { ...s.customArtifactData },
@@ -154,7 +154,7 @@ export function useWorkspacePersistence() {
     if (data.causalGraph) store.setArtifactGenerated("causal-graph", data.causalGraph);
     if (data.statisticalModel) store.setArtifactGenerated("statistical-model", data.statisticalModel);
     if (data.propertyTests) store.setArtifactGenerated("property-tests", data.propertyTests);
-    if (data.dialecticalMap) store.setArtifactGenerated("dialectical-map", data.dialecticalMap);
+    if (data.dialecticalMap) store.setArtifactGenerated("balanced-perspectives", data.dialecticalMap);
     if (data.counterexamples) store.setArtifactGenerated("counterexamples", data.counterexamples);
 
     // Restore custom artifact types + generated data
