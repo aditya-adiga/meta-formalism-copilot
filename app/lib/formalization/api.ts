@@ -100,14 +100,28 @@ export async function fetchStreamingApi(
   return finalResult;
 }
 
-export async function verifyLean(leanCode: string) {
+export type VerifyLeanResult = {
+  valid: boolean;
+  errors: string;
+  /** True when the verifier is not configured or could not be reached. */
+  unavailable: boolean;
+  /** Machine-readable reason when unavailable: "verifier-not-configured" | "verifier-unreachable" | "verifier-error". */
+  unavailableReason?: string;
+};
+
+export async function verifyLean(leanCode: string): Promise<VerifyLeanResult> {
   const res = await fetch("/api/verification/lean", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ leanCode }),
   });
   const data = await res.json();
-  return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
+  return {
+    valid: Boolean(data.valid),
+    errors: (data.errors as string | undefined) ?? "",
+    unavailable: Boolean(data.unavailable),
+    unavailableReason: data.reason as string | undefined,
+  };
 }
 
 export async function generateLean(

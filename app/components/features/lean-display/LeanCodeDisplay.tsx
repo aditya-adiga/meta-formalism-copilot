@@ -108,7 +108,7 @@ export default function LeanCodeDisplay({
         {/* Edit / Done toggle + Re-verify — outside scroll container so they stay visible */}
         {code && (
           <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
-            {(leanEdited || verificationStatus === "invalid") && editMode === "rendered" && (
+            {(leanEdited || verificationStatus === "invalid" || verificationStatus === "unavailable") && editMode === "rendered" && (
               <button
                 onClick={() => { onReVerify(); setLeanEdited(false); }}
                 disabled={!canReVerify}
@@ -126,6 +126,21 @@ export default function LeanCodeDisplay({
           </div>
         )}
         <div className="h-full overflow-auto px-8 py-6">
+
+          {/* Verifier offline banner — distinct from "Verification Failed" so users
+              don't read a missing verifier as a passing proof. */}
+          {verificationStatus === "unavailable" && (
+            <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-4 py-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                Verifier offline — proof not checked
+              </h3>
+              <p className="mt-2 text-xs leading-relaxed text-amber-900">
+                The Lean verifier service is not configured or unreachable, so this proof has not been
+                checked. Set the <code className="font-mono">LEAN_VERIFIER_URL</code> environment variable
+                to a running verifier to enable checking.
+              </p>
+            </div>
+          )}
 
           {/* Verification errors */}
           {verificationStatus === "invalid" && verificationErrors && (

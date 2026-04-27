@@ -61,6 +61,26 @@ describe('LeanCodeDisplay', () => {
     expect(screen.getByText('Proof checker output')).toBeInTheDocument()
   })
 
+  it('shows the verifier-offline banner when status is unavailable', () => {
+    render(
+      <LeanCodeDisplay
+        {...defaultProps}
+        verificationStatus="unavailable"
+      />
+    )
+    expect(screen.getByText('Verifier offline — proof not checked')).toBeInTheDocument()
+  })
+
+  it('shows Re-check button when status is unavailable', () => {
+    render(
+      <LeanCodeDisplay
+        {...defaultProps}
+        verificationStatus="unavailable"
+      />
+    )
+    expect(screen.getByText('Re-check ↺')).toBeInTheDocument()
+  })
+
   it('shows code metrics when verification is invalid', () => {
     const code = 'line1\nline2\nline3'
     render(

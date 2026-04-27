@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const LEAN_VERIFIER_URL =
-  process.env.LEAN_VERIFIER_URL ?? "http://localhost:3100";
 const REQUEST_TIMEOUT_MS = 35_000;
+
+type UnavailableReason = "verifier-not-configured" | "verifier-unreachable" | "verifier-error";
+
+function unavailableResponse(reason: UnavailableReason, detail?: string) {
+  return NextResponse.json({
+    valid: false,
+    unavailable: true,
+    reason,
+    ...(detail ? { detail } : {}),
+  });
+}
 
 export async function POST(request: NextRequest) {
   const { leanCode } = await request.json();
@@ -14,11 +23,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const verifierUrl = process.env.LEAN_VERIFIER_URL;
+  if (!verifierUrl) {
+    // No verifier configured (typical on Vercel deploys without a separate verifier service).
+    return unavailableResponse("verifier-not-configured");
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const res = await fetch(`${LEAN_VERIFIER_URL}/verify`, {
+    const res = await fetch(`${verifierUrl}/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leanCode }),
@@ -27,15 +42,16 @@ export async function POST(request: NextRequest) {
 
     clearTimeout(timeout);
 
-    const data = await res.json();
-
     if (!res.ok) {
-      return NextResponse.json(data, { status: res.status });
+      // Verifier reachable but errored — treat as unavailable rather than a failed proof,
+      // since the proof itself was never checked.
+      return unavailableResponse("verifier-error", `HTTP ${res.status}`);
     }
 
+    const data = await res.json();
     return NextResponse.json(data);
   } catch {
-    // Service unavailable — fall back to mock
-    return NextResponse.json({ valid: true, mock: true });
+    // Network / timeout / DNS failure — verifier unreachable.
+    return unavailableResponse("verifier-unreachable");
   }
 }

@@ -119,10 +119,15 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
         onToken,
       });
 
-      const vStatus = result.valid ? "valid" as const : "invalid" as const;
+      const vStatus: VerificationStatus = result.unavailable
+        ? "unavailable"
+        : result.valid
+          ? "valid"
+          : "invalid";
+      const vErrors = result.valid || result.unavailable ? "" : result.errors;
       a.setVerificationStatus(vStatus);
-      if (result.valid) a.setVerificationErrors("");
-      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: result.valid ? "" : result.errors });
+      if (result.valid || result.unavailable) a.setVerificationErrors("");
+      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       const currentLean = a.getLeanCode();
@@ -138,9 +143,13 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
   const verifyWithDeps = useCallback(async (a: PipelineAccessors, code: string) => {
     const depContext = a.getDependencyContext?.();
     const fullCode = depContext ? `${depContext}\n\n${code}` : code;
-    const { valid, errors } = await verifyLean(fullCode);
-    const vStatus = valid ? "valid" as const : "invalid" as const;
-    const vErrors = valid ? "" : errors || "Verification failed";
+    const { valid, errors, unavailable } = await verifyLean(fullCode);
+    const vStatus: VerificationStatus = unavailable
+      ? "unavailable"
+      : valid
+        ? "valid"
+        : "invalid";
+    const vErrors = valid || unavailable ? "" : errors || "Verification failed";
     a.setVerificationStatus(vStatus);
     a.setVerificationErrors(vErrors);
     a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
