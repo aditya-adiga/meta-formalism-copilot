@@ -86,7 +86,7 @@ curl -X POST http://localhost:3100/verify \
   -d '{"leanCode":"theorem t : False := trivial"}'
 ```
 
-**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment. When unset, Lean verification is skipped and the UI shows a "verifier offline — proof not checked" badge so it's clear no checking happened.
+**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment. When unset, Lean verification is skipped and the UI shows a "verifier offline — proof not checked" badge so it's clear no checking happened. Set this to `http://localhost:3100` for local dev with the Docker Compose verifier above.
 
 **Stop the verifier:**
 

@@ -44,8 +44,13 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       // Verifier reachable but errored — treat as unavailable rather than a failed proof,
-      // since the proof itself was never checked.
-      return unavailableResponse("verifier-error", `HTTP ${res.status}`);
+      // since the proof itself was never checked. Forward upstream body (truncated) so
+      // operators can diagnose verifier-side failures.
+      const body = await res.text().catch(() => "");
+      const detail = body
+        ? `HTTP ${res.status}: ${body.slice(0, 500)}`
+        : `HTTP ${res.status}`;
+      return unavailableResponse("verifier-error", detail);
     }
 
     const data = await res.json();
