@@ -60,7 +60,7 @@ export type ArtifactPersistenceData = {
   causalGraph: string | null;
   statisticalModel: string | null;
   propertyTests: string | null;
-  dialecticalMap: string | null;
+  balancedPerspectives: string | null;
   counterexamples: string | null;
 };
 
@@ -78,7 +78,7 @@ export type SaveWorkspaceInput = {
 };
 
 export function saveWorkspace(input: SaveWorkspaceInput): boolean {
-  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null, counterexamples: null };
+  const artifacts = input.artifacts ?? { causalGraph: null, statisticalModel: null, propertyTests: null, balancedPerspectives: null, counterexamples: null };
   const data: PersistedWorkspace = {
     version: WORKSPACE_VERSION,
     sourceText: input.sourceText,
@@ -96,7 +96,7 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
     causalGraph: artifacts.causalGraph,
     statisticalModel: artifacts.statisticalModel,
     propertyTests: artifacts.propertyTests,
-    dialecticalMap: artifacts.dialecticalMap,
+    balancedPerspectives: artifacts.balancedPerspectives,
     counterexamples: artifacts.counterexamples,
   };
 
@@ -224,7 +224,7 @@ export function loadWorkspace(): PersistedWorkspace | null {
       causalGraph: typeof parsed.causalGraph === "string" ? parsed.causalGraph : null,
       statisticalModel: typeof parsed.statisticalModel === "string" ? parsed.statisticalModel : null,
       propertyTests: typeof parsed.propertyTests === "string" ? parsed.propertyTests : null,
-      dialecticalMap: typeof parsed.dialecticalMap === "string" ? parsed.dialecticalMap : null,
+      balancedPerspectives: typeof parsed.balancedPerspectives === "string" ? parsed.balancedPerspectives : null,
       counterexamples: typeof parsed.counterexamples === "string" ? parsed.counterexamples : null,
     };
   } catch {

@@ -116,7 +116,7 @@ describe("migration from workspace-v2", () => {
       causalGraph: '{"variables":[],"edges":[]}',
       statisticalModel: null,
       propertyTests: '{"tests":[]}',
-      dialecticalMap: '{"positions":[]}',
+      balancedPerspectives: '{"positions":[]}',
       counterexamples: null,
     };
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));
@@ -180,7 +180,7 @@ describe("migration from workspace-v2", () => {
       causalGraph: null,
       statisticalModel: null,
       propertyTests: null,
-      dialecticalMap: null,
+      balancedPerspectives: null,
       counterexamples: null,
     };
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));

@@ -297,7 +297,7 @@ export const PERSISTED_ARTIFACT_FIELDS: Record<string, ArtifactKey> = {
   causalGraph: "causal-graph",
   statisticalModel: "statistical-model",
   propertyTests: "property-tests",
-  dialecticalMap: "balanced-perspectives",
+  balancedPerspectives: "balanced-perspectives",
   counterexamples: "counterexamples",
 };
 

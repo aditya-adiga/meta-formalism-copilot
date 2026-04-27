@@ -18,7 +18,7 @@ describe("isCustomType", () => {
     expect(isCustomType("causal-graph")).toBe(false);
     expect(isCustomType("statistical-model")).toBe(false);
     expect(isCustomType("property-tests")).toBe(false);
-    expect(isCustomType("dialectical-map")).toBe(false);
+    expect(isCustomType("balanced-perspectives")).toBe(false);
     expect(isCustomType("counterexamples")).toBe(false);
   });
 

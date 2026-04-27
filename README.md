@@ -30,7 +30,7 @@ The interface is a **multi-panel workspace** with sidebar navigation. You move b
 - **Causal Graph** — Interactive visualization of variables, causal edges, confounders, and mechanisms.
 - **Statistical Model** — Variables with roles, hypotheses, assumptions, and sample requirements.
 - **Property Tests** — Invariants with preconditions, postconditions, and pseudocode generators.
-- **Dialectical Map** — Competing perspectives, tensions, and proposed synthesis.
+- **Balanced Perspectives** — Competing perspectives, tensions, and proposed synthesis.
 - **Custom Artifact Types** — Define your own artifact types with custom system prompts. An LLM-assisted designer helps you create the prompt, and the result is generated through a generic formalization route.
 
 **Meta:**

@@ -1,29 +1,29 @@
 "use client";
 
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
-type DialecticalMapPanelProps = {
-  dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
+type BalancedPerspectivesPanelProps = {
+  balancedPerspectives: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   /** Partial map data from streaming (partial-JSON parsed) */
-  streamingPreview?: DialecticalMapResponse["dialecticalMap"] | null;
+  streamingPreview?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps & StalenessProps;
 
-export default function DialecticalMapPanel({
-  dialecticalMap, streamingPreview, loading,
+export default function BalancedPerspectivesPanel({
+  balancedPerspectives, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
   isStale, onRegenerate,
-}: DialecticalMapPanelProps) {
-  const { updateField, updateArrayItem } = useFieldUpdaters(dialecticalMap, onContentChange);
+}: BalancedPerspectivesPanelProps) {
+  const { updateField, updateArrayItem } = useFieldUpdaters(balancedPerspectives, onContentChange);
 
   const { displayData: displayMap, hasDisplayData } = mergeStreamingPreview(
-    dialecticalMap, streamingPreview,
+    balancedPerspectives, streamingPreview,
     (d) => (d.perspectives?.length ?? 0) > 0 || !!d.topic,
   );
 
