@@ -55,7 +55,7 @@ export default function CounterexamplesPanel({
   const evidenceSearchContent = useMemo(() => {
     if (!counterexamples) return "";
     const parts = [counterexamples.claim];
-    for (const cx of counterexamples.counterexamples.slice(0, 3)) {
+    for (const cx of (counterexamples.scenarios ?? []).slice(0, 3)) {
       parts.push(cx.scenario);
     }
     return parts.filter(Boolean).join(". ");
