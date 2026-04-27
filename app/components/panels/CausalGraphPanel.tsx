@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -115,6 +115,14 @@ export default function CausalGraphPanel({
     (d) => (d.variables?.length ?? 0) > 0,
   );
 
+  const handleAddVariable = useCallback(() => {
+    if (!displayGraph || !onContentChange) return;
+    const id = `var-${crypto.randomUUID().slice(0, 8)}`;
+    const nextNum = displayGraph.variables.length + 1;
+    const newVar = { id, label: `New factor ${nextNum}`, description: "" };
+    onContentChange(JSON.stringify({ ...displayGraph, variables: [...displayGraph.variables, newVar] }));
+  }, [displayGraph, onContentChange]);
+
   return (
     <ArtifactPanelShell
       title="Causal Graph"
@@ -128,7 +136,7 @@ export default function CausalGraphPanel({
     >
       {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
-          <div className="sticky top-0 z-10 flex gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
+          <div className="sticky top-0 z-10 flex items-center gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
             {(["graph", "details"] as const).map((mode) => (
               <button
                 key={mode}
@@ -142,6 +150,15 @@ export default function CausalGraphPanel({
                 {mode.charAt(0).toUpperCase() + mode.slice(1)}
               </button>
             ))}
+            {onContentChange && (
+              <button
+                onClick={handleAddVariable}
+                className="ml-auto rounded-full border border-[#DDD9D5] bg-white px-3 py-1 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+                title="Add a new factor to the graph"
+              >
+                + Factor
+              </button>
+            )}
           </div>
 
           {viewMode === "graph" ? (
