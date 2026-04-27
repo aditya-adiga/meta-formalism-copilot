@@ -26,6 +26,38 @@ const eslintConfig = defineConfig([
       },
     },
   },
+  // Defense-in-depth lint rules. The XSS surface is already defensive (no
+  // dangerouslySetInnerHTML, no rehype-raw, KaTeX trust:false). These rules
+  // are guardrails that fail loudly if a future change tries to weaken any
+  // of those — cheaper than catching it in code review every time.
+  {
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "rehype-raw",
+              message: "rehype-raw lets raw HTML in markdown render as live DOM, which defeats sanitization on LLM output. If you genuinely need it, write an ADR and disable this rule explicitly.",
+            },
+          ],
+        },
+      ],
+      // Catches `trust: true` on object literals — most common in
+      // rehype-katex's options where it re-enables active links and HTML in
+      // math, defeating KaTeX's default-safe rendering. Broad enough to
+      // catch `{ trust: true }` elsewhere too; that's intended.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Property[key.name='trust'][value.value=true]",
+          message: "trust: true on KaTeX/rehype-katex (or anywhere similar) re-enables active links and raw HTML in math output. Don't enable this; if you must, write an ADR and disable this rule explicitly.",
+        },
+      ],
+      // Currently zero usages — keep it that way.
+      "react/no-danger": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
