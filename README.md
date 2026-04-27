@@ -4,7 +4,7 @@ A workspace for transforming insights, smells and ideas from source materials(ex
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot&env=ANTHROPIC_API_KEY&envDescription=Anthropic%20API%20key%20%E2%80%94%20get%20one%20at%20console.anthropic.com&envLink=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot%23deploy-to-vercel&project-name=metaformalism-copilot&repository-name=metaformalism-copilot)
 
-One-click deploys a single-tenant copy with your own Anthropic API key. See [Deploy to Vercel](#deploy-to-vercel) for details and optional env vars.
+Each user runs their own copy with their own Anthropic API key — see [Deploy to Vercel](#deploy-to-vercel).
 
 ## What is this?
 
@@ -62,7 +62,7 @@ Open [http://localhost:3000](http://localhost:3000) to use the application.
 
 ### Lean Verification Service
 
-The app includes a Dockerized Lean 4 verification service. When running, submitted Lean code is type-checked by a real Lean 4 installation. When the service is not running, the app falls back to a mock response.
+The app includes a Dockerized Lean 4 verification service. When running, submitted Lean code is type-checked by a real Lean 4 installation. When the service is not reachable, the verification API route returns `{ valid: false, unavailable: true, reason: ... }` and the UI shows a "verifier offline — proof not checked" badge so it's clear no type-checking happened.
 
 **Start the verifier:**
 
@@ -98,7 +98,7 @@ The rest of the app keeps working without the verifier. Lean code can still be g
 
 ## Deploy to Vercel
 
-Each user runs their own single-tenant deployment with their own Anthropic API key. The "Deploy with Vercel" button at the top of this README walks you through it.
+Click the "Deploy with Vercel" button at the top of this README. Vercel clones the repo, prompts for the required env var, and deploys.
 
 ### Required environment variable
 
@@ -108,23 +108,17 @@ Each user runs their own single-tenant deployment with their own Anthropic API k
 
 ### Optional environment variables
 
-You can leave these unset on first deploy and add them later from the Vercel dashboard (`Settings → Environment Variables`).
+Add these later from the Vercel dashboard (`Settings → Environment Variables`).
 
-| Variable | Effect when set | Notes |
-|---|---|---|
-| `OPENROUTER_API_KEY` | Routes some calls through OpenRouter for non-Anthropic models. | **Privacy note:** prompts (including your source material) are sent to OpenRouter for those calls. Leave unset to keep all LLM traffic on Anthropic. |
-| `LEAN_VERIFIER_URL` | Enables Lean 4 type-checking. | The verifier is a separate Docker service (see [Lean Verification Service](#lean-verification-service)). Vercel cannot host it directly; deploy it on Railway/Render/Fly.io and set this to its URL. Without it, Lean code is generated but not checked. |
-| `OPENALEX_MAILTO` | Identifies your evidence-search calls to the OpenAlex API ([polite pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication#the-polite-pool)). | Recommended but not required. |
+| Variable | Effect when set |
+|---|---|
+| `OPENROUTER_API_KEY` | Acts as a fallback LLM provider when `ANTHROPIC_API_KEY` is unset. **Privacy note:** prompts (including your source material) are sent to OpenRouter when this path is used. |
+| `LEAN_VERIFIER_URL` | Points the Lean type-check API at a running verifier. The verifier is a separate Docker service (see [Lean Verification Service](#lean-verification-service)) and cannot run on Vercel; host it elsewhere (Railway, Render, Fly.io, your own infra) and set this to its URL. When unset, Lean code is generated but the type-check step is skipped (UI shows the "verifier offline" badge). |
 
-### What works on Vercel out of the box
+### Limitations on Vercel
 
-- All LLM-driven flows: semiformal proofs, Lean code generation, edits, decomposition, evidence search.
-- Workspace persistence (your data stays in the browser via localStorage).
-
-### What does not work without extra setup
-
-- **Lean verification** — needs `LEAN_VERIFIER_URL` pointing at a running verifier (see above).
-- **Persistent analytics history** — analytics is local-dev-only; on Vercel each cold start gets a fresh log.
+- **Lean verification** runs only when `LEAN_VERIFIER_URL` points at a separately hosted verifier (see above).
+- **Analytics history** writes to `/tmp` on Vercel, which doesn't persist across cold starts and isn't shared between concurrent Function instances. Treat the analytics panel as dev-only.
 
 ## Available Scripts
 

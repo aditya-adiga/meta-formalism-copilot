@@ -8,7 +8,7 @@ Metaformalism Copilot is a Next.js web app for transforming insights and source 
 
 ## Prerequisites
 
-- Node.js (v18+) and npm
+- Node.js 20+ and npm
 - An `ANTHROPIC_API_KEY` environment variable for LLM features
 
 ## Commands
