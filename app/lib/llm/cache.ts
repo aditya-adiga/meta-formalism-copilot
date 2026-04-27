@@ -3,7 +3,12 @@ import { readFile, writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
 import type { LlmCallUsage } from "./callLlm";
 
-const CACHE_DIR = join(process.cwd(), "data", "cache");
+// Vercel Functions can only write to /tmp, and that lives only as long as
+// the warm container. In dev/self-hosted deployments we still write to the
+// repo's data/ dir for durable cross-restart caching.
+const CACHE_DIR = process.env.VERCEL
+  ? "/tmp/cache"
+  : join(process.cwd(), "data", "cache");
 
 type CachedResult = {
   text: string;
