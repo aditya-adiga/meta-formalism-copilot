@@ -23,9 +23,10 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
 }
 
 /** Create an Error with a `details` property for structured error info.
- *  Kept available so future error surfaces (e.g. an opt-in "show technical
- *  details" UI) can read structured info — but we no longer write `details`
- *  to logs or to the SSE error event by default. */
+ *  The streaming catch block intentionally does not log or forward `details`
+ *  over SSE (provider error bodies can echo request content), but the property
+ *  remains attached to the thrown Error for any in-process consumer that
+ *  opts in to reading it. */
 function errorWithDetails(message: string, details: string): Error {
   const err = new Error(message);
   (err as Error & { details: string }).details = details;
@@ -67,7 +68,10 @@ async function recordAndCache(
  * SSE protocol:
  *   event: token   — { text: "partial chunk" }
  *   event: done    — { text: "full accumulated text", usage: LlmCallUsage }
- *   event: error   — { error: "message", details: "..." }
+ *   event: error   — { error: "message" }
+ *     The error event carries the message only; provider details are
+ *     deliberately not forwarded over SSE because their bodies can echo
+ *     request content (see errorWithDetails for the in-process channel).
  *
  * Provider chain mirrors callLlm(): Anthropic → OpenRouter → mock.
  * Cache hits emit a single `done` event.
