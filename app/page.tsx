@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId, SplitOrientation } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -32,6 +32,7 @@ import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useFormalizationPipeline } from "@/app/hooks/useFormalizationPipeline";
 import { useActiveArtifactState } from "@/app/hooks/useActiveArtifactState";
+import { useActiveStructuredArtifacts } from "@/app/hooks/useActiveStructuredArtifacts";
 import { usePanelDefinitions } from "@/app/hooks/usePanelDefinitions";
 import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
@@ -573,6 +574,14 @@ export default function Home() {
     nodePipeline.loadingPhase,
   );
 
+  const {
+    activeCausalGraph, activeStatisticalModel, activePropertyTests,
+    activeDialecticalMap, activeCounterexamples,
+  } = useActiveStructuredArtifacts(
+    causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples,
+    selectedNode, isDecompMode,
+  );
+
   // Determine if any RPC is in flight (for workspace session-switch guard)
   const isAnyRpcBusy = loadingPhase !== "idle" || isAnyGenerating || queueRunning;
 
@@ -743,15 +752,15 @@ export default function Home() {
     activeSemiformal, activeLeanCode, loadingPhase,
     activeVerificationStatus, semiformalReadyForLean,
     nodes: decomp.nodes, selectedNode,
-    hasCausalGraph: causalGraph !== null,
+    hasCausalGraph: activeCausalGraph !== null,
     causalGraphLoading,
-    hasStatisticalModel: statisticalModel !== null,
+    hasStatisticalModel: activeStatisticalModel !== null,
     statisticalModelLoading,
-    hasPropertyTests: propertyTests !== null,
+    hasPropertyTests: activePropertyTests !== null,
     propertyTestsLoading,
-    hasDialecticalMap: dialecticalMap !== null,
+    hasDialecticalMap: activeDialecticalMap !== null,
     dialecticalMapLoading,
-    hasCounterexamples: counterexamples !== null,
+    hasCounterexamples: activeCounterexamples !== null,
     counterexamplesLoading,
   });
 
@@ -880,7 +889,8 @@ export default function Home() {
       case "causal-graph":
         return (
           <CausalGraphPanel
-            causalGraph={causalGraph}
+            causalGraph={activeCausalGraph}
+            streamingPreview={streamingJsonPreview["causal-graph"] as CausalGraphResponse["causalGraph"] | undefined}
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
             isStale={causalGraphIsStale}
@@ -890,7 +900,8 @@ export default function Home() {
       case "statistical-model":
         return (
           <StatisticalModelPanel
-            statisticalModel={statisticalModel}
+            statisticalModel={activeStatisticalModel}
+            streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
             isStale={statisticalModelIsStale}
             onRegenerate={handleGenerate}
@@ -899,7 +910,8 @@ export default function Home() {
       case "property-tests":
         return (
           <PropertyTestsPanel
-            propertyTests={propertyTests}
+            propertyTests={activePropertyTests}
+            streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
             isStale={propertyTestsIsStale}
             onRegenerate={handleGenerate}
@@ -908,7 +920,7 @@ export default function Home() {
       case "balanced-perspectives":
         return (
           <DialecticalMapPanel
-            dialecticalMap={dialecticalMap}
+            dialecticalMap={activeDialecticalMap}
             streamingPreview={streamingJsonPreview["balanced-perspectives"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
             onContentChange={setPersistedDialecticalMap}
@@ -922,7 +934,7 @@ export default function Home() {
       case "counterexamples":
         return (
           <CounterexamplesPanel
-            counterexamples={counterexamples}
+            counterexamples={activeCounterexamples}
             loading={counterexamplesLoading}
             isStale={counterexamplesIsStale}
             onRegenerate={handleGenerate}
@@ -945,13 +957,13 @@ export default function Home() {
     handleSelectNode, handleDecompose, handleNodeGenerate, handleNodeGenerateLean, updateNode,
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
-    causalGraph, causalGraphLoading, causalGraphWaitEstimate,
-    statisticalModel, statisticalModelLoading,
-    propertyTests, propertyTestsLoading,
-    dialecticalMap, dialecticalMapLoading,
+    activeCausalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
+    activeStatisticalModel, statisticalModelLoading,
+    activePropertyTests, propertyTestsLoading,
+    activeDialecticalMap, dialecticalMapLoading,
     setPersistedDialecticalMap,
     artifactEditing,
-    counterexamples, counterexamplesLoading,
+    counterexamplesLoading,
     semiformalIsStale, causalGraphIsStale, statisticalModelIsStale,
     propertyTestsIsStale, dialecticalMapIsStale, counterexamplesIsStale,
     analyticsEntries, analyticsSummary, clearAnalytics,
