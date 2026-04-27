@@ -73,7 +73,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 The app is designed to be self-hosted single-tenant: each end user clicks the "Deploy with Vercel" button in the README and runs their own copy with their own `ANTHROPIC_API_KEY`. There is no shared hosted instance and no demo mode. Implications:
 
 - The codebase assumes one trust boundary per deployment. There is no in-browser BYO-key flow; keys live in the Vercel project's environment variables (or `.env.local` in dev).
-- `LEAN_VERIFIER_URL` is optional. The Lean verifier is a separate Dockerized service and Vercel Functions cannot run it inline. When unset, the verification route returns `{ valid: false, unavailable: true, reason: ... }` and the UI shows a "verifier offline" state — never a silent pass.
+- The Lean verifier is a separate Dockerized service and cannot run inside a Vercel Function. When `LEAN_VERIFIER_URL` is unset or unreachable, `app/api/verification/lean/route.ts` falls back to a mock `{ valid: true, mock: true }` response. This is a known silent-pass behavior — `useFormalizationPipeline` treats it as `valid` and there is currently no "verifier offline" UI state. Anything depending on real type-checking must require the verifier explicitly.
 - Persistence on Vercel is best-effort. The LLM cache and analytics log write to the local filesystem in dev. Vercel Functions can only write to `/tmp` and that lasts only as long as the warm container — don't add features that assume durable filesystem state without an explicit storage backend.
 
 When changing user-facing setup steps, env vars, or deploy expectations, update both `README.md` (Deploy to Vercel section) and this file.
