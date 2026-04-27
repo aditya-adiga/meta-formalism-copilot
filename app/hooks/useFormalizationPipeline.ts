@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { generateSemiformalStreaming, generateLeanStreaming, verifyLean } from "@/app/lib/formalization/api";
+import { generateSemiformalStreaming, generateLeanStreaming, verifyLean, verifyResultToStatus } from "@/app/lib/formalization/api";
 import { leanRetryLoop } from "@/app/lib/formalization/leanRetryLoop";
 import { throttle } from "@/app/lib/utils/throttle";
 import type { LoadingPhase, VerificationStatus } from "@/app/lib/types/session";
@@ -118,10 +118,12 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
         onToken,
       });
 
-      const vStatus = result.valid ? "valid" as const : "invalid" as const;
+      const vStatus = verifyResultToStatus(result);
+      // Only "invalid" carries verifier output; "valid"/"unavailable" clear errors.
+      const vErrors = vStatus === "invalid" ? result.errors : "";
       a.setVerificationStatus(vStatus);
-      if (result.valid) a.setVerificationErrors("");
-      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: result.valid ? "" : result.errors });
+      if (vStatus !== "invalid") a.setVerificationErrors("");
+      a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
       const currentLean = a.getLeanCode();
@@ -137,9 +139,9 @@ export function useFormalizationPipeline(accessors: PipelineAccessors): Formaliz
   const verifyWithDeps = useCallback(async (a: PipelineAccessors, code: string) => {
     const depContext = a.getDependencyContext?.();
     const fullCode = depContext ? `${depContext}\n\n${code}` : code;
-    const { valid, errors } = await verifyLean(fullCode);
-    const vStatus = valid ? "valid" as const : "invalid" as const;
-    const vErrors = valid ? "" : errors || "Verification failed";
+    const result = await verifyLean(fullCode);
+    const vStatus = verifyResultToStatus(result);
+    const vErrors = vStatus === "invalid" ? (result.errors || "Verification failed") : "";
     a.setVerificationStatus(vStatus);
     a.setVerificationErrors(vErrors);
     a.onSessionUpdate?.({ verificationStatus: vStatus, verificationErrors: vErrors });
