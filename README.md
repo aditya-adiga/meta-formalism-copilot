@@ -117,7 +117,7 @@ Add these later from the Vercel dashboard (`Settings → Environment Variables`)
 ### Limitations on Vercel
 
 - **Lean verification** runs only when `LEAN_VERIFIER_URL` points at a separately hosted verifier (see above).
-- **Analytics history** is written to the local filesystem and does not persist across Vercel function invocations; treat the analytics panel as dev-only.
+- **Analytics history** writes to a `cwd()`-relative path that is read-only on Vercel, so the writes silently fail. Treat the analytics panel as dev-only.
 
 ## Available Scripts
 

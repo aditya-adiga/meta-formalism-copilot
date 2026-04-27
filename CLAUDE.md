@@ -8,7 +8,7 @@ Metaformalism Copilot is a Next.js web app for transforming insights and source 
 
 ## Prerequisites
 
-- Node.js (v18+) and npm
+- Node.js 20+ and npm
 - An `ANTHROPIC_API_KEY` environment variable for LLM features
 
 ## Commands
@@ -74,7 +74,7 @@ The app is designed to be self-hosted single-tenant: each end user clicks the "D
 
 - The codebase assumes one trust boundary per deployment. There is no in-browser BYO-key flow; keys live in the Vercel project's environment variables (or `.env.local` in dev).
 - The Lean verifier is a separate Dockerized service and cannot run inside a Vercel Function. When `LEAN_VERIFIER_URL` is unset or unreachable, `app/api/verification/lean/route.ts` falls back to a mock `{ valid: true, mock: true }` response. This is a known silent-pass behavior — `useFormalizationPipeline` treats it as `valid` and there is currently no "verifier offline" UI state. Anything depending on real type-checking must require the verifier explicitly.
-- Persistence on Vercel is best-effort. The LLM cache and analytics log write to the local filesystem in dev. Vercel Functions can only write to `/tmp` and that lasts only as long as the warm container — don't add features that assume durable filesystem state without an explicit storage backend.
+- Persistence on Vercel is best-effort. The LLM cache (`app/lib/llm/cache.ts`) and analytics log (`app/lib/analytics/persist.ts`) write to a directory under `cwd()`, which is read-only on Vercel — those writes currently throw and are silently swallowed. Even after the writes are redirected to a writable path, only `/tmp` is writable on Vercel Functions and it lasts only as long as the warm container, so cache hits don't survive cold starts. Don't add features that assume durable filesystem state without an explicit storage backend.
 
 When changing user-facing setup steps, env vars, or deploy expectations, update both `README.md` (Deploy to Vercel section) and this file.
 
