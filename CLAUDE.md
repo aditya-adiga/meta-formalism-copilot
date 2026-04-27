@@ -70,6 +70,16 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - Primary font: EB Garamond (serif); Mono: Geist Mono
 - Styling uses both Tailwind classes and `var(--css-variable)` references
 
+## Deployment
+
+The app is designed to be self-hosted single-tenant: each end user clicks the "Deploy with Vercel" button in the README and runs their own copy with their own `ANTHROPIC_API_KEY`. There is no shared hosted instance and no demo mode. Implications:
+
+- The codebase assumes one trust boundary per deployment. There is no in-browser BYO-key flow; keys live in the Vercel project's environment variables (or `.env.local` in dev).
+- `LEAN_VERIFIER_URL` is optional. The Lean verifier is a separate Dockerized service and Vercel Functions cannot run it inline. When unset, the verification route returns `{ valid: false, unavailable: true, reason: ... }` and the UI shows a "verifier offline" state — never a silent pass.
+- Persistence on Vercel is best-effort. The LLM cache and analytics log write to the local filesystem in dev. Vercel Functions can only write to `/tmp` and that lasts only as long as the warm container — don't add features that assume durable filesystem state without an explicit storage backend.
+
+When changing user-facing setup steps, env vars, or deploy expectations, update both `README.md` (Deploy to Vercel section) and this file.
+
 ## Code Guidelines
 
 - TypeScript for all components
