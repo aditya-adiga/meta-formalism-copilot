@@ -5,7 +5,7 @@
 
 import JSZip from "jszip";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse, CounterexamplesResponse } from "@/app/lib/types/artifacts";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, BalancedPerspectivesResponse, CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import { sanitizeFilename, triggerDownload } from "./export";
 import { getGraphViewportElement, graphToPngBlob } from "./exportGraph";
 
@@ -16,7 +16,7 @@ type ExportAllOptions = {
   causalGraph?: CausalGraphResponse["causalGraph"] | null;
   statisticalModel?: StatisticalModelResponse["statisticalModel"] | null;
   propertyTests?: PropertyTestsResponse["propertyTests"] | null;
-  dialecticalMap?: DialecticalMapResponse["dialecticalMap"] | null;
+  balancedPerspectives?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   counterexamples?: CounterexamplesResponse["counterexamples"] | null;
 };
 
@@ -27,7 +27,7 @@ export async function exportAllAsZip({
   causalGraph,
   statisticalModel,
   propertyTests,
-  dialecticalMap,
+  balancedPerspectives,
   counterexamples,
 }: ExportAllOptions) {
   const zip = new JSZip();
@@ -50,8 +50,8 @@ export async function exportAllAsZip({
   if (propertyTests) {
     zip.file("property-tests.json", JSON.stringify(propertyTests, null, 2));
   }
-  if (dialecticalMap) {
-    zip.file("dialectical-map.json", JSON.stringify(dialecticalMap, null, 2));
+  if (balancedPerspectives) {
+    zip.file("balanced-perspectives.json", JSON.stringify(balancedPerspectives, null, 2));
   }
   if (counterexamples) {
     zip.file("counterexamples.json", JSON.stringify(counterexamples, null, 2));
