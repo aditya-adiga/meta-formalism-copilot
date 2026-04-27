@@ -4,7 +4,7 @@ import { join } from "path";
 import { dataDir } from "@/app/lib/utils/dataDir";
 import type { LlmCallUsage } from "./callLlm";
 
-const CACHE_DIR = dataDir("cache");
+const CACHE_DIR = join(dataDir(), "cache");
 
 type CachedResult = {
   text: string;

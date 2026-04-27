@@ -3,8 +3,8 @@ import { join } from "path";
 import type { AnalyticsEntry } from "@/app/lib/types/analytics";
 import { dataDir } from "@/app/lib/utils/dataDir";
 
-// On Vercel, analytics history doesn't persist across cold starts — see
-// Deploy to Vercel in README. See dataDir() for the underlying rationale.
+// On Vercel, analytics history doesn't persist across cold starts and is
+// per-Function-instance. See dataDir() for the underlying rationale.
 const DATA_DIR = dataDir();
 const FILE_PATH = join(DATA_DIR, "analytics.jsonl");
 
