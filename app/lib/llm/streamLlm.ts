@@ -5,7 +5,7 @@ import { computeHash, getCachedResult, setCachedResult } from "./cache";
 import {
   OPENROUTER_API_URL,
   DEFAULT_ANTHROPIC_MODEL,
-  getAnthropicClient,
+  makeAnthropicClient,
 } from "./callLlm";
 import type { LlmCallUsage } from "./callLlm";
 
@@ -22,18 +22,14 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-/** Create an Error with a `details` property for structured error info. */
+/** Create an Error with a `details` property for structured error info.
+ *  Kept available so future error surfaces (e.g. an opt-in "show technical
+ *  details" UI) can read structured info — but we no longer write `details`
+ *  to logs or to the SSE error event by default. */
 function errorWithDetails(message: string, details: string): Error {
   const err = new Error(message);
   (err as Error & { details: string }).details = details;
   return err;
-}
-
-/** Extract a `details` property from an error, if present. */
-function getErrorDetails(err: unknown): string {
-  return (typeof err === "object" && err !== null && "details" in err)
-    ? String((err as Record<string, unknown>).details)
-    : "";
 }
 
 type StreamLlmOptions = {
@@ -158,10 +154,11 @@ export function streamLlm({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
-        const details = getErrorDetails(err);
-        console.error(`[${endpoint}] Stream error:`, message, details);
+        // Provider error bodies can echo parts of the request, so don't write
+        // them to logs or send them to the client over SSE.
+        console.error(`[${endpoint}] Stream error: ${message}`);
         try {
-          controller.enqueue(sseEvent("error", { error: message, details }));
+          controller.enqueue(sseEvent("error", { error: message }));
         } catch { /* controller may already be closed */ }
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -206,7 +203,7 @@ async function streamAnthropic(
   controller: ReadableStreamDefaultController<Uint8Array>,
   opts: StreamProviderOptions,
 ): Promise<void> {
-  const client = getAnthropicClient(opts.apiKey);
+  const client = makeAnthropicClient(opts.apiKey);
   const start = Date.now();
 
   const stream = client.messages.stream({
