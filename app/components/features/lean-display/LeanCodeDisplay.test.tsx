@@ -61,6 +61,26 @@ describe('LeanCodeDisplay', () => {
     expect(screen.getByText('lake build output')).toBeInTheDocument()
   })
 
+  it('shows the verifier-offline banner when status is unavailable', () => {
+    render(
+      <LeanCodeDisplay
+        {...defaultProps}
+        verificationStatus="unavailable"
+      />
+    )
+    expect(screen.getByText('Verifier offline — proof not checked')).toBeInTheDocument()
+  })
+
+  it('shows Re-verify button when status is unavailable', () => {
+    render(
+      <LeanCodeDisplay
+        {...defaultProps}
+        verificationStatus="unavailable"
+      />
+    )
+    expect(screen.getByText('Re-verify ↺')).toBeInTheDocument()
+  })
+
   it('shows code metrics when verification is invalid', () => {
     const code = 'line1\nline2\nline3'
     render(

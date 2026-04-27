@@ -29,6 +29,10 @@ describe("sanitizeVerificationStatus", () => {
     expect(sanitizeVerificationStatus("verifying")).toBe("none");
   });
 
+  it("maps 'unavailable' to 'none' (transient verifier-state, not artifact-state)", () => {
+    expect(sanitizeVerificationStatus("unavailable")).toBe("none");
+  });
+
   it("maps unknown strings to 'none'", () => {
     expect(sanitizeVerificationStatus("garbage")).toBe("none");
   });
