@@ -31,11 +31,10 @@ function buildCsp(nonce: string): string {
   return directives.join("; ");
 }
 
-export function proxy(request: NextRequest) {
-  // Generate a fresh nonce per request. crypto.randomUUID is available in the
-  // Edge runtime that Next proxy runs in.
+export function proxy(request: NextRequest): NextResponse {
+  // Generate a fresh nonce per request. crypto.randomUUID and Buffer are both
+  // available in the Edge runtime that Next proxy runs in.
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp(nonce);
 
   // Forward the nonce to server components via a request header so layouts
   // can read it via `headers()` and pass it to <Script> tags they render.
@@ -45,7 +44,7 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
-  response.headers.set("Content-Security-Policy", csp);
+  response.headers.set("Content-Security-Policy", buildCsp(nonce));
   return response;
 }
 

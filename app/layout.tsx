@@ -24,10 +24,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read the per-request CSP nonce that proxy.ts forwards via x-nonce.
-  // Next.js automatically applies it to its own bootstrap script tags when a
-  // CSP with 'strict-dynamic' + nonce-... is present on the response, so we
-  // just need to opt this layout out of static rendering by reading headers.
+  // Opt this layout out of static rendering so proxy.ts runs on every request
+  // and can attach a fresh per-request CSP nonce. Next.js automatically tags
+  // its own bootstrap <script> elements with the nonce from the response's
+  // CSP header, so we don't need to read x-nonce here ourselves.
   await headers();
 
   return (
