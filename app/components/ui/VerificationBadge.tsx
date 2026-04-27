@@ -9,9 +9,12 @@ export default function VerificationBadge({ status }: { status: VerificationStat
     return <span className="ml-2 text-xs font-normal text-green-700">Verified</span>;
   }
   if (status === "unavailable") {
+    // font-medium + amber-800 so the offline state is at least as prominent as
+    // "Verified" (it's an action-required state, not a low-priority hint) and
+    // clears AA contrast against the panel background.
     return (
       <span
-        className="ml-2 text-xs font-normal text-amber-700"
+        className="ml-2 text-xs font-medium text-amber-800"
         title="Lean verifier is offline or not configured. Set LEAN_VERIFIER_URL to enable checking."
       >
         Verifier offline — not checked
