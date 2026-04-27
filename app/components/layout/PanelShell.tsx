@@ -10,12 +10,13 @@ type PanelShellProps = {
   renderPanel: (id: PanelId) => React.ReactNode;
   onExportAll?: () => void;
   exportAllDisabled?: boolean;
+  onOpenHelp?: () => void;
   split: SplitConfig;
 };
 
 export default function PanelShell({
   panels, activePanelId, onSelectPanel, renderPanel,
-  onExportAll, exportAllDisabled, split,
+  onExportAll, exportAllDisabled, onOpenHelp, split,
 }: PanelShellProps) {
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-[var(--ivory-cream)]">
@@ -25,6 +26,7 @@ export default function PanelShell({
         onSelectPanel={onSelectPanel}
         onExportAll={onExportAll}
         exportAllDisabled={exportAllDisabled}
+        onOpenHelp={onOpenHelp}
         secondaryPanelId={split.secondaryPanelId}
         onSelectSecondaryPanel={split.onSelectSecondaryPanel}
       />

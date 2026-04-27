@@ -9,13 +9,14 @@ type IconRailProps = {
   onSelectPanel: (id: PanelId) => void;
   onExportAll?: () => void;
   exportAllDisabled?: boolean;
+  onOpenHelp?: () => void;
   secondaryPanelId?: PanelId | null;
   onSelectSecondaryPanel?: (id: PanelId) => void;
 };
 
 export default function IconRail({
   panels, activePanelId, onSelectPanel,
-  onExportAll, exportAllDisabled,
+  onExportAll, exportAllDisabled, onOpenHelp,
   secondaryPanelId, onSelectSecondaryPanel,
 }: IconRailProps) {
   const [expanded, setExpanded] = useState(false);
@@ -100,6 +101,26 @@ export default function IconRail({
 
       {/* Spacer pushes export button to bottom */}
       <div className="flex-1" />
+
+      {/* Help / onboarding button */}
+      {onOpenHelp && (
+        <button
+          onClick={onOpenHelp}
+          title={expanded ? undefined : "Getting started guide"}
+          className="group flex items-center gap-3 px-3 py-3 text-left transition-colors border-t border-[#DDD9D5] text-[#6B6560] hover:bg-[var(--rail-hover)] hover:text-[var(--ink-black)]"
+        >
+          <span className="flex shrink-0 items-center justify-center w-6 h-6">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10" cy="10" r="8" />
+              <path d="M7.5 7.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" />
+              <circle cx="10" cy="14.5" r="0.5" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          {expanded && (
+            <span className="truncate text-xs font-semibold">Getting started</span>
+          )}
+        </button>
+      )}
 
       {/* Export All button */}
       {onExportAll && (

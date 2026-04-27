@@ -22,6 +22,7 @@ import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import CustomArtifactPanel from "@/app/components/panels/CustomArtifactPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
+import OnboardingOverlay, { useOnboarding } from "@/app/components/features/onboarding/OnboardingOverlay";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { isCustomType } from "@/app/lib/types/customArtifact";
@@ -98,6 +99,9 @@ export default function Home() {
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
   const [secondaryPanelId, setSecondaryPanelIdRaw] = useState<PanelId | null>(null);
   const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>("horizontal");
+
+  // --- Onboarding overlay (shown to first-time users; reopenable via help button) ---
+  const { showOnboarding, closeOnboarding, openOnboarding } = useOnboarding();
 
   // --- Persisted state from Zustand store ---
   const sourceText = useWorkspaceStore((s) => s.sourceText);
@@ -1058,6 +1062,7 @@ export default function Home() {
         renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
+        onOpenHelp={openOnboarding}
         split={{
           secondaryPanelId,
           onSelectSecondaryPanel: setSecondaryPanelId,
@@ -1066,6 +1071,7 @@ export default function Home() {
           onToggleOrientation: toggleSplitOrientation,
         }}
       />
+      <OnboardingOverlay open={showOnboarding} onClose={closeOnboarding} />
     </main>
   );
 }
