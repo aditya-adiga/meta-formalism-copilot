@@ -1,12 +1,11 @@
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { AnalyticsEntry } from "@/app/lib/types/analytics";
+import { dataDir } from "@/app/lib/utils/dataDir";
 
-// On Vercel, only /tmp is writable, and it lasts only as long as the warm
-// container. Analytics history therefore doesn't persist across cold starts
-// on Vercel — see Deploy to Vercel in README. In dev/self-hosted deployments
-// we still write to the repo's data/ dir.
-const DATA_DIR = process.env.VERCEL ? "/tmp" : join(process.cwd(), "data");
+// On Vercel, analytics history doesn't persist across cold starts — see
+// Deploy to Vercel in README. See dataDir() for the underlying rationale.
+const DATA_DIR = dataDir();
 const FILE_PATH = join(DATA_DIR, "analytics.jsonl");
 
 function ensureDir() {
