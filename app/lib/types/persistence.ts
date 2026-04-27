@@ -1,5 +1,4 @@
 import type { PropositionNode, SourceDocument } from "./decomposition";
-import type { CustomArtifactTypeDefinition } from "./customArtifact";
 
 export const WORKSPACE_VERSION = 2;
 export const WORKSPACE_KEY = "workspace-v2";
@@ -10,6 +9,7 @@ export type PersistedDecomposition = {
   selectedNodeId: string | null;
   paperText: string;
   sources: SourceDocument[];
+  graphLayout?: import("./decomposition").GraphLayout;
 };
 
 export type PersistedWorkspace = {
@@ -29,8 +29,4 @@ export type PersistedWorkspace = {
   propertyTests: string | null;
   dialecticalMap: string | null;
   counterexamples: string | null;
-  // Custom artifact types and their generated data (optional, backward-compatible addition to v2)
-  customArtifactTypes?: CustomArtifactTypeDefinition[];
-  /** Generated output for custom types, keyed by custom type ID */
-  customArtifactData?: Record<string, string | null>;
 };

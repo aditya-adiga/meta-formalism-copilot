@@ -82,10 +82,17 @@ export type PropositionNode = {
   artifacts: NodeArtifact[];
 };
 
+/** Persisted node positions and viewport from user drag interactions. */
+export type GraphLayout = {
+  positions: Record<string, { x: number; y: number }>;
+  viewport?: { x: number; y: number; zoom: number };
+};
+
 export type DecompositionState = {
   nodes: PropositionNode[];
   selectedNodeId: string | null;
   paperText: string;
   sources: SourceDocument[];
   extractionStatus: "idle" | "extracting" | "done" | "error";
+  graphLayout?: GraphLayout;
 };

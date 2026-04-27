@@ -2,13 +2,18 @@
  * Tests for SSR hydration and migration from workspace-v2 format.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useWorkspaceStore, migrateFromV2 } from "../workspaceStore";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 
 beforeEach(() => {
+  vi.useFakeTimers();
   localStorage.clear();
   useWorkspaceStore.setState(useWorkspaceStore.getInitialState());
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("SSR hydration", () => {
@@ -59,6 +64,8 @@ describe("SSR hydration", () => {
     await useWorkspaceStore.persist.rehydrate();
 
     useWorkspaceStore.getState().setSourceText("auto-saved");
+    // Flush debounced localStorage write
+    vi.advanceTimersByTime(300);
 
     const raw = localStorage.getItem("workspace-zustand-v1");
     expect(raw).not.toBeNull();
@@ -69,11 +76,26 @@ describe("SSR hydration", () => {
   it("persisted data excludes action functions", async () => {
     await useWorkspaceStore.persist.rehydrate();
     useWorkspaceStore.getState().setSourceText("test");
+    // Flush debounced localStorage write
+    vi.advanceTimersByTime(300);
 
     const stored = JSON.parse(localStorage.getItem("workspace-zustand-v1")!);
     expect(stored.state.setSourceText).toBeUndefined();
     expect(stored.state.setArtifactGenerated).toBeUndefined();
     expect(stored.state.getSnapshot).toBeUndefined();
+  });
+
+  it("sanitizes transient verificationStatus to 'none' when persisting", async () => {
+    await useWorkspaceStore.persist.rehydrate();
+    // Set a transient "verifying" status (as if verification was in progress)
+    useWorkspaceStore.getState().setVerificationStatus("verifying");
+    vi.advanceTimersByTime(300);
+
+    const stored = JSON.parse(localStorage.getItem("workspace-zustand-v1")!);
+    // partialize should strip "verifying" back to "none"
+    expect(stored.state.verificationStatus).toBe("none");
+    // In-memory store still holds the transient value
+    expect(useWorkspaceStore.getState().verificationStatus).toBe("verifying");
   });
 });
 
