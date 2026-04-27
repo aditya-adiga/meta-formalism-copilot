@@ -37,3 +37,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # --omit=dev: only audit production deps (the ones that ship to users).
+      # --audit-level=high: fail only on high+ severity. Lower levels are
+      # informational and would otherwise make every fresh CVE break CI on
+      # branches that have nothing to do with security.
+      - name: Audit
+        run: npm audit --omit=dev --audit-level=high
