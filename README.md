@@ -2,6 +2,10 @@
 
 A workspace for transforming insights, smells and ideas from source materials(ex: conversations, text, etc) into personalized, context-sensitive formalisms.
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot&env=ANTHROPIC_API_KEY&envDescription=Anthropic%20API%20key%20%E2%80%94%20get%20one%20at%20console.anthropic.com&envLink=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot%23deploy-to-vercel&project-name=metaformalism-copilot&repository-name=metaformalism-copilot)
+
+One-click deploys a single-tenant copy with your own Anthropic API key. See [Deploy to Vercel](#deploy-to-vercel) for details and optional env vars.
+
 ## What is this?
 
 Metaformalism Copilot is an extension of the [Live Conversational Threads](https://www.lesswrong.com/posts/uueHkKrGmeEsKGHPR/live-conversational-threads-not-an-ai-notetaker-2) research project. Rather than producing unified, context-independent theories, this tool helps generate **pluralistic formalisms** - multiple rigorous representations of the same insight, each tailored to the specific context where it will be used.
@@ -81,7 +85,7 @@ curl -X POST http://localhost:3100/verify \
   -d '{"leanCode":"theorem t : False := trivial"}'
 ```
 
-**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment (defaults to `http://localhost:3100`).
+**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment. When unset, Lean verification is skipped and the UI shows a "verifier offline — proof not checked" badge so it's clear no checking happened.
 
 **Stop the verifier:**
 
@@ -89,7 +93,37 @@ curl -X POST http://localhost:3100/verify \
 docker compose down
 ```
 
-The app continues to work without the verifier — the API route falls back to a mock `{ valid: true, mock: true }` response.
+The rest of the app keeps working without the verifier. Lean code can still be generated and edited; only the type-check step is skipped.
+
+## Deploy to Vercel
+
+Each user runs their own single-tenant deployment with their own Anthropic API key. The "Deploy with Vercel" button at the top of this README walks you through it.
+
+### Required environment variable
+
+| Variable | Where to get it |
+|---|---|
+| `ANTHROPIC_API_KEY` | https://console.anthropic.com — create a key with API access. |
+
+### Optional environment variables
+
+You can leave these unset on first deploy and add them later from the Vercel dashboard (`Settings → Environment Variables`).
+
+| Variable | Effect when set | Notes |
+|---|---|---|
+| `OPENROUTER_API_KEY` | Routes some calls through OpenRouter for non-Anthropic models. | **Privacy note:** prompts (including your source material) are sent to OpenRouter for those calls. Leave unset to keep all LLM traffic on Anthropic. |
+| `LEAN_VERIFIER_URL` | Enables Lean 4 type-checking. | The verifier is a separate Docker service (see [Lean Verification Service](#lean-verification-service)). Vercel cannot host it directly; deploy it on Railway/Render/Fly.io and set this to its URL. Without it, Lean code is generated but not checked. |
+| `OPENALEX_MAILTO` | Identifies your evidence-search calls to the OpenAlex API ([polite pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication#the-polite-pool)). | Recommended but not required. |
+
+### What works on Vercel out of the box
+
+- All LLM-driven flows: semiformal proofs, Lean code generation, edits, decomposition, evidence search.
+- Workspace persistence (your data stays in the browser via localStorage).
+
+### What does not work without extra setup
+
+- **Lean verification** — needs `LEAN_VERIFIER_URL` pointing at a running verifier (see above).
+- **Persistent analytics history** — analytics is local-dev-only; on Vercel each cold start gets a fresh log.
 
 ## Available Scripts
 
