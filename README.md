@@ -2,9 +2,9 @@
 
 A workspace for transforming insights, smells and ideas from source materials(ex: conversations, text, etc) into personalized, context-sensitive formalisms.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot&env=ANTHROPIC_API_KEY&envDescription=Anthropic%20API%20key%20%E2%80%94%20get%20one%20at%20console.anthropic.com&envLink=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot%23deploy-to-vercel&project-name=metaformalism-copilot&repository-name=metaformalism-copilot)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot&env=ANTHROPIC_API_KEY,OPENROUTER_API_KEY&envDescription=Provide%20at%20least%20one%20LLM%20provider%20key%20%E2%80%94%20Anthropic%20or%20OpenRouter.%20Leave%20the%20other%20blank.&envLink=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot%23deploy-to-vercel&project-name=metaformalism-copilot&repository-name=metaformalism-copilot)
 
-Each user runs their own copy with their own Anthropic API key — see [Deploy to Vercel](#deploy-to-vercel).
+Each user runs their own copy with their own LLM provider key — see [Deploy to Vercel](#deploy-to-vercel).
 
 ## What is this?
 
@@ -97,13 +97,16 @@ The rest of the app keeps working without the verifier. Lean code can still be g
 
 ## Deploy to Vercel
 
-Click the "Deploy with Vercel" button at the top of this README. Vercel clones the repo, prompts for the required env var, and deploys.
+Click the "Deploy with Vercel" button at the top of this README. Vercel clones the repo, prompts for the env vars below, and deploys.
 
-### Required environment variable
+### LLM provider keys (provide at least one)
 
-| Variable | Where to get it |
-|---|---|
-| `ANTHROPIC_API_KEY` | https://console.anthropic.com — create a key with API access. |
+The deploy form lists both keys; fill in whichever provider you have and leave the other blank. The app prefers Anthropic when both are set, and falls back to OpenRouter otherwise. If neither is set, LLM-driven panels return mock responses.
+
+| Variable | Where to get it | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | https://console.anthropic.com — create a key with API access. | Direct Anthropic API; lowest latency and no third-party hop. |
+| `OPENROUTER_API_KEY` | https://openrouter.ai — create a key. | Routes to a wider set of models (Anthropic, Gemini, OpenAI, etc.). **Privacy note:** prompts (including your source material) are forwarded through OpenRouter when this path is used. |
 
 ### Optional environment variables
 
@@ -111,7 +114,6 @@ Add these later from the Vercel dashboard (`Settings → Environment Variables`)
 
 | Variable | Effect when set |
 |---|---|
-| `OPENROUTER_API_KEY` | Acts as a fallback LLM provider when `ANTHROPIC_API_KEY` is unset. **Privacy note:** prompts (including your source material) are sent to OpenRouter when this path is used. |
 | `LEAN_VERIFIER_URL` | Points the Lean type-check API at a running verifier. The verifier is a separate Docker service (see [Lean Verification Service](#lean-verification-service)) and cannot run on Vercel; host it elsewhere (Railway, Render, Fly.io, your own infra) and set this to its URL. When unset, Lean code is generated but the type-check step returns the mock-valid response. |
 
 ### Limitations on Vercel
