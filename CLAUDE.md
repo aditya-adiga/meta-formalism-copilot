@@ -9,7 +9,7 @@ Metaformalism Copilot is a Next.js web app for transforming insights and source 
 ## Prerequisites
 
 - Node.js 20+ and npm
-- An `ANTHROPIC_API_KEY` environment variable for LLM features
+- An `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY` environment variable for LLM features (the call layer prefers Anthropic, falls back to OpenRouter, and returns mock responses if neither is set)
 
 ## Commands
 
@@ -72,7 +72,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 
 ## Deployment
 
-The app is designed to be self-hosted single-tenant: each end user clicks the "Deploy with Vercel" button in the README and runs their own copy with their own `ANTHROPIC_API_KEY`. There is no shared hosted instance and no demo mode. Implications:
+The app is designed to be self-hosted single-tenant: each end user clicks the "Deploy with Vercel" button in the README and runs their own copy with their own LLM provider key. The deploy form lists both `ANTHROPIC_API_KEY` and `OPENROUTER_API_KEY`; users provide at least one. There is no shared hosted instance and no demo mode. Implications:
 
 - The codebase assumes one trust boundary per deployment. There is no in-browser BYO-key flow; keys live in the Vercel project's environment variables (or `.env.local` in dev).
 - `LEAN_VERIFIER_URL` is optional. The Lean verifier is a separate Dockerized service and Vercel Functions cannot run it inline. When unset, the verification route returns `{ valid: false, unavailable: true, reason: ... }` and the UI shows a "verifier offline" state — never a silent pass.
