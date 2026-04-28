@@ -8,6 +8,7 @@ import { downloadSemiformalAsMarkdown } from "@/app/lib/utils/export";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { fetchApi } from "@/app/lib/formalization/api";
+import CostTooltip from "@/app/components/ui/CostTooltip";
 
 type SemiformalPanelProps = {
   semiformalText: string;
@@ -120,14 +121,19 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
           <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800">
             Review and edit the semiformal proof above, then generate Lean4 code when ready.
           </div>
-          <button
-            type="button"
-            onClick={onGenerateLean}
-            disabled={leanLoading}
-            className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          <CostTooltip
+            inputCharLength={semiformalText.length}
+            artifactTypes={["lean"]}
           >
-            {leanLoading ? "Generating..." : "Generate Lean4 Code"}
-          </button>
+            <button
+              type="button"
+              onClick={onGenerateLean}
+              disabled={leanLoading}
+              className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+            >
+              {leanLoading ? "Generating..." : "Generate Lean4 Code"}
+            </button>
+          </CostTooltip>
         </div>
       )}
     </div>

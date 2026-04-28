@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { CausalGraphResponse } from "@/app/lib/types/artifacts";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
@@ -42,7 +43,6 @@ function DetailsView({
 
   return (
     <>
-      {/* Summary */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Summary</h3>
         <EditableSection value={causalGraph.summary} onChange={(v) => updateField("summary", v)}>
@@ -50,11 +50,7 @@ function DetailsView({
         </EditableSection>
       </section>
 
-      {/* Variables */}
-      <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Variables ({causalGraph.variables.length})
-        </h3>
+      <CollapsibleSection title="Variables" defaultOpen={false} count={causalGraph.variables.length}>
         <div className="space-y-2">
           {causalGraph.variables.map((v, i) => (
             <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
@@ -68,13 +64,9 @@ function DetailsView({
             </EditableSection>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      {/* Edges */}
-      <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-          Causal Edges ({causalGraph.edges.length})
-        </h3>
+      <CollapsibleSection title="Causal Edges" defaultOpen={false} count={causalGraph.edges.length}>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
             <EditableSection key={`${e.from}-${e.to}-${i}`} value={e} onChange={(newE) => updateArrayItem("edges", i, newE)}>
@@ -90,14 +82,10 @@ function DetailsView({
             </EditableSection>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      {/* Confounders */}
       {causalGraph.confounders.length > 0 && (
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-            Confounders ({causalGraph.confounders.length})
-          </h3>
+        <CollapsibleSection title="Confounders" defaultOpen={false} count={causalGraph.confounders.length}>
           <div className="space-y-2">
             {causalGraph.confounders.map((c, i) => (
               <EditableSection key={c.id} value={c} onChange={(newC) => updateArrayItem("confounders", i, newC)}>
@@ -110,7 +98,7 @@ function DetailsView({
               </EditableSection>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
       )}
     </>
   );
@@ -127,6 +115,14 @@ export default function CausalGraphPanel({
     (d) => (d.variables?.length ?? 0) > 0,
   );
 
+  const handleAddVariable = useCallback(() => {
+    if (!displayGraph || !onContentChange) return;
+    const id = `var-${crypto.randomUUID().slice(0, 8)}`;
+    const nextNum = displayGraph.variables.length + 1;
+    const newVar = { id, label: `New factor ${nextNum}`, description: "" };
+    onContentChange(JSON.stringify({ ...displayGraph, variables: [...displayGraph.variables, newVar] }));
+  }, [displayGraph, onContentChange]);
+
   return (
     <ArtifactPanelShell
       title="Causal Graph"
@@ -140,28 +136,29 @@ export default function CausalGraphPanel({
     >
       {hasDisplayData && displayGraph && (
         <div className="flex flex-col h-full">
-          {/* View toggle — sticky so it doesn't scroll away with graph content */}
-          <div className="sticky top-0 z-10 flex gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
-            <button
-              onClick={() => setViewMode("graph")}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                viewMode === "graph"
-                  ? "bg-[var(--ink-black)] text-white"
-                  : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
-              }`}
-            >
-              Graph
-            </button>
-            <button
-              onClick={() => setViewMode("details")}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                viewMode === "details"
-                  ? "bg-[var(--ink-black)] text-white"
-                  : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
-              }`}
-            >
-              Details
-            </button>
+          <div className="sticky top-0 z-10 flex items-center gap-1 mb-3 bg-[var(--ivory-cream)] pb-2">
+            {(["graph", "details"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  viewMode === mode
+                    ? "bg-[var(--ink-black)] text-white"
+                    : "bg-[#F5F1ED] text-[#6B6560] hover:bg-[#E8E4E0]"
+                }`}
+              >
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
+            {onContentChange && (
+              <button
+                onClick={handleAddVariable}
+                className="ml-auto rounded-full border border-[#DDD9D5] bg-white px-3 py-1 text-xs font-medium text-[var(--ink-black)] shadow-sm hover:bg-[#F5F1ED]"
+                title="Add a new factor to the graph"
+              >
+                + Factor
+              </button>
+            )}
           </div>
 
           {viewMode === "graph" ? (
