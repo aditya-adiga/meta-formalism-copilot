@@ -2,6 +2,10 @@
 
 A workspace for transforming insights, smells and ideas from source materials(ex: conversations, text, etc) into personalized, context-sensitive formalisms.
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot&env=ANTHROPIC_API_KEY,OPENROUTER_API_KEY&envDescription=Provide%20at%20least%20one%20LLM%20provider%20key%20%E2%80%94%20Anthropic%20or%20OpenRouter.%20Leave%20the%20other%20blank.&envLink=https%3A%2F%2Fgithub.com%2Faditya-adiga%2Fmeta-formalism-copilot%23deploy-to-vercel&project-name=metaformalism-copilot&repository-name=metaformalism-copilot)
+
+Each user runs their own copy with their own LLM provider key — see [Deploy to Vercel](#deploy-to-vercel).
+
 ## What is this?
 
 Metaformalism Copilot is an extension of the [Live Conversational Threads](https://www.lesswrong.com/posts/uueHkKrGmeEsKGHPR/live-conversational-threads-not-an-ai-notetaker-2) research project. Rather than producing unified, context-independent theories, this tool helps generate **pluralistic formalisms** - multiple rigorous representations of the same insight, each tailored to the specific context where it will be used.
@@ -57,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000) to use the application.
 
 ### Lean Verification Service
 
-The app includes a Dockerized Lean 4 verification service. When running, submitted Lean code is type-checked by a real Lean 4 installation. When the service is not running, the app falls back to a mock response.
+The app includes a Dockerized Lean 4 verification service. When running, submitted Lean code is type-checked by a real Lean 4 installation. When the service is not reachable, the verification API route returns a mock `{ valid: true, mock: true }` response so the rest of the app keeps working — note that this means generated Lean code is reported as valid without actually being type-checked.
 
 **Start the verifier:**
 
@@ -81,7 +85,7 @@ curl -X POST http://localhost:3100/verify \
   -d '{"leanCode":"theorem t : False := trivial"}'
 ```
 
-**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment (defaults to `http://localhost:3100`).
+**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment (defaults to `http://localhost:3100`). When the verifier is unreachable, the route falls back to the mock response described above.
 
 **Stop the verifier:**
 
@@ -89,7 +93,33 @@ curl -X POST http://localhost:3100/verify \
 docker compose down
 ```
 
-The app continues to work without the verifier — the API route falls back to a mock `{ valid: true, mock: true }` response.
+The rest of the app keeps working without the verifier. Lean code can still be generated and edited; the type-check step returns the mock-valid response described above.
+
+## Deploy to Vercel
+
+Click the "Deploy with Vercel" button at the top of this README. Vercel clones the repo, prompts for the env vars below, and deploys.
+
+### LLM provider keys (provide at least one)
+
+The deploy form lists both keys; fill in whichever provider you have and leave the other blank. The app prefers Anthropic when both are set, and falls back to OpenRouter otherwise. If neither is set, LLM-driven panels return mock responses.
+
+| Variable | Where to get it | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | https://console.anthropic.com — create a key with API access. | Direct Anthropic API; lowest latency and no third-party hop. |
+| `OPENROUTER_API_KEY` | https://openrouter.ai — create a key. | Routes to a wider set of models (Anthropic, Gemini, OpenAI, etc.). **Privacy note:** prompts (including your source material) are forwarded through OpenRouter when this path is used. |
+
+### Optional environment variables
+
+Add these later from the Vercel dashboard (`Settings → Environment Variables`).
+
+| Variable | Effect when set |
+|---|---|
+| `LEAN_VERIFIER_URL` | Points the Lean type-check API at a running verifier. The verifier is a separate Docker service (see [Lean Verification Service](#lean-verification-service)) and cannot run on Vercel; host it elsewhere (Railway, Render, Fly.io, your own infra) and set this to its URL. When unset, Lean code is generated but the type-check step returns the mock-valid response. |
+
+### Limitations on Vercel
+
+- **Lean verification** runs only when `LEAN_VERIFIER_URL` points at a separately hosted verifier (see above).
+- **Analytics history** writes to a `cwd()`-relative path that is read-only on Vercel, so the writes silently fail. Treat the analytics panel as dev-only.
 
 ## Available Scripts
 
