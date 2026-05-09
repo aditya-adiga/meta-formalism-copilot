@@ -37,6 +37,7 @@ import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
+import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
@@ -309,6 +310,11 @@ export default function Home() {
       }
     }
   }, [resetDecomp]);
+
+  // Rehydrate evidence store from localStorage on mount
+  useEffect(() => {
+    useEvidenceStore.persist.rehydrate();
+  }, []);
 
   // Keep persistence layer in sync with decomposition changes
   useEffect(() => {
