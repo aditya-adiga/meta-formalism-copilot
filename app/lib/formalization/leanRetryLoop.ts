@@ -23,6 +23,8 @@ export type LeanRetryResult = {
   valid: boolean;
   code: string;
   errors: string;
+  /** True when the verifier was unavailable — the proof was generated but never checked. */
+  unavailable?: boolean;
 };
 
 /**
@@ -66,7 +68,13 @@ export async function leanRetryLoop(
     onVerifyStart?.(attempt);
 
     const fullCode = dependencyContext ? `${dependencyContext}\n\n${currentCode}` : currentCode;
-    const { valid, errors } = await verifyLean(fullCode);
+    const { valid, errors, unavailable } = await verifyLean(fullCode);
+
+    if (unavailable) {
+      // No point retrying — the proof was never actually checked.
+      onErrors("");
+      return { valid: false, code: currentCode, errors: "", unavailable: true };
+    }
 
     if (valid) {
       onErrors("");

@@ -109,6 +109,12 @@ describe('OutputPanel', () => {
       expect(screen.getByText('Verification Failed')).toBeInTheDocument()
     })
 
+    it('shows "Verifier offline" for unavailable status (not a passing badge)', () => {
+      render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="unavailable" />)
+      expect(screen.getByText(/Verifier offline/)).toBeInTheDocument()
+      expect(screen.queryByText('Verified')).not.toBeInTheDocument()
+    })
+
     it('shows nothing for none status', () => {
       render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="none" />)
       expect(screen.queryByText('Verifying...')).not.toBeInTheDocument()

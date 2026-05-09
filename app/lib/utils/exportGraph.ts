@@ -3,7 +3,8 @@
  * html-to-image is only needed when exporting the React Flow graph.
  */
 
-import { toPng } from "html-to-image";
+// Use toBlob (not toPng + fetch) so we don't need `data:` in CSP connect-src.
+import { toBlob } from "html-to-image";
 import { triggerDownload } from "./export";
 
 /** Query the React Flow viewport element from the DOM */
@@ -13,27 +14,23 @@ export function getGraphViewportElement(): HTMLElement | null {
 
 const EXPORT_BG = "#F9F5F1"; // --ivory-cream
 
+async function renderGraphPng(viewportElement: HTMLElement): Promise<Blob> {
+  const blob = await toBlob(viewportElement, {
+    pixelRatio: 2,
+    backgroundColor: EXPORT_BG,
+  });
+  if (!blob) throw new Error("Failed to render graph PNG");
+  return blob;
+}
+
 export async function downloadGraphAsPng(
   viewportElement: HTMLElement,
   filename = "proof-graph.png",
 ) {
-  const dataUrl = await toPng(viewportElement, {
-    pixelRatio: 2,
-    backgroundColor: EXPORT_BG,
-  });
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  triggerDownload(blob, filename);
+  triggerDownload(await renderGraphPng(viewportElement), filename);
 }
 
 /** Generate a PNG blob of the graph (for embedding in zip) */
-export async function graphToPngBlob(
-  viewportElement: HTMLElement,
-): Promise<Blob> {
-  const dataUrl = await toPng(viewportElement, {
-    pixelRatio: 2,
-    backgroundColor: EXPORT_BG,
-  });
-  const res = await fetch(dataUrl);
-  return res.blob();
+export function graphToPngBlob(viewportElement: HTMLElement): Promise<Blob> {
+  return renderGraphPng(viewportElement);
 }

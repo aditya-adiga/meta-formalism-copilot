@@ -85,7 +85,7 @@ curl -X POST http://localhost:3100/verify \
   -d '{"leanCode":"theorem t : False := trivial"}'
 ```
 
-**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment (defaults to `http://localhost:3100`). When the verifier is unreachable, the route falls back to the mock response described above.
+**Configuration:** The Next.js route reads `LEAN_VERIFIER_URL` from the environment. If unset, the route returns an "unavailable" response and the UI shows a "Verifier offline — proof not checked" banner. Set this to `http://localhost:3100` for local dev with the Docker Compose verifier above.
 
 **Stop the verifier:**
 

@@ -1,8 +1,11 @@
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { AnalyticsEntry } from "@/app/lib/types/analytics";
+import { dataDir } from "@/app/lib/utils/dataDir";
 
-const DATA_DIR = join(process.cwd(), "data");
+// On Vercel, analytics history doesn't persist across cold starts and is
+// per-Function-instance. See dataDir() for the underlying rationale.
+const DATA_DIR = dataDir();
 const FILE_PATH = join(DATA_DIR, "analytics.jsonl");
 
 function ensureDir() {

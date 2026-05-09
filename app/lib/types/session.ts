@@ -1,4 +1,4 @@
-export type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+export type VerificationStatus = "none" | "verifying" | "valid" | "invalid" | "unavailable";
 export type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 
 export type SessionScope =

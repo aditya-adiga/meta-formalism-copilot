@@ -5,6 +5,7 @@ import type { PanelId, SplitOrientation } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import { buildArtifactEditHandlers } from "@/app/lib/stores/artifactEditHandlers";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -21,8 +22,11 @@ import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
 import SessionBanner from "@/app/components/features/session-banner/SessionBanner";
+import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
+import type { ArtifactKey, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { useDecomposition } from "@/app/hooks/useDecomposition";
-import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
+import { useWorkspaceStore, makeVersion, resolveArtifactContent, PERSISTED_ARTIFACT_FIELDS, type WorkspaceState, type WorkspaceActions } from "@/app/lib/stores/workspaceStore";
+import { sanitizeVerificationStatus } from "@/app/lib/utils/workspacePersistence";
 import { useAutoFormalizeQueue } from "@/app/hooks/useAutoFormalizeQueue";
 import { useFormalizationSessions } from "@/app/hooks/useFormalizationSessions";
 import { useWaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
@@ -33,15 +37,22 @@ import { useArtifactGeneration } from "@/app/hooks/useArtifactGeneration";
 import { useAnalytics } from "@/app/hooks/useAnalytics";
 import { useWorkspaceSessions } from "@/app/hooks/useWorkspaceSessions";
 import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
+import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
 
-/** Safely parse a JSON string, returning null on failure */
-function parseJson<T>(json: string | null): T | null {
-  if (!json) return null;
-  try { return JSON.parse(json) as T; }
-  catch { return null; }
+// Stable selectors for artifact content — read from the state snapshot `s`
+// (not `get()`) so Zustand can track dependencies and skip re-renders when
+// unrelated state changes.
+type StoreState = WorkspaceState & WorkspaceActions;
+function artifactSelector(key: ArtifactKey): (s: StoreState) => string | null {
+  return (s) => resolveArtifactContent(s.artifacts[key]);
 }
+const selectCausalGraph = artifactSelector("causal-graph");
+const selectStatisticalModel = artifactSelector("statistical-model");
+const selectPropertyTests = artifactSelector("property-tests");
+const selectDialecticalMap = artifactSelector("dialectical-map");
+const selectCounterexamples = artifactSelector("counterexamples");
 
 function phaseToEndpoint(phase: LoadingPhase): string | null {
   switch (phase) {
@@ -60,57 +71,160 @@ function phaseToEndpoint(phase: LoadingPhase): string | null {
 }
 
 export default function Home() {
+  // --- SSR hydration: trigger Zustand rehydrate once on mount ---
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      useWorkspaceStore.persist.rehydrate();
+    }
+  }, []);
+
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
   const [secondaryPanelId, setSecondaryPanelIdRaw] = useState<PanelId | null>(null);
   const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>("horizontal");
 
-  // --- Persisted state (survives page refresh) ---
-  const {
-    sourceText, setSourceText,
-    extractedFiles, setExtractedFiles,
-    contextText, setContextText,
-    semiformalText, setSemiformalText,
-    leanCode, setLeanCode,
-    semiformalDirty, setSemiformalDirty,
-    verificationStatus, setVerificationStatus,
-    verificationErrors, setVerificationErrors,
-    restoredDecompState, persistDecompState,
-    getSnapshot: getWorkspaceSnapshot, resetToSnapshot: resetWorkspaceToSnapshot, clearWorkspace,
-    causalGraph: persistedCausalGraph, setCausalGraph: setPersistedCausalGraph,
-    statisticalModel: persistedStatisticalModel, setStatisticalModel: setPersistedStatisticalModel,
-    propertyTests: persistedPropertyTests, setPropertyTests: setPersistedPropertyTests,
-    dialecticalMap: persistedDialecticalMap, setDialecticalMap: setPersistedDialecticalMap,
-    counterexamples: persistedCounterexamples, setCounterexamples: setPersistedCounterexamples,
-  } = useWorkspacePersistence();
+  // --- Persisted state from Zustand store ---
+  const sourceText = useWorkspaceStore((s) => s.sourceText);
+  const extractedFiles = useWorkspaceStore((s) => s.extractedFiles);
+  const contextText = useWorkspaceStore((s) => s.contextText);
+  const semiformalText = useWorkspaceStore((s) => s.semiformalText);
+  const leanCode = useWorkspaceStore((s) => s.leanCode);
+  const semiformalDirty = useWorkspaceStore((s) => s.semiformalDirty);
+  const verificationStatus = useWorkspaceStore((s) => s.verificationStatus);
+  const verificationErrors = useWorkspaceStore((s) => s.verificationErrors);
+  // Store setters — Zustand selectors return the same function identity across
+  // state changes, so Object.is comparison prevents re-renders for these.
+  const setSourceText = useWorkspaceStore((s) => s.setSourceText);
+  const setExtractedFiles = useWorkspaceStore((s) => s.setExtractedFiles);
+  const setContextText = useWorkspaceStore((s) => s.setContextText);
+  const setSemiformalText = useWorkspaceStore((s) => s.setSemiformalText);
+  const setLeanCode = useWorkspaceStore((s) => s.setLeanCode);
+  const setSemiformalDirty = useWorkspaceStore((s) => s.setSemiformalDirty);
+  const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
+  const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
 
-  // Shared map: artifact type → persisted-state setter (used by restore, store, and clear)
-  const artifactSetters = useMemo(() => ({
-    "causal-graph": setPersistedCausalGraph,
-    "statistical-model": setPersistedStatisticalModel,
-    "property-tests": setPersistedPropertyTests,
-    "dialectical-map": setPersistedDialecticalMap,
-  } as const satisfies Partial<Record<ArtifactType, (v: string) => void>>), [setPersistedCausalGraph, setPersistedStatisticalModel, setPersistedPropertyTests, setPersistedDialecticalMap]);
+  // Decomposition persistence bridge
+  const persistDecompState = useCallback((d: PersistedDecomposition) => {
+    useWorkspaceStore.getState().setDecomposition(d);
+  }, []);
+
+  // Workspace sessions bridge: convert between WorkspaceState and PersistedWorkspace
+  const getWorkspaceSnapshot = useCallback((): PersistedWorkspace => {
+    const s = useWorkspaceStore.getState();
+    return {
+      version: 2,
+      sourceText: s.sourceText,
+      extractedFiles: s.extractedFiles.map(({ name, text }) => ({ name, text })),
+      contextText: s.contextText,
+      semiformalText: s.semiformalText,
+      leanCode: s.leanCode,
+      semiformalDirty: s.semiformalDirty,
+      verificationStatus: sanitizeVerificationStatus(s.verificationStatus),
+      verificationErrors: s.verificationErrors,
+      decomposition: structuredClone(s.decomposition),
+      causalGraph: s.getArtifactContent("causal-graph"),
+      statisticalModel: s.getArtifactContent("statistical-model"),
+      propertyTests: s.getArtifactContent("property-tests"),
+      dialecticalMap: s.getArtifactContent("dialectical-map"),
+      counterexamples: s.getArtifactContent("counterexamples"),
+    };
+  }, []);
+
+  const resetWorkspaceToSnapshot = useCallback((data: PersistedWorkspace): PersistedDecomposition => {
+    // Build versioned artifact records from flat PersistedWorkspace strings
+    const artifacts: Partial<Record<ArtifactKey, ArtifactRecord>> = {};
+    for (const [field, key] of Object.entries(PERSISTED_ARTIFACT_FIELDS)) {
+      const content = data[field as keyof PersistedWorkspace] as string | null;
+      if (content) {
+        artifacts[key] = {
+          type: key,
+          currentVersionIndex: 0,
+          versions: [makeVersion(content, "generated")],
+        };
+      }
+    }
+
+    // Single setState call: one persist write instead of 15
+    useWorkspaceStore.setState({
+      sourceText: data.sourceText,
+      extractedFiles: data.extractedFiles,
+      contextText: data.contextText,
+      semiformalText: data.semiformalText,
+      leanCode: data.leanCode,
+      semiformalDirty: data.semiformalDirty,
+      verificationStatus: sanitizeVerificationStatus(data.verificationStatus),
+      verificationErrors: data.verificationErrors,
+      decomposition: data.decomposition,
+      artifacts,
+    });
+    return data.decomposition;
+  }, []);
+
+  const clearWorkspace = useCallback((): PersistedDecomposition => {
+    useWorkspaceStore.getState().clearWorkspace();
+    return { nodes: [], selectedNodeId: null, paperText: "", sources: [] };
+  }, []);
+
+  // Artifact content (versioned store → flat JSON strings for display)
+  const persistedCausalGraph = useWorkspaceStore(selectCausalGraph);
+  const persistedStatisticalModel = useWorkspaceStore(selectStatisticalModel);
+  const persistedPropertyTests = useWorkspaceStore(selectPropertyTests);
+  const persistedDialecticalMap = useWorkspaceStore(selectDialecticalMap);
+  const persistedCounterexamples = useWorkspaceStore(selectCounterexamples);
 
   // --- Artifact data (persisted as JSON strings, parsed for display) ---
-  const causalGraph = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]>(persistedCausalGraph), [persistedCausalGraph]);
-  const statisticalModel = useMemo(() => parseJson<import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]>(persistedStatisticalModel), [persistedStatisticalModel]);
-  const propertyTests = useMemo(() => parseJson<import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]>(persistedPropertyTests), [persistedPropertyTests]);
-  const dialecticalMap = useMemo(() => parseJson<import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]>(persistedDialecticalMap), [persistedDialecticalMap]);
-  const counterexamples = useMemo(() => parseJson<import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]>(persistedCounterexamples), [persistedCounterexamples]);
+  const causalGraph = useMemo(() => {
+    if (!persistedCausalGraph) return null;
+    try { return JSON.parse(persistedCausalGraph) as import("@/app/lib/types/artifacts").CausalGraphResponse["causalGraph"]; }
+    catch { return null; }
+  }, [persistedCausalGraph]);
+
+  const statisticalModel = useMemo(() => {
+    if (!persistedStatisticalModel) return null;
+    try { return JSON.parse(persistedStatisticalModel) as import("@/app/lib/types/artifacts").StatisticalModelResponse["statisticalModel"]; }
+    catch { return null; }
+  }, [persistedStatisticalModel]);
+
+  const propertyTests = useMemo(() => {
+    if (!persistedPropertyTests) return null;
+    try { return JSON.parse(persistedPropertyTests) as import("@/app/lib/types/artifacts").PropertyTestsResponse["propertyTests"]; }
+    catch { return null; }
+  }, [persistedPropertyTests]);
+
+  const dialecticalMap = useMemo(() => {
+    if (!persistedDialecticalMap) return null;
+    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+    catch { return null; }
+  }, [persistedDialecticalMap]);
+
+  const counterexamples = useMemo(() => {
+    if (!persistedCounterexamples) return null;
+    try { return JSON.parse(persistedCounterexamples) as import("@/app/lib/types/artifacts").CounterexamplesResponse["counterexamples"]; }
+    catch { return null; }
+  }, [persistedCounterexamples]);
 
   // --- Artifact editing ---
+  // Handlers split by intent: `onSave` wires panel onContentChange (manual-edit
+  // source); `onAiEdited` is passed into useAllArtifactEditing so Cmd+K/whole-doc
+  // rewrites record ai-edit. Both go through setArtifactEdited, keeping undo/redo
+  // and version history intact. Empty deps → stable identity for the component's
+  // lifetime, so the render memo below can list `artifactEditHandlers` once
+  // instead of every inner callback.
+  const artifactEditHandlers = useMemo(() => buildArtifactEditHandlers(), []);
+
   const artifactEditing = useAllArtifactEditing({
     causalGraph: persistedCausalGraph,
-    setCausalGraph: setPersistedCausalGraph,
+    setCausalGraph: artifactEditHandlers["causal-graph"].onAiEdited,
     statisticalModel: persistedStatisticalModel,
-    setStatisticalModel: setPersistedStatisticalModel,
+    setStatisticalModel: artifactEditHandlers["statistical-model"].onAiEdited,
     propertyTests: persistedPropertyTests,
-    setPropertyTests: setPersistedPropertyTests,
+    setPropertyTests: artifactEditHandlers["property-tests"].onAiEdited,
     dialecticalMap: persistedDialecticalMap,
-    setDialecticalMap: setPersistedDialecticalMap,
+    setDialecticalMap: artifactEditHandlers["dialectical-map"].onAiEdited,
     counterexamples: persistedCounterexamples,
-    setCounterexamples: setPersistedCounterexamples,
+    setCounterexamples: artifactEditHandlers.counterexamples.onAiEdited,
   });
 
   // --- Artifact type selection + parallel generation ---
@@ -149,21 +263,58 @@ export default function Home() {
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes } = useDecomposition();
+  const {
+    state: decomp,
+    selectedNode,
+    extractPropositions,
+    selectNode,
+    updateNode,
+    addGraphNode,
+    removeGraphNode,
+    renameGraphNode,
+    addGraphEdge,
+    removeGraphEdge,
+    updateGraphLayout,
+    resetState: resetDecomp,
+    streamingNodes,
+  } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
 
+  // --- Graph editing handlers ---
+  const handleAddNode = useCallback(() => {
+    const id = addGraphNode({ label: "New Node" });
+    selectNode(id);
+  }, [addGraphNode, selectNode]);
+
+  const handleDeleteEdges = useCallback(
+    (edges: Array<{ source: string; target: string }>) => {
+      for (const e of edges) {
+        removeGraphEdge(e.source, e.target);
+      }
+    },
+    [removeGraphEdge],
+  );
+
   // --- Auto-formalize queue ---
-  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue, reset: resetQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
   const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
-  // Restore decomposition from localStorage once on mount
+  // Restore decomposition from persisted store once on mount (one-time read, no subscription)
   const decompRestoredRef = useRef(false);
   useEffect(() => {
-    if (!decompRestoredRef.current && restoredDecompState) {
+    if (!decompRestoredRef.current) {
       decompRestoredRef.current = true;
-      resetDecomp(restoredDecompState);
+      const persisted = useWorkspaceStore.getState().decomposition;
+      if (persisted.nodes.length > 0) {
+        resetDecomp(persisted);
+      }
     }
-  }, [restoredDecompState, resetDecomp]);
+  }, [resetDecomp]);
+
+  // Rehydrate evidence store from localStorage on mount
+  useEffect(() => {
+    useEvidenceStore.persist.rehydrate();
+  }, []);
 
   // Keep persistence layer in sync with decomposition changes
   useEffect(() => {
@@ -172,8 +323,9 @@ export default function Home() {
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
       sources: decomp.sources ?? [],
+      graphLayout: decomp.graphLayout,
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, decomp.graphLayout, persistDecompState]);
 
   // --- Session state ---
   // Restore callback: applies a session's data to global or per-node state
@@ -196,17 +348,18 @@ export default function Home() {
     }
 
     // Restore artifact data from session's artifacts[]
-    const restoreSetters: Partial<Record<ArtifactType, (v: string | null) => void>> = {
-      "causal-graph": setPersistedCausalGraph,
-      "statistical-model": setPersistedStatisticalModel,
-      "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
-      counterexamples: setPersistedCounterexamples,
-    };
     for (const artifact of session.artifacts) {
-      restoreSetters[artifact.type]?.(artifact.content);
+      switch (artifact.type) {
+        case "causal-graph":
+        case "statistical-model":
+        case "property-tests":
+        case "dialectical-map":
+        case "counterexamples":
+          useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
+          break;
+      }
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, artifactSetters, setPersistedCounterexamples]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
 
   const {
     activeSession,
@@ -254,21 +407,17 @@ export default function Home() {
       }
     }
 
-    // Also update persisted display state (JSON strings)
-    const persistSetters: Partial<Record<ArtifactType, (v: string | null) => void>> = {
-      "causal-graph": setPersistedCausalGraph,
-      "statistical-model": setPersistedStatisticalModel,
-      "property-tests": setPersistedPropertyTests,
-      "dialectical-map": setPersistedDialecticalMap,
-      counterexamples: setPersistedCounterexamples,
-    };
-    for (const [type, value] of Object.entries(results)) {
-      const setter = persistSetters[type as ArtifactType];
-      if (setter && value != null) {
-        setter(JSON.stringify(value));
-      }
+    // Batch-update persisted display state — single set() via store action
+    const entries = Object.values(PERSISTED_ARTIFACT_FIELDS)
+      .filter((key) => results[key] != null)
+      .map((key) => ({
+        key,
+        content: typeof results[key] === "string" ? results[key] as string : JSON.stringify(results[key]),
+      }));
+    if (entries.length > 0) {
+      useWorkspaceStore.getState().setArtifactsBatchGenerated(entries);
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes, artifactSetters, setPersistedCounterexamples]);
+  }, [updateSessionArtifact, updateNode, decomp.nodes]);
 
   // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
   const {
@@ -286,6 +435,8 @@ export default function Home() {
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
+    cancelQueue,
+    resetQueue,
   });
 
   // --- Combined paper text for single-proof formalization ---
@@ -316,17 +467,20 @@ export default function Home() {
   }, [sourceText, extractedFiles]);
 
   // --- Formalization pipelines ---
-  // Global pipeline: reads/writes global persisted state
+  // Global pipeline uses getState() so async callbacks always read the latest store
+  // values, avoiding stale closures during multi-step operations (generate → verify → retry).
+  // The node pipeline below closes over `selectedNode` instead, because it needs the
+  // node identity captured at callback creation time (updateNode is keyed by node ID).
   const globalPipeline = useFormalizationPipeline({
-    getSemiformal: () => semiformalText,
-    setSemiformal: setSemiformalText,
-    getLeanCode: () => leanCode,
-    setLeanCode: setLeanCode,
-    getVerificationErrors: () => verificationErrors,
-    setVerificationStatus,
-    setVerificationErrors,
-    onResetForSemiformal: () => { setSemiformalDirty(false); },
-    onResetForLean: () => { setSemiformalDirty(false); },
+    getSemiformal: () => useWorkspaceStore.getState().semiformalText,
+    setSemiformal: (text) => useWorkspaceStore.getState().setSemiformalText(text),
+    getLeanCode: () => useWorkspaceStore.getState().leanCode,
+    setLeanCode: (code) => useWorkspaceStore.getState().setLeanCode(code),
+    getVerificationErrors: () => useWorkspaceStore.getState().verificationErrors,
+    setVerificationStatus: (s) => useWorkspaceStore.getState().setVerificationStatus(s),
+    setVerificationErrors: (e) => useWorkspaceStore.getState().setVerificationErrors(e),
+    onResetForSemiformal: () => { useWorkspaceStore.getState().setSemiformalDirty(false); },
+    onResetForLean: () => { useWorkspaceStore.getState().setSemiformalDirty(false); },
     onSessionUpdate: (updates) => {
       syncToActiveSession(updates);
       if (typeof updates.semiformalText === "string" && updates.semiformalText) {
@@ -428,8 +582,9 @@ export default function Home() {
     // Clear persisted data for types being regenerated so streaming previews
     // are visible via mergeStreamingPreview (which prefers finalData over preview)
     for (const type of artifactTypes) {
-      const setter = artifactSetters[type as keyof typeof artifactSetters];
-      if (setter) setter("");
+      if (type !== "semiformal") {
+        useWorkspaceStore.getState().setArtifactGenerated(type as ArtifactKey, "");
+      }
     }
 
     // Navigate to the first selected artifact panel
@@ -452,7 +607,7 @@ export default function Home() {
     if (artifactResults) {
       storeArtifactResults(artifactResults, nodeId);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId, artifactSetters]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -662,6 +817,13 @@ export default function Home() {
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
+            graphLayout={decomp.graphLayout}
+            onLayoutChange={updateGraphLayout}
+            onAddNode={handleAddNode}
+            onDeleteNode={removeGraphNode}
+            onRenameNode={renameGraphNode}
+            onConnectNodes={addGraphEdge}
+            onDeleteEdges={handleDeleteEdges}
           />
         );
       case "node-detail":
@@ -686,7 +848,7 @@ export default function Home() {
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
 
-            onContentChange={setPersistedCausalGraph}
+            onContentChange={artifactEditHandlers["causal-graph"].onSave}
             onAiEdit={artifactEditing.causalGraph.handleAiEdit}
             editing={artifactEditing.causalGraph.editing}
             editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
@@ -699,7 +861,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
 
-            onContentChange={setPersistedStatisticalModel}
+            onContentChange={artifactEditHandlers["statistical-model"].onSave}
             onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
             editing={artifactEditing.statisticalModel.editing}
             editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
@@ -712,7 +874,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
 
-            onContentChange={setPersistedPropertyTests}
+            onContentChange={artifactEditHandlers["property-tests"].onSave}
             onAiEdit={artifactEditing.propertyTests.handleAiEdit}
             editing={artifactEditing.propertyTests.editing}
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
@@ -725,7 +887,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
 
-            onContentChange={setPersistedDialecticalMap}
+            onContentChange={artifactEditHandlers["dialectical-map"].onSave}
             onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
             editing={artifactEditing.dialecticalMap.editing}
             editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
@@ -737,7 +899,7 @@ export default function Home() {
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
 
-            onContentChange={setPersistedCounterexamples}
+            onContentChange={artifactEditHandlers.counterexamples.onSave}
             onAiEdit={artifactEditing.counterexamples.handleAiEdit}
             editing={artifactEditing.counterexamples.editing}
             editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
@@ -761,19 +923,16 @@ export default function Home() {
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
-    setPersistedCausalGraph,
     statisticalModel, statisticalModelLoading,
-    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
-    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
-    setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
-    setPersistedCounterexamples,
+    artifactEditHandlers,
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     streamingNodes,
+    addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
   ]);
 
   return (

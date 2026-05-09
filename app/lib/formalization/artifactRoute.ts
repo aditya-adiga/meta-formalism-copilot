@@ -67,6 +67,10 @@ export async function handleArtifactRoute(
 
   // Streaming path: all artifact types use real token streaming.
   // JSON artifacts stream raw tokens for partial-JSON parsing on the client.
+  // Note: streaming does not pass responseFormat (JSON schema enforcement) because
+  // provider streaming APIs don't support it consistently. The system prompt is
+  // relied upon to produce correctly-shaped JSON. The batch path enforces the schema
+  // as an extra safety net via responseFormat.
   if (wantStream) {
     const stream = streamLlm({
       endpoint: config.endpoint,
@@ -103,10 +107,13 @@ export async function handleArtifactRoute(
       if (cacheKey) {
         try { await removeCachedResult(cacheKey.model, cacheKey.systemPrompt, cacheKey.userContent, cacheKey.maxTokens); } catch { /* ignore */ }
       }
-      const preview = responseText.slice(0, 500);
-      console.error(`[${config.endpoint}] Failed to parse LLM response as JSON:`, preview);
+      // Log only length — responseText is a function of the user's source
+      // material and shouldn't end up in server logs. The response payload
+      // still echoes a slice back to the caller, since they originated the
+      // request and need it to debug their input. Mirrors edit/artifact.
+      console.error(`[${config.endpoint}] LLM returned invalid JSON: ${responseText.length} chars`);
       return NextResponse.json(
-        { error: "LLM response was not valid JSON", details: preview },
+        { error: "LLM response was not valid JSON", details: responseText.slice(0, 500) },
         { status: 502 },
       );
     }
