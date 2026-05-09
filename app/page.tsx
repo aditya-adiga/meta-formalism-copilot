@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import type { PanelId } from "@/app/lib/types/panels";
+import type { PanelId, SplitOrientation } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import { buildArtifactEditHandlers } from "@/app/lib/stores/artifactEditHandlers";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
 import PanelShell from "@/app/components/layout/PanelShell";
@@ -80,6 +81,8 @@ export default function Home() {
 
   // --- Panel navigation ---
   const [activePanelId, setActivePanelIdRaw] = useState<PanelId>("source");
+  const [secondaryPanelId, setSecondaryPanelIdRaw] = useState<PanelId | null>(null);
+  const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>("horizontal");
 
   // --- Persisted state from Zustand store ---
   const sourceText = useWorkspaceStore((s) => s.sourceText);
@@ -202,35 +205,25 @@ export default function Home() {
   }, [persistedCounterexamples]);
 
   // --- Artifact editing ---
-  // Bridge Zustand store actions to the (string | null) => void interface
-  // expected by useAllArtifactEditing. Stable identity: useCallback with no deps.
-  const setPersistedCausalGraph = useCallback((v: string | null) => {
-    if (v) useWorkspaceStore.getState().setArtifactGenerated("causal-graph", v);
-  }, []);
-  const setPersistedStatisticalModel = useCallback((v: string | null) => {
-    if (v) useWorkspaceStore.getState().setArtifactGenerated("statistical-model", v);
-  }, []);
-  const setPersistedPropertyTests = useCallback((v: string | null) => {
-    if (v) useWorkspaceStore.getState().setArtifactGenerated("property-tests", v);
-  }, []);
-  const setPersistedDialecticalMap = useCallback((v: string | null) => {
-    if (v) useWorkspaceStore.getState().setArtifactGenerated("dialectical-map", v);
-  }, []);
-  const setPersistedCounterexamples = useCallback((v: string | null) => {
-    if (v) useWorkspaceStore.getState().setArtifactGenerated("counterexamples", v);
-  }, []);
+  // Handlers split by intent: `onSave` wires panel onContentChange (manual-edit
+  // source); `onAiEdited` is passed into useAllArtifactEditing so Cmd+K/whole-doc
+  // rewrites record ai-edit. Both go through setArtifactEdited, keeping undo/redo
+  // and version history intact. Empty deps → stable identity for the component's
+  // lifetime, so the render memo below can list `artifactEditHandlers` once
+  // instead of every inner callback.
+  const artifactEditHandlers = useMemo(() => buildArtifactEditHandlers(), []);
 
   const artifactEditing = useAllArtifactEditing({
     causalGraph: persistedCausalGraph,
-    setCausalGraph: setPersistedCausalGraph,
+    setCausalGraph: artifactEditHandlers["causal-graph"].onAiEdited,
     statisticalModel: persistedStatisticalModel,
-    setStatisticalModel: setPersistedStatisticalModel,
+    setStatisticalModel: artifactEditHandlers["statistical-model"].onAiEdited,
     propertyTests: persistedPropertyTests,
-    setPropertyTests: setPersistedPropertyTests,
+    setPropertyTests: artifactEditHandlers["property-tests"].onAiEdited,
     dialecticalMap: persistedDialecticalMap,
-    setDialecticalMap: setPersistedDialecticalMap,
+    setDialecticalMap: artifactEditHandlers["dialectical-map"].onAiEdited,
     counterexamples: persistedCounterexamples,
-    setCounterexamples: setPersistedCounterexamples,
+    setCounterexamples: artifactEditHandlers.counterexamples.onAiEdited,
   });
 
   // --- Artifact type selection + parallel generation ---
@@ -243,7 +236,23 @@ export default function Home() {
   const setActivePanelId = useCallback((id: PanelId) => {
     if (id === "analytics") refreshAnalytics();
     setActivePanelIdRaw(id);
+    // Clear secondary if it now matches the new primary
+    setSecondaryPanelIdRaw((prev) => prev === id ? null : prev);
   }, [refreshAnalytics]);
+
+  const setSecondaryPanelId = useCallback((id: PanelId) => {
+    if (id === activePanelId) return;
+    if (id === "analytics") refreshAnalytics();
+    setSecondaryPanelIdRaw(id);
+  }, [activePanelId, refreshAnalytics]);
+
+  const closeSecondaryPanel = useCallback(() => {
+    setSecondaryPanelIdRaw(null);
+  }, []);
+
+  const toggleSplitOrientation = useCallback(() => {
+    setSplitOrientation((prev) => prev === "horizontal" ? "vertical" : "horizontal");
+  }, []);
 
   // Derive per-type loading booleans from artifactLoadingState
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
@@ -286,7 +295,7 @@ export default function Home() {
   );
 
   // --- Auto-formalize queue ---
-  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
+  const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue, reset: resetQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
   const queueRunning = queueProgress.status === "running" || queueProgress.status === "paused";
 
   // Restore decomposition from persisted store once on mount (one-time read, no subscription)
@@ -420,6 +429,8 @@ export default function Home() {
     clearWorkspace,
     clearAllSessions,
     resetDecomp,
+    cancelQueue,
+    resetQueue,
   });
 
   // --- Combined paper text for single-proof formalization ---
@@ -658,7 +669,15 @@ export default function Home() {
 
   const handleSelectNode = useCallback((id: string) => {
     selectNode(id);
-    setActivePanelId("node-detail");
+    // If we're in split mode with the graph visible, open node-detail in the
+    // secondary panel so the graph stays visible for context.
+    if (secondaryPanelId !== null && activePanelId === "decomposition") {
+      setSecondaryPanelId("node-detail");
+    } else if (secondaryPanelId !== null && secondaryPanelId === "decomposition") {
+      setActivePanelId("node-detail");
+    } else {
+      setActivePanelId("node-detail");
+    }
     // Auto-select the most recent session for this node
     const node = decomp.nodes.find((n) => n.id === id);
     if (node) {
@@ -667,7 +686,7 @@ export default function Home() {
         selectSession(nodeSessions[0].id);
       }
     }
-  }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId]);
+  }, [selectNode, decomp.nodes, sessionsForScope, selectSession, setActivePanelId, secondaryPanelId, activePanelId, setSecondaryPanelId]);
 
   // Resolve dependencies for NodeDetailPanel
   const selectedNodeDeps = useMemo(() => {
@@ -823,7 +842,7 @@ export default function Home() {
             loading={causalGraphLoading}
             waitEstimate={causalGraphWaitEstimate}
 
-            onContentChange={setPersistedCausalGraph}
+            onContentChange={artifactEditHandlers["causal-graph"].onSave}
             onAiEdit={artifactEditing.causalGraph.handleAiEdit}
             editing={artifactEditing.causalGraph.editing}
             editWaitEstimate={artifactEditing.causalGraph.editWaitEstimate}
@@ -836,7 +855,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["statistical-model"] as StatisticalModelResponse["statisticalModel"] | undefined}
             loading={statisticalModelLoading}
 
-            onContentChange={setPersistedStatisticalModel}
+            onContentChange={artifactEditHandlers["statistical-model"].onSave}
             onAiEdit={artifactEditing.statisticalModel.handleAiEdit}
             editing={artifactEditing.statisticalModel.editing}
             editWaitEstimate={artifactEditing.statisticalModel.editWaitEstimate}
@@ -849,7 +868,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["property-tests"] as PropertyTestsResponse["propertyTests"] | undefined}
             loading={propertyTestsLoading}
 
-            onContentChange={setPersistedPropertyTests}
+            onContentChange={artifactEditHandlers["property-tests"].onSave}
             onAiEdit={artifactEditing.propertyTests.handleAiEdit}
             editing={artifactEditing.propertyTests.editing}
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
@@ -862,7 +881,7 @@ export default function Home() {
             streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
             loading={dialecticalMapLoading}
 
-            onContentChange={setPersistedDialecticalMap}
+            onContentChange={artifactEditHandlers["dialectical-map"].onSave}
             onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
             editing={artifactEditing.dialecticalMap.editing}
             editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
@@ -874,7 +893,7 @@ export default function Home() {
             counterexamples={counterexamples}
             loading={counterexamplesLoading}
 
-            onContentChange={setPersistedCounterexamples}
+            onContentChange={artifactEditHandlers.counterexamples.onSave}
             onAiEdit={artifactEditing.counterexamples.handleAiEdit}
             editing={artifactEditing.counterexamples.editing}
             editWaitEstimate={artifactEditing.counterexamples.editWaitEstimate}
@@ -898,15 +917,11 @@ export default function Home() {
     selectedArtifactTypes, artifactLoadingState,
     activeSession, allSessionsSorted, selectAndRestore,
     causalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
-    setPersistedCausalGraph,
     statisticalModel, statisticalModelLoading,
-    setPersistedStatisticalModel,
     propertyTests, propertyTestsLoading,
-    setPersistedPropertyTests,
     dialecticalMap, dialecticalMapLoading,
-    setPersistedDialecticalMap,
     counterexamples, counterexamplesLoading,
-    setPersistedCounterexamples,
+    artifactEditHandlers,
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
@@ -932,6 +947,13 @@ export default function Home() {
         renderPanel={renderPanel}
         onExportAll={handleExportAll}
         exportAllDisabled={!hasExportableContent}
+        split={{
+          secondaryPanelId,
+          onSelectSecondaryPanel: setSecondaryPanelId,
+          onCloseSecondary: closeSecondaryPanel,
+          orientation: splitOrientation,
+          onToggleOrientation: toggleSplitOrientation,
+        }}
       />
     </main>
   );
