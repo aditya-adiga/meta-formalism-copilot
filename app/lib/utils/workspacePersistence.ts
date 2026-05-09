@@ -136,6 +136,30 @@ export function coerceDecomposition(raw: unknown): PersistedDecomposition {
       } as PropositionNode))
     : [];
 
+  // Validate graphLayout: positions must be Record<string, {x: number, y: number}>
+  let graphLayout: import("@/app/lib/types/decomposition").GraphLayout | undefined;
+  if (isObject(raw.graphLayout)) {
+    const rawLayout = raw.graphLayout as Record<string, unknown>;
+    if (isObject(rawLayout.positions)) {
+      const rawPositions = rawLayout.positions as Record<string, unknown>;
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const [key, val] of Object.entries(rawPositions)) {
+        if (isObject(val) && typeof val.x === "number" && typeof val.y === "number") {
+          positions[key] = { x: val.x, y: val.y };
+        }
+      }
+      if (Object.keys(positions).length > 0) {
+        graphLayout = { positions };
+        if (isObject(rawLayout.viewport)) {
+          const vp = rawLayout.viewport as Record<string, unknown>;
+          if (typeof vp.x === "number" && typeof vp.y === "number" && typeof vp.zoom === "number") {
+            graphLayout.viewport = { x: vp.x, y: vp.y, zoom: vp.zoom };
+          }
+        }
+      }
+    }
+  }
+
   return {
     nodes,
     selectedNodeId: typeof raw.selectedNodeId === "string" ? raw.selectedNodeId : null,
@@ -145,6 +169,7 @@ export function coerceDecomposition(raw: unknown): PersistedDecomposition {
       sourceLabel: typeof s.sourceLabel === "string" ? s.sourceLabel : "",
       text: typeof s.text === "string" ? s.text : "",
     })) : [],
+    graphLayout,
   };
 }
 

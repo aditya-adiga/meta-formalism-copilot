@@ -208,10 +208,9 @@ export default function Home() {
   // Handlers split by intent: `onSave` wires panel onContentChange (manual-edit
   // source); `onAiEdited` is passed into useAllArtifactEditing so Cmd+K/whole-doc
   // rewrites record ai-edit. Both go through setArtifactEdited, keeping undo/redo
-  // and version history intact. The shim's setPersistedXxx callbacks stay on
-  // restore/generation paths (setArtifactGenerated is the correct source there).
-  // Empty deps → stable identity for the component's lifetime, so the render
-  // memo below can list `artifactEditHandlers` once instead of every inner callback.
+  // and version history intact. Empty deps → stable identity for the component's
+  // lifetime, so the render memo below can list `artifactEditHandlers` once
+  // instead of every inner callback.
   const artifactEditHandlers = useMemo(() => buildArtifactEditHandlers(), []);
 
   const artifactEditing = useAllArtifactEditing({
@@ -263,8 +262,37 @@ export default function Home() {
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
-  const { state: decomp, selectedNode, extractPropositions, selectNode, updateNode, resetState: resetDecomp, streamingNodes } = useDecomposition();
+  const {
+    state: decomp,
+    selectedNode,
+    extractPropositions,
+    selectNode,
+    updateNode,
+    addGraphNode,
+    removeGraphNode,
+    renameGraphNode,
+    addGraphEdge,
+    removeGraphEdge,
+    updateGraphLayout,
+    resetState: resetDecomp,
+    streamingNodes,
+  } = useDecomposition();
   const isDecompMode = decomp.nodes.length > 0 && selectedNode !== null;
+
+  // --- Graph editing handlers ---
+  const handleAddNode = useCallback(() => {
+    const id = addGraphNode({ label: "New Node" });
+    selectNode(id);
+  }, [addGraphNode, selectNode]);
+
+  const handleDeleteEdges = useCallback(
+    (edges: Array<{ source: string; target: string }>) => {
+      for (const e of edges) {
+        removeGraphEdge(e.source, e.target);
+      }
+    },
+    [removeGraphEdge],
+  );
 
   // --- Auto-formalize queue ---
   const { progress: queueProgress, start: startQueue, pause: pauseQueue, resume: resumeQueue, cancel: cancelQueue, reset: resetQueue } = useAutoFormalizeQueue(decomp.nodes, updateNode, contextText);
@@ -289,8 +317,9 @@ export default function Home() {
       selectedNodeId: decomp.selectedNodeId,
       paperText: decomp.paperText,
       sources: decomp.sources ?? [],
+      graphLayout: decomp.graphLayout,
     });
-  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, persistDecompState]);
+  }, [decomp.nodes, decomp.selectedNodeId, decomp.paperText, decomp.sources, decomp.graphLayout, persistDecompState]);
 
   // --- Session state ---
   // Restore callback: applies a session's data to global or per-node state
@@ -782,6 +811,13 @@ export default function Home() {
             onPauseQueue={pauseQueue}
             onResumeQueue={resumeQueue}
             onCancelQueue={cancelQueue}
+            graphLayout={decomp.graphLayout}
+            onLayoutChange={updateGraphLayout}
+            onAddNode={handleAddNode}
+            onDeleteNode={removeGraphNode}
+            onRenameNode={renameGraphNode}
+            onConnectNodes={addGraphEdge}
+            onDeleteEdges={handleDeleteEdges}
           />
         );
       case "node-detail":
@@ -890,6 +926,7 @@ export default function Home() {
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     streamingNodes,
+    addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
   ]);
 
   return (
