@@ -7,13 +7,12 @@ import { computeHash, getCachedResult, setCachedResult } from "./cache";
 export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
-// Lazy-initialized Anthropic client — reused across calls
-let _anthropicClient: Anthropic | null = null;
-export function getAnthropicClient(apiKey: string): Anthropic {
-  if (!_anthropicClient) {
-    _anthropicClient = new Anthropic({ apiKey });
-  }
-  return _anthropicClient;
+// Construct a fresh Anthropic client per call. The SDK is cheap to instantiate
+// and per-call construction means an env-var rotation (e.g. swapping
+// ANTHROPIC_API_KEY in the Vercel dashboard) takes effect on the next request
+// without needing a redeploy or process restart.
+export function makeAnthropicClient(apiKey: string): Anthropic {
+  return new Anthropic({ apiKey });
 }
 
 export class OpenRouterError extends Error {
@@ -131,7 +130,7 @@ export async function callLlm({
   if (anthropicKey) {
     const model = anthropicModel ?? DEFAULT_ANTHROPIC_MODEL;
     const start = Date.now();
-    const client = getAnthropicClient(anthropicKey);
+    const client = makeAnthropicClient(anthropicKey);
     const message = await client.messages.create({
       model,
       max_tokens: maxTokens,
@@ -180,7 +179,11 @@ export async function callLlm({
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`[${endpoint}] OpenRouter error:`, response.status, errorBody);
+      // Log only status + endpoint here; the body can echo parts of the request
+      // and we don't want it on disk in plaintext. The body still rides on
+      // OpenRouterError so route handlers can decide what (if anything) to
+      // surface to the caller.
+      console.error(`[${endpoint}] OpenRouter error: status=${response.status}`);
       throw new OpenRouterError(response.status, errorBody);
     }
 
