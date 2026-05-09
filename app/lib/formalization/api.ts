@@ -1,6 +1,7 @@
 /** Shared HTTP helpers for the formalization pipeline. */
 
 import type { LlmCallUsage } from "@/app/lib/llm/callLlm";
+import type { VerificationStatus } from "@/app/lib/types/session";
 
 /** Fetch a JSON API route, throwing on non-OK responses. */
 export async function fetchApi<T>(
@@ -100,14 +101,34 @@ export async function fetchStreamingApi(
   return finalResult;
 }
 
-export async function verifyLean(leanCode: string) {
+export type VerifyLeanResult = {
+  valid: boolean;
+  errors: string;
+  /** True when the verifier is not configured or could not be reached. */
+  unavailable: boolean;
+};
+
+/**
+ * Map a verification result's `valid`/`unavailable` flags to a `VerificationStatus`.
+ * `unavailable` wins over `valid` so a missing verifier never reads as a passing proof.
+ */
+export function verifyResultToStatus(result: { valid: boolean; unavailable?: boolean }): VerificationStatus {
+  if (result.unavailable) return "unavailable";
+  return result.valid ? "valid" : "invalid";
+}
+
+export async function verifyLean(leanCode: string): Promise<VerifyLeanResult> {
   const res = await fetch("/api/verification/lean", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ leanCode }),
   });
   const data = await res.json();
-  return { valid: Boolean(data.valid), errors: (data.errors as string | undefined) ?? "" };
+  return {
+    valid: Boolean(data.valid),
+    errors: (data.errors as string | undefined) ?? "",
+    unavailable: Boolean(data.unavailable),
+  };
 }
 
 export async function generateLean(
