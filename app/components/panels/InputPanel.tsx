@@ -99,6 +99,7 @@ export default function InputPanel({
           onEditCustomType={onEditCustomType}
           onDeleteCustomType={onDeleteCustomType}
           sourceText={sourceText}
+          sourceCharLength={sourceText.length}
         />
       </div>
     </div>

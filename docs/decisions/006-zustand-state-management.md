@@ -1,4 +1,4 @@
-# 005: Zustand for State Management
+# 006: Zustand for State Management
 
 ## Context
 

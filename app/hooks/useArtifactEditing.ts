@@ -71,15 +71,15 @@ export function useArtifactEditing(
  */
 export function useAllArtifactEditing(artifacts: {
   causalGraph: string | null;
-  setCausalGraph: (v: string | null) => void;
+  setCausalGraph: (v: string) => void;
   statisticalModel: string | null;
-  setStatisticalModel: (v: string | null) => void;
+  setStatisticalModel: (v: string) => void;
   propertyTests: string | null;
-  setPropertyTests: (v: string | null) => void;
+  setPropertyTests: (v: string) => void;
   dialecticalMap: string | null;
-  setDialecticalMap: (v: string | null) => void;
+  setDialecticalMap: (v: string) => void;
   counterexamples: string | null;
-  setCounterexamples: (v: string | null) => void;
+  setCounterexamples: (v: string) => void;
 }) {
   const causalGraph = useArtifactEditing(
     "causal-graph",

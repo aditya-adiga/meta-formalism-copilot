@@ -15,7 +15,7 @@ const MAX_SYSTEM_PROMPT_LENGTH = 10_000;
  * custom artifact types let the user define their own LLM instructions. The trust
  * model is that the user is also the operator; there is no multi-tenant separation.
  * The MAX_SYSTEM_PROMPT_LENGTH limit bounds resource usage, not content.
- * See docs/decisions/005-custom-artifact-trust-model.md for rationale.
+ * See docs/decisions/008-custom-artifact-trust-model.md for rationale.
  */
 export async function POST(request: NextRequest) {
   // We need to peek at the body to get the custom config, then let

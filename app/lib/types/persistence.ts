@@ -10,6 +10,7 @@ export type PersistedDecomposition = {
   selectedNodeId: string | null;
   paperText: string;
   sources: SourceDocument[];
+  graphLayout?: import("./decomposition").GraphLayout;
 };
 
 export type PersistedWorkspace = {
