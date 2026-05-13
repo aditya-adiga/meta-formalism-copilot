@@ -130,6 +130,17 @@ export function CounterexamplesIcon({ className }: IconProps) {
   );
 }
 
+/** Puzzle piece icon for Custom Artifact types */
+export function CustomArtifactIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4" width="12" height="12" rx="1" />
+      <path d="M8 4v-1a2 2 0 0 1 4 0v1" />
+      <path d="M16 8h1a2 2 0 0 1 0 4h-1" />
+    </svg>
+  );
+}
+
 /** Detail/inspect icon for Node Detail */
 export function NodeDetailIcon({ className }: IconProps) {
   return (

@@ -1,4 +1,4 @@
-import type { ArtifactType } from "./session";
+import type { BuiltinArtifactType } from "./session";
 
 /** Uniform request shape for all new artifact generation routes (003 §2) */
 export type ArtifactGenerationRequest = {
@@ -127,8 +127,8 @@ export type CounterexamplesResponse = {
   };
 };
 
-/** Display metadata for each artifact type */
-export const ARTIFACT_META: Record<ArtifactType, {
+/** Display metadata for each built-in artifact type */
+export const ARTIFACT_META: Record<BuiltinArtifactType, {
   label: string;
   chipLabel: string;
   description: string;
@@ -178,8 +178,8 @@ export const ARTIFACT_META: Record<ArtifactType, {
   },
 };
 
-/** Artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
-export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
+/** Built-in artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline) */
+export const SELECTABLE_ARTIFACT_TYPES: BuiltinArtifactType[] = [
   "semiformal",
   "causal-graph",
   "statistical-model",
@@ -188,8 +188,8 @@ export const SELECTABLE_ARTIFACT_TYPES: ArtifactType[] = [
   "counterexamples",
 ];
 
-/** Maps artifact types to their API route paths */
-export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
+/** Maps built-in artifact types to their API route paths */
+export const ARTIFACT_ROUTE: Partial<Record<BuiltinArtifactType, string>> = {
   "causal-graph": "/api/formalization/causal-graph",
   "statistical-model": "/api/formalization/statistical-model",
   "property-tests": "/api/formalization/property-tests",
@@ -197,8 +197,8 @@ export const ARTIFACT_ROUTE: Partial<Record<ArtifactType, string>> = {
   counterexamples: "/api/formalization/counterexamples",
 };
 
-/** Maps artifact types to their JSON response key (kebab-case -> camelCase) */
-export const ARTIFACT_RESPONSE_KEY: Record<ArtifactType, string> = {
+/** Maps built-in artifact types to their JSON response field name (varies by type; not a mechanical conversion) */
+export const ARTIFACT_RESPONSE_KEY: Record<BuiltinArtifactType, string> = {
   semiformal: "proof",
   lean: "leanCode",
   "causal-graph": "causalGraph",

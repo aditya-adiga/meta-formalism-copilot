@@ -1,132 +1,257 @@
-# Test Strategy Review: feat/zustand-wire-page (Loop 2)
+# Test Strategy Review: `feat/custom-artifact-types`
 
-**Date:** 2026-04-03
-**Branch:** `feat/zustand-wire-page` vs `main`
-**Fix commit:** `3ed18f8` (fix: address code review findings A1-A10)
-**Scope:** New validation functions, memoization, batched state updates
-
----
-
-## What Changed in the Fix Commit
-
-The fix commit introduced four categories of new logic:
-
-### 1. `coerceArtifactVersion` (field-level validation)
-- New function at line 69 of `workspaceStore.ts`
-- Validates individual `ArtifactVersion` objects from deserialized JSON
-- Checks `id` (string, required), `content` (string, required), `createdAt` (string, defaults to `new Date().toISOString()`), `source` (enum validated against `VALID_ARTIFACT_SOURCES`, defaults to `"generated"`), `editInstruction` (optional string)
-- Returns `null` for invalid entries, which are then filtered out by `coerceArtifactRecord`
-
-### 2. `sanitizeDecomposition` memoization
-- Module-level cache (`_lastDecompRef` / `_lastDecompSanitized`) at line 291
-- Returns cached result when the input reference is unchanged
-- Used in `partialize` to avoid re-mapping decomposition nodes on every `set()` call
-
-### 3. Batched `storeArtifactResults` in `page.tsx`
-- Replaced N individual `setArtifactGenerated` calls with a single `useWorkspaceStore.setState()`
-- Builds `ArtifactRecord` objects inline, including `MAX_VERSIONS` cap logic via `.slice(-MAX_VERSIONS + 1)`
-
-### 4. Batched `migrateFromV2`
-- Replaced N individual setter calls with a single `useWorkspaceStore.setState()`
-- Builds artifact records inline from flat `PersistedWorkspace` strings
-
-### 5. Decomposition coercion delegation
-- `coercePersistedState` now delegates to the exported `coerceDecomposition()` from `workspacePersistence.ts` instead of inline coercion
-- This is a de-duplication, not new logic -- `coerceDecomposition` already has tests in `workspacePersistence.test.ts`
+**Branch:** `feat/custom-artifact-types`  
+**Date:** 2026-04-07  
+**Files changed:** 23 (1434 additions, 193 deletions)  
+**Existing tests passing:** 173/173
 
 ---
 
-## Prior Recommendations: Status Update
+## Risk Profile
 
-| # | Test | Status | Notes |
-|---|-------|--------|-------|
-| 1 | `resolveArtifactContent` edge cases | **Still valid, high priority** | No changes to this function. Still untested for degenerate inputs. |
-| 2 | Undo/redo no-ops on boundaries | **Still valid, high priority** | No changes to undo/redo logic. |
-| 3 | `onRehydrateStorage` auto-migration | **Still valid, high priority** | Migration logic changed (batched setState), but the test approach is the same. |
-| 4 | Snapshot bridge round-trip | **Still valid, high priority** | No changes to snapshot bridge functions in this commit. |
-| 5 | `clearWorkspace` persistence round-trip | **Still valid, medium priority** | No changes. |
-| 6 | Multiple artifact types independence | **Still valid, medium priority** | The batched `storeArtifactResults` makes this slightly more important -- a bug in the spread pattern could clobber other artifact keys. |
-| 7 | Corrupted localStorage resilience | **Priority increased** | `coerceArtifactVersion` is new validation logic specifically for this scenario. The existing hydration test uses well-formed data. |
-| 8 | Debounced storage adapter | **Still valid, low priority** | No changes. |
+### What can go wrong?
 
----
+1. **Persistence corruption / data loss** — Custom type definitions and their generated data are stored alongside existing workspace state in localStorage. Malformed data on load could crash the app or silently lose custom types.
+2. **Type system widening breaks existing flows** — `ArtifactType` was widened from a fixed union (`BuiltinArtifactType`) to include `CustomArtifactTypeId`. Any code that exhaustively switches on artifact types or indexes `ARTIFACT_ROUTE`/`ARTIFACT_RESPONSE_KEY` with the wider type could fail at runtime.
+3. **Custom system prompt injection** — User-provided system prompts are passed directly to the LLM. The `MAX_SYSTEM_PROMPT_LENGTH` guard (10,000 chars) exists, but there are no sanitization checks beyond length.
+4. **Stale panel/selection state** — When a custom type is deleted, its ID must be removed from `selectedArtifactTypes` and the active panel must fall back. The cleanup in `handleDeleteCustomType` could miss edge cases (e.g., node-level selections).
+5. **JSON parsing in CustomArtifactPanel** — The panel tries `JSON.parse` on content for JSON-format custom types. Malformed LLM output falls back to text display, but deeply nested or very large JSON could cause rendering issues.
 
-## New Test Recommendations from Fix Commit
+### Blast radius
 
-### 9. `coerceArtifactVersion` field validation
-- **Type:** Unit
-- **Priority:** High
-- **File:** `app/lib/stores/__tests__/workspaceStore-hydration.test.ts`
-- **What it verifies:** The new per-version validation rejects malformed versions and applies correct defaults.
-- **Key cases:**
-  - Non-object input (string, number, null, array) returns `null`
-  - Missing `id` field returns `null`
-  - Missing `content` field returns `null`
-  - Missing `createdAt` defaults to an ISO string (not crash)
-  - Invalid `source` value (e.g., `"hacked"`) defaults to `"generated"`
-  - Valid `source` values (`"generated"`, `"ai-edit"`, `"manual-edit"`) are preserved
-  - `editInstruction` present as string is preserved; non-string is dropped
-  - Mixed valid/invalid versions in an array: valid ones survive, invalid ones are filtered
-- **Why this matters:** This is the innermost validation gate for persisted data. Prior to this commit, `coerceArtifactRecord` did `versions.filter(isObject)` -- a much weaker check that accepted any object as a valid version. The new function is stricter (requires `id` and `content`), which is better, but the strictness itself needs testing to ensure real persisted data passes.
-- **Setup needed:** `coerceArtifactVersion` is not exported. Test indirectly by feeding malformed version data through `rehydrate()` with pre-populated localStorage containing a `workspace-zustand-v1` key with bad version entries.
-- **Risk reduced:** High. A regression here silently drops user artifact history.
+Custom artifact types touch the root orchestrator (`page.tsx`), persistence layer, artifact generation hook, panel definitions, and two new API routes. A bug in persistence could affect all workspace data, not just custom types.
 
-### 10. `sanitizeDecomposition` memoization correctness
-- **Type:** Unit
-- **Priority:** Medium
-- **File:** `app/lib/stores/__tests__/workspaceStore-hydration.test.ts`
-- **What it verifies:** The module-level memoization cache returns correct results and does not serve stale data.
-- **Key cases:**
-  - Same decomposition reference twice: second call returns `===` same result (referential equality)
-  - Different decomposition reference: returns fresh sanitized result, not the cached one
-  - Decomposition with a node that has `verificationStatus: "verifying"`: sanitized to valid status
-  - Empty nodes array: does not crash, returns valid structure
-- **Why this matters:** Module-level mutable state (`_lastDecompRef`, `_lastDecompSanitized`) is a classic source of test-order-dependent bugs. The cache is never cleared -- if a test sets decomposition, the cached reference persists into subsequent tests. The `beforeEach` reset (`useWorkspaceStore.setState(useWorkspaceStore.getInitialState())`) does NOT reset these module-level variables.
-- **Setup needed:** `sanitizeDecomposition` is not exported. Test indirectly: set decomposition on the store, flush the persist timer, read from localStorage, verify the persisted decomposition has sanitized statuses. Then change decomposition and verify the new value is persisted (not the cached one).
-- **Risk reduced:** Medium. A stale cache bug would cause silent data corruption where the wrong decomposition is persisted. The reference-equality check makes this unlikely for real usage (Zustand creates new objects on state change), but the module-level mutation is unusual enough to warrant a regression test.
+### Change frequency
 
-### 11. Batched `storeArtifactResults` version cap
-- **Type:** Unit
-- **Priority:** Medium
-- **File:** `app/lib/stores/__tests__/workspaceStore.test.ts`
-- **What it verifies:** The inline version-cap logic in `page.tsx`'s `storeArtifactResults` correctly caps at `MAX_VERSIONS` and preserves the existing version history.
-- **Key cases:**
-  - Store 25 versions via repeated `storeArtifactResults`-style updates, verify cap at 20
-  - First generation (no existing record) creates a single-version record
-  - Generation with existing 5-version record appends and sets `currentVersionIndex` to 5
-- **Why this matters:** The `storeArtifactResults` callback duplicates version-management logic that already exists in `setArtifactGenerated`. The inline version uses `.slice(-MAX_VERSIONS + 1)` while the store action uses `.slice(-(MAX_VERSIONS - 1))` -- these are equivalent, but the duplication means a future change to one might not propagate to the other. Testing both paths catches divergence.
-- **Setup needed:** Cannot test `storeArtifactResults` directly (it's a `useCallback` inside `page.tsx`). Instead, test the equivalent operation: build artifact records with the same slice logic and verify via `useWorkspaceStore.setState()`. Alternatively, extract the version-append-and-cap logic into a shared helper (recommended refactor).
-- **Risk reduced:** Medium. Version cap bugs cause unbounded localStorage growth, eventually hitting quota limits.
+This is a new feature with active iteration (8 commits on the branch). The type system changes and persistence additions are likely stable; the UI components (CustomTypeDesigner) may continue to evolve.
 
 ---
 
-## Summary of All Recommendations
+## Existing Coverage Survey
 
-| Priority | Tests | Status |
-|----------|-------|--------|
-| **High** | #1 resolveArtifactContent edges, #2 undo/redo no-ops, #3 auto-migration path, #4 snapshot bridge, #9 coerceArtifactVersion | 5 tests |
-| **Medium** | #5 clearWorkspace round-trip, #6 artifact independence, #7 corrupted localStorage (priority raised), #10 sanitizeDecomposition memo, #11 batched version cap | 5 tests |
-| **Low** | #8 debounced storage adapter | 1 test |
+### Tests already on this branch
 
-### Implementation order recommendation
+| File | What it tests | Coverage |
+|------|--------------|----------|
+| `app/lib/types/customArtifact.test.ts` | `isCustomType` type guard — valid IDs, built-in types, edge cases | Good: 6 cases |
+| `app/components/panels/CustomArtifactPanel.test.ts` | `formatLabel` utility — camelCase, snake_case, kebab-case, edge cases | Good: 6 cases |
+| `app/lib/utils/workspacePersistence.test.ts` (additions) | `isValidCustomTypeDef` validation + save/load round-trip + backward compat + filtering invalid defs | Good: 7 cases |
 
-Start with #9 (coerceArtifactVersion) and #7 (corrupted localStorage) -- these are closely related and test the same code path (malformed data through rehydration). Then #1 and #2 (quick pure-function tests). Then #3 (auto-migration with the new batched setState). The remaining medium-priority tests can follow.
+### What is NOT tested
+
+- API routes (`custom-type/design`, `formalization/custom`) — no unit tests
+- `useWorkspacePersistence` hook — no tests for the new custom type CRUD methods (`addCustomArtifactType`, `updateCustomArtifactType`, `removeCustomArtifactType`, `setCustomArtifactContent`)
+- `useArtifactGeneration` — no tests for the new custom type branching logic
+- `usePanelDefinitions` — no tests for dynamic custom panel entries
+- `CustomTypeDesigner` component — no tests (complex multi-step wizard with API calls)
+- `ArtifactChipSelector` / `ArtifactTypeModal` — existing tests not updated for custom type props
+- `page.tsx` orchestration — no tests for custom type wiring (stale ID cleanup, delete handler, panel rendering)
+- `formalizeNode.ts` — no tests for the `isCustomType` early-return guard
+
+### Project test patterns
+
+- **Framework:** Vitest + jsdom + React Testing Library + `@testing-library/jest-dom`
+- **File location:** Co-located with source (`.test.ts` / `.test.tsx` next to the file being tested)
+- **Naming:** `describe("functionName")` or `describe("ComponentName")` with `it("description")`
+- **Mocking:** `vi.mock()` for modules; `localStorage.clear()` in `beforeEach` for persistence tests
+- **Hook testing:** `renderHook` + `act` from `@testing-library/react`
+- **No API route tests exist in the project** — routes are tested manually or via integration
 
 ---
 
-## Refactoring Suggestion
+## Fact-Check Findings
 
-The fix commit created a **second copy** of the version-append-and-cap logic. `setArtifactGenerated` in the store and `storeArtifactResults` in `page.tsx` both independently build `ArtifactRecord` objects with version slicing. Consider extracting a shared `appendArtifactVersion(existing: ArtifactRecord | undefined, content: string, source: ArtifactVersion["source"]): ArtifactRecord` helper. This would:
-- Eliminate the duplication
-- Make the logic directly unit-testable (addressing #11 without needing to mock page.tsx)
-- Reduce the risk of the two paths diverging in future changes
+### CONFIRMED INCORRECT: `persistence.ts:32` comment says "added in v2" but version wasn't bumped
+
+The comment on line 32 of `persistence.ts` reads `// Custom artifact types and their generated data (added in v2)`. `WORKSPACE_VERSION` remains `2` (line 4) and `WORKSPACE_KEY` remains `"workspace-v2"` (line 5). These custom fields are optional (`?`) so they are backward-compatible within v2 — no migration is needed and no version bump occurred. The comment is technically accurate (these fields were added to the v2 schema) but misleading — it suggests a version change happened. A clearer comment would be: "Custom artifact types (optional extension to v2 schema)."
+
+**Risk:** Low. Since the fields are optional and `loadWorkspace` defaults missing fields to `[]`/`{}`, no data loss occurs. But the comment could confuse future developers.
+
+### CONFIRMED UNVERIFIABLE: `customArtifact.ts:7` mentions cross-session library
+
+Line 7-8 of `customArtifact.ts` reads: "Definitions are stored in the workspace persistence layer and optionally saved to a cross-session library." No cross-session library feature exists in this branch or the codebase. The `customArtifactTypes` array is stored per-workspace in localStorage — there is no shared library across workspaces or sessions.
+
+**Risk:** Low (documentation inaccuracy). But it could lead someone to look for library functionality that doesn't exist.
+
+---
+
+## Recommended Tests
+
+### 1. useWorkspacePersistence custom type CRUD
+
+**Type:** Unit (hook test)  
+**Priority:** High  
+**File:** `app/hooks/useWorkspacePersistence.test.ts`  
+**What it verifies:** The new CRUD operations for custom artifact types correctly update state and trigger persistence.  
+**Key cases:**
+- `addCustomArtifactType` adds a definition and it appears in `customArtifactTypes`
+- `updateCustomArtifactType` with a new `systemPrompt` clears the corresponding entry in `customArtifactData` (stale data cleanup)
+- `updateCustomArtifactType` without changing `systemPrompt` preserves `customArtifactData`
+- `removeCustomArtifactType` removes the definition AND its entry from `customArtifactData`
+- `setCustomArtifactContent` stores content keyed by custom type ID
+- `setCustomArtifactContent` with same value returns same state reference (no-op optimization)
+- Round-trip: add type, set content, save (via debounce timer), reload hook — data survives
+
+**Setup needed:** `localStorage.clear()` in `beforeEach`; `vi.useFakeTimers()` for debounce; `renderHook` + `act` pattern matching existing tests in this file.
+
+---
+
+### 2. useArtifactGeneration custom type routing
+
+**Type:** Unit (hook test)  
+**Priority:** High  
+**File:** `app/hooks/useArtifactGeneration.test.ts` (new file)  
+**What it verifies:** Custom artifact types are routed to `/api/formalization/custom` with the correct body; built-in types still use their standard routes.  
+**Key cases:**
+- Custom type ID (`custom-xyz`) calls `/api/formalization/custom` with `customSystemPrompt` and `customOutputFormat` in the body
+- Custom type with no matching definition in `customTypeDefs` returns `[type, null]`
+- Built-in type (`causal-graph`) still calls its standard route
+- `"lean"` type is filtered out (existing behavior preserved)
+- Mixed array of custom + built-in types generates all in parallel
+
+**Setup needed:** Mock `fetchApi` and `generateSemiformal` via `vi.mock("@/app/lib/formalization/api")`; provide `CustomArtifactTypeDefinition[]` fixtures.
+
+---
+
+### 3. Custom artifact API route validation
+
+**Type:** Unit  
+**Priority:** High  
+**File:** `app/api/formalization/custom/route.test.ts` (new file)  
+**What it verifies:** The `/api/formalization/custom` route correctly validates input and delegates to `handleArtifactRoute`.  
+**Key cases:**
+- Returns 400 when `customSystemPrompt` is missing
+- Returns 400 when `customSystemPrompt` is not a string
+- Returns 400 when `customSystemPrompt` exceeds `MAX_SYSTEM_PROMPT_LENGTH` (10,000 chars)
+- Valid request calls `handleArtifactRoute` with correct config (systemPrompt, responseKey, parseResponse)
+- `transformBody` strips `customSystemPrompt` and `customOutputFormat` from the body before passing to `buildUserMessage`
+- `customOutputFormat: "text"` sets `parseResponse: "text"`; default/json sets `parseResponse: "json"`
+
+**Setup needed:** Mock `handleArtifactRoute` via `vi.mock("@/app/lib/formalization/artifactRoute")`; construct `NextRequest` objects with JSON bodies.
+
+---
+
+### 4. Design API route validation and response handling
+
+**Type:** Unit  
+**Priority:** Medium  
+**File:** `app/api/custom-type/design/route.test.ts` (new file)  
+**What it verifies:** The design route validates input, constructs the user message correctly, and handles LLM response parsing.  
+**Key cases:**
+- Returns 400 when neither `userDescription` nor `refinementInstruction` is provided
+- Constructs user message with all three parts when all provided (`userDescription`, `currentDraft`, `refinementInstruction`)
+- Returns mock definition when `usage.provider === "mock"`
+- Returns 502 when LLM response is missing `name` field
+- Returns 502 when LLM response is missing `systemPrompt` field
+- Defaults `outputFormat` to `"json"` when missing or invalid in LLM response
+- Returns 502 when LLM response is not valid JSON
+
+**Setup needed:** Mock `callLlm` via `vi.mock("@/app/lib/llm/callLlm")`; mock `stripCodeFences`.
+
+---
+
+### 5. usePanelDefinitions with custom types
+
+**Type:** Unit (hook test)  
+**Priority:** Medium  
+**File:** `app/hooks/usePanelDefinitions.test.ts` (new file)  
+**What it verifies:** Custom artifact types generate dynamic panel entries in the correct position (after built-in artifacts, before meta).  
+**Key cases:**
+- No custom types: panel list matches existing built-in set
+- One custom type with data: panel appears in artifacts group with "Ready" status
+- One custom type without data and not loading: panel is hidden
+- One custom type currently loading: panel appears with "Generating..." status
+- Custom type panel uses `CustomArtifactIcon` and the type's `name` as label
+
+**Setup needed:** Minimal `PanelDefsInput` fixture; `renderHook`.
+
+---
+
+### 6. CustomArtifactPanel rendering
+
+**Type:** Unit (component test)  
+**Priority:** Medium  
+**File:** `app/components/panels/CustomArtifactPanel.test.tsx` (extend existing `.test.ts`)  
+**What it verifies:** The panel correctly renders JSON and text content, handles malformed JSON gracefully.  
+**Key cases:**
+- JSON outputFormat with valid JSON string: renders sections with formatted labels
+- JSON outputFormat with malformed JSON: falls back to text display
+- Text outputFormat: renders as prose paragraph
+- Null content: renders empty message
+- Loading state: renders loading message
+- Nested JSON objects: renders recursively
+- Array JSON values: renders list with count
+
+**Setup needed:** Mock `ArtifactPanelShell` or render full component tree; provide `CustomArtifactTypeDefinition` and content fixtures.
+
+---
+
+### 7. Stale custom type cleanup in page.tsx
+
+**Type:** Integration  
+**Priority:** Medium  
+**File:** `app/page.test.tsx` (new file, or skip — see "What NOT to Test")  
+**What it verifies:** When a custom type is removed, its ID is removed from `selectedArtifactTypes` and the active panel falls back to "source".  
+**Key cases:**
+- Removing a custom type that is in `selectedArtifactTypes` filters it out
+- Removing a custom type that is the active panel resets to "source"
+- Removing a custom type that is NOT selected or active is a no-op
+
+**Setup needed:** This tests `handleDeleteCustomType` and the `useEffect` cleanup. Given the complexity of `page.tsx` dependencies, this may be better tested as part of e2e tests rather than unit tests. See "What NOT to Test" section.
+
+---
+
+### 8. formalizeNode custom type guard
+
+**Type:** Unit  
+**Priority:** Low  
+**File:** `app/lib/formalization/formalizeNode.test.ts` (new file)  
+**What it verifies:** `generateNonDeductiveArtifacts` returns null for custom type IDs (they should only be generated via `useArtifactGeneration`).  
+**Key cases:**
+- Custom type ID in the types array is skipped (returns null)
+- Built-in types still generate normally
+
+**Setup needed:** Mock `fetchApi`; this function is not exported directly, so may need to test via the exported `formalizeNode` or refactor for testability.
+
+---
+
+## What NOT to Test
+
+### `page.tsx` orchestration (recommended: skip unit tests)
+The root orchestrator wires together 15+ hooks and renders 10+ panel types. Unit-testing it requires mocking the entire hook surface. The wiring logic (storing custom artifact results, passing props through) is better verified through integration/e2e tests or manual testing. The individual pieces (hooks, components) should be tested in isolation.
+
+### `CustomTypeDesigner` component (recommended: defer)
+This is a complex multi-step wizard with async API calls, controlled form state, and modal behavior. It has no pure logic worth unit-testing separately (the interesting behavior is the API interaction). If it stabilizes, snapshot tests of each step's rendered state could be valuable.
+
+### `ArtifactChipSelector` / `ArtifactTypeModal` custom type rendering (recommended: low priority)
+These are presentational components. The custom type integration adds props and renders them in the same pattern as built-in types. Visual regression or e2e tests are more appropriate than unit tests.
+
+### `PanelIcons` (recommended: never)
+`CustomArtifactIcon` is a static SVG component. Testing it provides no value.
 
 ---
 
 ## Coverage Gaps Beyond Current Scope
 
-Unchanged from Loop 1. The four adjacent untested areas remain:
-1. `useWorkspaceSessions` hook (snapshot bridge consumer)
-2. `useFormalizationPipeline` with Zustand accessors
-3. `useDecomposition` + persistence sync effect
-4. localStorage quota handling (regression from old `saveWorkspace`)
+1. **No existing API route tests anywhere in the project.** The two new routes follow the same pattern as existing routes (e.g., `formalization/causal-graph`), none of which are tested. This is a systemic gap, not specific to this branch.
+
+2. **`useArtifactGeneration` has zero tests** (not just for custom types — the entire hook is untested). This is the central artifact generation dispatcher. Adding tests for the custom type branch would also cover the existing built-in logic.
+
+3. **`useWorkspacePersistence` hook tests do not cover artifact data** (existing tests only check basic scalar fields). The `customArtifactData` round-trip tests in `workspacePersistence.test.ts` (the utility, not the hook) partially cover this.
+
+4. **No e2e tests exist in the project.** The custom type workflow (describe -> design -> review -> test -> save -> generate -> view) is a multi-step flow that would benefit from a Playwright or Cypress test.
+
+---
+
+## Priority Summary
+
+| Priority | Test | Effort | Risk Reduced |
+|----------|------|--------|-------------|
+| **High** | useWorkspacePersistence custom CRUD | Low | Persistence correctness for custom types |
+| **High** | useArtifactGeneration custom routing | Medium | Correct API dispatch for custom vs built-in |
+| **High** | Custom artifact API route validation | Medium | Input validation and security boundary |
+| **Medium** | Design API route validation | Medium | LLM response handling robustness |
+| **Medium** | usePanelDefinitions with custom types | Low | Dynamic panel generation correctness |
+| **Medium** | CustomArtifactPanel rendering | Low | JSON/text display and error handling |
+| **Medium** | Stale type cleanup | High | State consistency on delete |
+| **Low** | formalizeNode guard | Low | Prevents accidental custom type in node flow |

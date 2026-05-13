@@ -18,6 +18,7 @@ import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
 import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
 import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
+import CustomArtifactPanel from "@/app/components/panels/CustomArtifactPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
 import NodeDetailPanel from "@/app/components/panels/NodeDetailPanel";
 import AnalyticsPanel from "@/app/components/panels/AnalyticsPanel";
@@ -40,6 +41,8 @@ import { useAllArtifactEditing } from "@/app/hooks/useArtifactEditing";
 import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import type { LoadingPhase } from "@/app/hooks/useFormalizationPipeline";
+import { isCustomType } from "@/app/lib/types/customArtifact";
+import type { CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
 
 // Stable selectors for artifact content — read from the state snapshot `s`
 // (not `get()`) so Zustand can track dependencies and skip re-renders when
@@ -94,6 +97,8 @@ export default function Home() {
   const semiformalDirty = useWorkspaceStore((s) => s.semiformalDirty);
   const verificationStatus = useWorkspaceStore((s) => s.verificationStatus);
   const verificationErrors = useWorkspaceStore((s) => s.verificationErrors);
+  const customArtifactTypes = useWorkspaceStore((s) => s.customArtifactTypes);
+  const customArtifactData = useWorkspaceStore((s) => s.customArtifactData);
   // Store setters — Zustand selectors return the same function identity across
   // state changes, so Object.is comparison prevents re-renders for these.
   const setSourceText = useWorkspaceStore((s) => s.setSourceText);
@@ -104,6 +109,10 @@ export default function Home() {
   const setSemiformalDirty = useWorkspaceStore((s) => s.setSemiformalDirty);
   const setVerificationStatus = useWorkspaceStore((s) => s.setVerificationStatus);
   const setVerificationErrors = useWorkspaceStore((s) => s.setVerificationErrors);
+  const addCustomArtifactType = useWorkspaceStore((s) => s.addCustomArtifactType);
+  const updateCustomArtifactType = useWorkspaceStore((s) => s.updateCustomArtifactType);
+  const removeCustomArtifactType = useWorkspaceStore((s) => s.removeCustomArtifactType);
+  const setCustomArtifactContent = useWorkspaceStore((s) => s.setCustomArtifactContent);
 
   // Decomposition persistence bridge
   const persistDecompState = useCallback((d: PersistedDecomposition) => {
@@ -231,6 +240,16 @@ export default function Home() {
   const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<ArtifactType[]>([]);
   const { loadingState: artifactLoadingState, streamingJsonPreview, generateArtifacts, isAnyGenerating } = useArtifactGeneration();
 
+  // Filter out stale custom type IDs when custom types are removed (e.g. workspace clear/switch)
+  useEffect(() => {
+    setSelectedArtifactTypes((prev) => {
+      const filtered = prev.filter(
+        (t) => !isCustomType(t) || customArtifactTypes.some((ct) => ct.id === t),
+      );
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [customArtifactTypes]);
+
   // --- Analytics ---
   const { entries: analyticsEntries, summary: analyticsSummary, clearAnalytics, refresh: refreshAnalytics } = useAnalytics();
 
@@ -357,9 +376,13 @@ export default function Home() {
         case "counterexamples":
           useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
           break;
+        default:
+          if (isCustomType(artifact.type)) {
+            setCustomArtifactContent(artifact.type as CustomArtifactTypeId, artifact.content);
+          }
       }
     }
-  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty]);
+  }, [selectNode, updateNode, setSemiformalText, setLeanCode, setVerificationStatus, setVerificationErrors, setSemiformalDirty, setCustomArtifactContent]);
 
   const {
     activeSession,
@@ -417,7 +440,14 @@ export default function Home() {
     if (entries.length > 0) {
       useWorkspaceStore.getState().setArtifactsBatchGenerated(entries);
     }
-  }, [updateSessionArtifact, updateNode, decomp.nodes]);
+    // Custom artifact types
+    for (const [type, value] of Object.entries(results)) {
+      if (isCustomType(type) && value != null) {
+        const content = typeof value === "string" ? value : JSON.stringify(value);
+        setCustomArtifactContent(type as CustomArtifactTypeId, content);
+      }
+    }
+  }, [updateSessionArtifact, updateNode, decomp.nodes, setCustomArtifactContent]);
 
   // --- Workspace sessions (higher-level grouping of inputs + outputs) ---
   const {
@@ -600,14 +630,21 @@ export default function Home() {
         ? pipeline.handleGenerateSemiformal(text)
         : Promise.resolve(),
       nonSemiformalTypes.length > 0
-        ? generateArtifacts(nonSemiformalTypes, request)
+        ? generateArtifacts(nonSemiformalTypes, request, customArtifactTypes)
         : Promise.resolve({} as Partial<Record<ArtifactType, unknown>>),
     ]);
 
     if (artifactResults) {
       storeArtifactResults(artifactResults, nodeId);
     }
-  }, [generateArtifacts, storeArtifactResults, setActivePanelId]);
+  }, [generateArtifacts, storeArtifactResults, setActivePanelId, customArtifactTypes]);
+
+  /** Delete a custom type and clean up related state */
+  const handleDeleteCustomType = useCallback((id: string) => {
+    removeCustomArtifactType(id);
+    setSelectedArtifactTypes((prev) => prev.filter((t) => t !== id));
+    setActivePanelIdRaw((prev) => prev === id ? "source" : prev);
+  }, [removeCustomArtifactType]);
 
   /** Unified: generate all selected artifact types in parallel */
   const handleGenerate = useCallback(async () => {
@@ -702,6 +739,12 @@ export default function Home() {
       .filter((n): n is NonNullable<typeof n> => n != null);
   }, [selectedNode, decomp.nodes]);
 
+  // Refs for custom type data — avoids invalidating renderPanel when custom data changes
+  const customArtifactTypesRef = useRef(customArtifactTypes);
+  customArtifactTypesRef.current = customArtifactTypes;
+  const customArtifactDataRef = useRef(customArtifactData);
+  customArtifactDataRef.current = customArtifactData;
+
   // --- Panel definitions ---
   const panels = usePanelDefinitions({
     sourceText, extractedFiles, contextText,
@@ -718,6 +761,9 @@ export default function Home() {
     dialecticalMapLoading,
     hasCounterexamples: counterexamples !== null,
     counterexamplesLoading,
+    customArtifactTypes,
+    customArtifactData,
+    artifactLoadingState,
   });
 
   // --- Export All handler ---
@@ -769,6 +815,10 @@ export default function Home() {
             onArtifactTypesChange={setSelectedArtifactTypes}
             loadingState={artifactLoadingState}
             waitEstimate={waitEstimate}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={addCustomArtifactType}
+            onEditCustomType={(def) => updateCustomArtifactType(def.id, def)}
+            onDeleteCustomType={handleDeleteCustomType}
           />
         );
       case "semiformal":
@@ -908,8 +958,18 @@ export default function Home() {
       case "analytics":
         return <AnalyticsPanel entries={analyticsEntries} summary={analyticsSummary} onClear={clearAnalytics} />;
       default:
+        // Custom artifact type panels (read from refs to avoid dependency churn)
+        if (isCustomType(panelId)) {
+          const def = customArtifactTypesRef.current.find((ct) => ct.id === panelId);
+          const content = customArtifactDataRef.current[panelId] ?? null;
+          const isLoading = artifactLoadingState[panelId] === "generating";
+          if (def) {
+            return <CustomArtifactPanel definition={def} content={content} loading={isLoading} />;
+          }
+        }
         return undefined;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- customArtifactTypes/customArtifactData read via refs to avoid re-render cascade
   }, [
     sourceText, extractedFiles, contextText, activeSemiformal, activeLeanCode,
     loadingPhase, activeVerificationStatus, activeVerificationErrors,
@@ -931,6 +991,7 @@ export default function Home() {
     artifactEditing,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
+    addCustomArtifactType, updateCustomArtifactType, handleDeleteCustomType,
     streamingNodes,
     addGraphEdge, handleAddNode, handleDeleteEdges, removeGraphNode, renameGraphNode, updateGraphLayout,
   ]);
