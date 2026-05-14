@@ -38,11 +38,11 @@ export default function CounterexamplesPanel({
   const evidenceSearchContent = useMemo(() => {
     if (!counterexamples) return "";
     const parts = [counterexamples.claim];
-    for (const cx of getScenarios(counterexamples)?.slice(0, 3) ?? []) {
+    for (const cx of (scenarios ?? []).slice(0, 3)) {
       parts.push(cx.scenario);
     }
     return parts.filter(Boolean).join(". ");
-  }, [counterexamples]);
+  }, [counterexamples, scenarios]);
 
   return (
     <ArtifactPanelShell
