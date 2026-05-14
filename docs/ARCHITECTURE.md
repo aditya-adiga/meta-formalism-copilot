@@ -197,11 +197,16 @@ The app includes a Dockerized Lean 4 verification service (`verifier/`) that typ
 
 ```
 Next.js route (POST /api/verification/lean)
-  → POST http://localhost:3100/verify { leanCode }
+  → POST $LEAN_VERIFIER_URL/verify { leanCode }   (e.g. http://localhost:3100)
   ← { valid: true/false, errors?: string }
 
-If verifier is unavailable:
-  ← fallback mock { valid: true, mock: true }
+If LEAN_VERIFIER_URL is unset, the verifier is unreachable, or the verifier
+returns a non-2xx status, the route surfaces an "unavailable" response:
+  ← { valid: false, unavailable: true,
+       reason: "verifier-not-configured" | "verifier-unreachable" | "verifier-error",
+       detail?: string }
+The UI renders this as an amber "Verifier offline — proof not checked" banner
+rather than as a passing proof.
 ```
 
 ### Verifier Structure

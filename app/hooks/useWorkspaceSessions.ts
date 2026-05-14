@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from "react";
 import type { PersistedWorkspace, PersistedDecomposition } from "@/app/lib/types/persistence";
 import type { SessionsState } from "@/app/lib/types/session";
 import {
@@ -18,19 +18,47 @@ type WorkspaceSnapshotFns = {
   clearWorkspace: () => PersistedDecomposition;
   clearAllSessions: () => void;
   resetDecomp: (data: PersistedDecomposition) => void;
+  cancelQueue: () => void;
+  resetQueue: () => void;
 };
 
 const DEBOUNCE_MS = 500;
 
+const EMPTY_STATE: WorkspaceSessionsState = { sessions: [], activeSessionId: null };
+
 function loadFromStorage(): WorkspaceSessionsState {
-  if (typeof window === "undefined") return { sessions: [], activeSessionId: null };
   try {
     const raw = localStorage.getItem(WORKSPACE_SESSIONS_KEY);
     if (raw) return JSON.parse(raw) as WorkspaceSessionsState;
   } catch {
     // Ignore parse errors
   }
-  return { sessions: [], activeSessionId: null };
+  return EMPTY_STATE;
+}
+
+// Tiny external store for SSR-safe hydration of workspace sessions.
+// useSyncExternalStore with a server snapshot avoids hydration mismatch
+// (React error #418) without needing setState-in-effect.
+let _sessionsCache: WorkspaceSessionsState | null = null;
+const _listeners = new Set<() => void>();
+
+function getSessionsSnapshot(): WorkspaceSessionsState {
+  if (!_sessionsCache) _sessionsCache = loadFromStorage();
+  return _sessionsCache;
+}
+
+function getServerSnapshot(): WorkspaceSessionsState {
+  return EMPTY_STATE;
+}
+
+function subscribeToSessions(cb: () => void): () => void {
+  _listeners.add(cb);
+  return () => _listeners.delete(cb);
+}
+
+function emitSessionsChange(next: WorkspaceSessionsState): void {
+  _sessionsCache = next;
+  for (const cb of _listeners) cb();
 }
 
 function hasWorkspaceContent(ws: PersistedWorkspace): boolean {
@@ -44,7 +72,14 @@ function hasWorkspaceContent(ws: PersistedWorkspace): boolean {
 }
 
 export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
-  const [state, setState] = useState<WorkspaceSessionsState>(loadFromStorage);
+  // useSyncExternalStore with a server snapshot avoids hydration mismatch
+  // (React error #418): server always renders EMPTY_STATE, client reads localStorage.
+  const state = useSyncExternalStore(subscribeToSessions, getSessionsSnapshot, getServerSnapshot);
+  const setState = useCallback((updater: WorkspaceSessionsState | ((prev: WorkspaceSessionsState) => WorkspaceSessionsState)) => {
+    const next = typeof updater === "function" ? updater(getSessionsSnapshot()) : updater;
+    emitSessionsChange(next);
+  }, []);
+
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -102,7 +137,7 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     };
 
     setState({ sessions: [session], activeSessionId: session.id });
-  }, []);
+  }, [setState]);
 
   /** Snapshot the current workspace into the active workspace session */
   const saveCurrentSession = useCallback(() => {
@@ -128,13 +163,15 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
           : s,
       ),
     }));
-  }, []);
+  }, [setState]);
 
   /** Create a new empty workspace session, auto-saving the current one first */
   const createNewSession = useCallback(() => {
     // Save current session before clearing
     saveCurrentSession();
 
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.clearWorkspace();
     fnsRef.current.clearAllSessions();
     fnsRef.current.resetDecomp(decompData);
@@ -152,7 +189,7 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
       sessions: [...prev.sessions, newSession],
       activeSessionId: newSession.id,
     }));
-  }, [saveCurrentSession]);
+  }, [saveCurrentSession, setState]);
 
   /** Switch to a different workspace session, auto-saving the current one first */
   const switchToSession = useCallback((targetId: string) => {
@@ -165,13 +202,15 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
     // Save current session
     saveCurrentSession();
 
-    // Load the target session's data
+    // Cancel any running queue and reset progress before loading new session's data
+    fnsRef.current.cancelQueue();
+    fnsRef.current.resetQueue();
     const decompData = fnsRef.current.resetWorkspaceToSnapshot(target.workspace);
     fnsRef.current.resetSessionsToSnapshot(target.formalizationSessions);
     fnsRef.current.resetDecomp(decompData);
 
     setState((prev) => ({ ...prev, activeSessionId: targetId }));
-  }, [saveCurrentSession]);
+  }, [saveCurrentSession, setState]);
 
   const renameSession = useCallback((id: string, title: string) => {
     setState((prev) => ({
@@ -180,7 +219,7 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
         s.id === id ? { ...s, title, updatedAt: new Date().toISOString() } : s,
       ),
     }));
-  }, []);
+  }, [setState]);
 
   const deleteSession = useCallback((id: string) => {
     setState((prev) => {
@@ -189,8 +228,10 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
         ? (remaining.length > 0 ? remaining[remaining.length - 1].id : null)
         : prev.activeSessionId;
 
-      // If we're deleting the active session, load the new active one (or clear)
+      // If we're deleting the active session, cancel queue and load the new active one (or clear)
       if (prev.activeSessionId === id) {
+        fnsRef.current.cancelQueue();
+        fnsRef.current.resetQueue();
         const newActive = remaining.find((s) => s.id === newActiveId);
         if (newActive) {
           const decompData = fnsRef.current.resetWorkspaceToSnapshot(newActive.workspace);
@@ -205,7 +246,7 @@ export function useWorkspaceSessions(fns: WorkspaceSnapshotFns) {
 
       return { sessions: remaining, activeSessionId: newActiveId };
     });
-  }, []);
+  }, [setState]);
 
   // --- Auto-save: periodically snapshot the active session ---
   // Piggybacks on a 5-second interval rather than every workspace change

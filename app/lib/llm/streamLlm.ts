@@ -5,7 +5,7 @@ import { computeHash, getCachedResult, setCachedResult } from "./cache";
 import {
   OPENROUTER_API_URL,
   DEFAULT_ANTHROPIC_MODEL,
-  getAnthropicClient,
+  makeAnthropicClient,
 } from "./callLlm";
 import type { LlmCallUsage } from "./callLlm";
 
@@ -22,18 +22,15 @@ export function sseEvent(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-/** Create an Error with a `details` property for structured error info. */
+/** Create an Error with a `details` property for structured error info.
+ *  The streaming catch block intentionally does not log or forward `details`
+ *  over SSE (provider error bodies can echo request content), but the property
+ *  remains attached to the thrown Error for any in-process consumer that
+ *  opts in to reading it. */
 function errorWithDetails(message: string, details: string): Error {
   const err = new Error(message);
   (err as Error & { details: string }).details = details;
   return err;
-}
-
-/** Extract a `details` property from an error, if present. */
-function getErrorDetails(err: unknown): string {
-  return (typeof err === "object" && err !== null && "details" in err)
-    ? String((err as Record<string, unknown>).details)
-    : "";
 }
 
 type StreamLlmOptions = {
@@ -71,7 +68,10 @@ async function recordAndCache(
  * SSE protocol:
  *   event: token   — { text: "partial chunk" }
  *   event: done    — { text: "full accumulated text", usage: LlmCallUsage }
- *   event: error   — { error: "message", details: "..." }
+ *   event: error   — { error: "message" }
+ *     The error event carries the message only; provider details are
+ *     deliberately not forwarded over SSE because their bodies can echo
+ *     request content (see errorWithDetails for the in-process channel).
  *
  * Provider chain mirrors callLlm(): Anthropic → OpenRouter → mock.
  * Cache hits emit a single `done` event.
@@ -158,10 +158,11 @@ export function streamLlm({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
-        const details = getErrorDetails(err);
-        console.error(`[${endpoint}] Stream error:`, message, details);
+        // Provider error bodies can echo parts of the request, so don't write
+        // them to logs or send them to the client over SSE.
+        console.error(`[${endpoint}] Stream error: ${message}`);
         try {
-          controller.enqueue(sseEvent("error", { error: message, details }));
+          controller.enqueue(sseEvent("error", { error: message }));
         } catch { /* controller may already be closed */ }
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -206,7 +207,7 @@ async function streamAnthropic(
   controller: ReadableStreamDefaultController<Uint8Array>,
   opts: StreamProviderOptions,
 ): Promise<void> {
-  const client = getAnthropicClient(opts.apiKey);
+  const client = makeAnthropicClient(opts.apiKey);
   const start = Date.now();
 
   const stream = client.messages.stream({

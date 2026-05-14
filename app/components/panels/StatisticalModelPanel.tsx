@@ -1,10 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import type { StatisticalModelResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
+import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
 type StatisticalModelPanelProps = {
   statisticalModel: StatisticalModelResponse["statisticalModel"] | null;
@@ -41,6 +45,16 @@ export default function StatisticalModelPanel({
     (d) => (d.variables?.length ?? 0) > 0,
   );
 
+  // Build a concise search description from the artifact for evidence search
+  const evidenceSearchContent = useMemo(() => {
+    if (!statisticalModel) return "";
+    const parts = [statisticalModel.summary];
+    for (const h of statisticalModel.hypotheses.slice(0, 3)) {
+      parts.push(h.statement);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [statisticalModel]);
+
   return (
     <ArtifactPanelShell
       title="Statistical Model"
@@ -66,10 +80,7 @@ export default function StatisticalModelPanel({
 
           {/* Variables */}
           {(displayModel.variables?.length ?? 0) > 0 && (
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Variables ({displayModel.variables.length})
-            </h3>
+          <CollapsibleSection title="Variables" defaultOpen={false} count={displayModel.variables.length}>
             <div className="space-y-2">
               {displayModel.variables.map((v, i) => (
                 <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
@@ -86,15 +97,12 @@ export default function StatisticalModelPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
           )}
 
           {/* Hypotheses */}
           {(displayModel.hypotheses?.length ?? 0) > 0 && (
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Hypotheses ({displayModel.hypotheses.length})
-            </h3>
+          <CollapsibleSection title="Hypotheses" defaultOpen={false} count={displayModel.hypotheses.length}>
             <div className="space-y-2">
               {displayModel.hypotheses.map((h, i) => (
                 <EditableSection key={h.id} value={h} onChange={(newH) => updateArrayItem("hypotheses", i, newH)}>
@@ -110,15 +118,12 @@ export default function StatisticalModelPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
           )}
 
           {/* Assumptions */}
           {(displayModel.assumptions?.length ?? 0) > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-                Assumptions ({displayModel.assumptions.length})
-              </h3>
+            <CollapsibleSection title="Assumptions" defaultOpen={false} count={displayModel.assumptions.length}>
               <div className="space-y-1 pl-5">
                 {displayModel.assumptions.map((a, i) => (
                   <EditableSection key={i} value={a} onChange={(newA) => updateArrayItem("assumptions", i, newA)}>
@@ -126,7 +131,7 @@ export default function StatisticalModelPanel({
                   </EditableSection>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* Sample Requirements */}
@@ -140,6 +145,20 @@ export default function StatisticalModelPanel({
                   {displayModel.sampleRequirements}
                 </p>
               </EditableSection>
+            </section>
+          )}
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="statistical-model"
+                elementId={WHOLE_ARTIFACT_ELEMENT_ID}
+                elementContent={evidenceSearchContent}
+              />
             </section>
           )}
         </>

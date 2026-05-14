@@ -1,140 +1,176 @@
-# Security Code Review: feat/zustand-wire-page (Loop 2)
+# Security Code Review: `feat/custom-artifact-types`
 
-**Branch:** `feat/zustand-wire-page` relative to `main`
-**Scope:** 20 files changed -- workspaceStore.ts, page.tsx, artifactStore.ts, workspacePersistence.ts, tests, package.json, docs
-**Reviewer:** Claude Opus 4.6 (security review)
-**Date:** 2026-04-03
-**Loop:** 2 (prior loop found 5 findings; fixes applied in commit 3ed18f8)
+**Reviewer:** Claude (automated security review)
+**Branch:** `feat/custom-artifact-types` relative to `main`
+**Date:** 2026-04-07
+
+---
 
 ## Trust Boundary Map
 
-This diff is entirely client-side. The trust boundaries are:
+This feature introduces a new data path where **user-authored system prompts** flow from the browser client through API routes into LLM provider calls (Anthropic / OpenRouter). The trust boundaries are:
 
-1. **localStorage -> Zustand store (rehydration)**: Data read from `workspace-zustand-v1` localStorage key is untrusted (modifiable by browser extensions, XSS payloads, or manual editing). Zustand's `persist` middleware deserializes it via `JSON.parse`, then the custom `merge` function passes it through `coercePersistedState()` before it reaches the store.
+1. **Browser -> Next.js API routes**: User-supplied `customSystemPrompt` and `customOutputFormat` fields arrive via POST to `/api/formalization/custom` and `/api/custom-type/design`. The API runs server-side with access to API keys.
+2. **Next.js API -> LLM Provider**: The user-supplied `customSystemPrompt` is passed directly as the `system` parameter to `callLlm()`, which forwards it verbatim to the Anthropic SDK or OpenRouter API.
+3. **LLM response -> Browser**: LLM output is parsed (JSON or text) and returned to the client, where it is rendered in `CustomArtifactPanel`.
+4. **Browser <-> localStorage**: Custom type definitions (including system prompts) are persisted to and restored from localStorage.
 
-2. **Old workspace-v2 localStorage -> Zustand store (migration)**: `migrateFromV2()` reads the old `workspace-v2` key via `loadWorkspace()`, which performs its own defensive coercion (including the now-shared `coerceDecomposition`), then writes into the store via a single `setState()` call.
-
-3. **Zustand store -> localStorage (persistence)**: The `partialize` function controls what is written. It sanitizes `verificationStatus` and node statuses before serialization, with memoization via `sanitizeDecomposition` to avoid redundant node mapping. The debounced storage adapter wraps `setItem` in a try/catch for quota errors.
-
-4. **Snapshot/restore boundary**: `getSnapshot()` produces a deep copy via `structuredClone`. `resetToSnapshot()` receives a `WorkspaceState` and applies it via `set({ ...data })`. Callers in `page.tsx` sanitize `verificationStatus` before calling, but the store method itself does not.
-
-5. **Zustand store -> React components**: Same client-side JS context; no trust transition. Components read via selectors and write via setters.
-
-No server-side code, API routes, authentication, or cryptographic operations are changed in this diff. The `ANTHROPIC_API_KEY` is not touched.
-
-## Fix Verification (from Loop 1)
-
-### A1 (ArtifactVersion field validation) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Added `coerceArtifactVersion()` function that validates each field of an `ArtifactVersion` individually: `id` must be a string (rejects if not), `content` must be a string (rejects if not), `createdAt` falls back to `new Date().toISOString()`, `source` is validated against a `VALID_ARTIFACT_SOURCES` Set (falls back to `"generated"`), and `editInstruction` is accepted only if it is a string. `coerceArtifactRecord` now maps through `coerceArtifactVersion` and filters nulls instead of just checking `isObject`.
-
-**Assessment:** The fix is correct and complete. It closes the deserialization gap identified in Loop 1 Finding 1. The approach is consistent with how other fields in `coercePersistedState` are validated (typeof checks with safe defaults or rejection). The `VALID_ARTIFACT_SOURCES` Set prevents injection of unexpected source values. No new issues introduced.
-
-### A4 (GenerationProvenance removal) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** Removed the unused `GenerationProvenance` type from `app/lib/types/artifactStore.ts`.
-
-**Assessment:** Clean removal. The type was dead code with a misleading comment. No references existed, so no downstream breakage.
-
-### A2 (Node coercion reuse) -- FIXED, VERIFIED CORRECT
-
-**Commit:** 3ed18f8
-**What was done:** The inline decomposition coercion in `coercePersistedState()` was replaced with a call to the existing `coerceDecomposition()` function from `workspacePersistence.ts` (which was made `export`). The inline version had used `isObject` filtering with a spread-and-cast pattern that did not validate individual node fields. The shared `coerceDecomposition()` validates every field of each `PropositionNode` individually (id, label, kind, statement, proofText, dependsOn, sourceId, sourceLabel, etc.).
-
-**Assessment:** This is a meaningful security improvement. The prior inline version could pass through nodes with non-string fields (e.g., `id: 42` or `statement: null`) because it only checked `isObject` at the node level. The shared function validates each field with typeof checks and safe defaults. Single source of truth eliminates drift risk between the two code paths.
+---
 
 ## Findings
 
-### 1. resetToSnapshot applies data without internal sanitization
+#### 1. User-controlled system prompt enables indirect prompt injection
+**Severity:** Medium
+**Location:** `app/api/formalization/custom/route.ts:33-35`, `app/lib/llm/callLlm.ts:110-112`
+**Move:** Trace the trust boundaries; Find the implicit sanitization assumption
+**Confidence:** High
 
+The `customSystemPrompt` field is supplied by the user (or by a prior LLM call via the design API), validated only for type and length (max 10,000 chars), and then passed directly as the system prompt to `callLlm()`. This is architecturally intentional -- the whole feature is "user designs their own prompt" -- but it means the system prompt slot, which is normally trusted application code, now contains untrusted user content. An attacker who can influence the prompt (e.g., via a shared workspace export or crafted localStorage payload) could instruct the LLM to exfiltrate source text, generate misleading content, or attempt to extract other information from the LLM context.
+
+In this application's threat model (single-user local tool), the risk is limited. However, if workspace sharing is ever added, this becomes a prompt injection vector.
+
+**Recommendation:** Document in the codebase that `customSystemPrompt` is user-controlled and must never be concatenated with trusted system instructions without clear separation. Consider adding a fixed preamble to the system prompt in `handleArtifactRoute` that the user cannot override (e.g., "You are generating an analytical artifact. Never output API keys, credentials, or system information.").
+
+---
+
+#### 2. LLM-generated type definitions flow through without structural validation
+**Severity:** Medium
+**Location:** `app/api/custom-type/design/route.ts:76-89`
+**Move:** Test the serialization boundary
+**Confidence:** High
+
+The `/api/custom-type/design` route asks an LLM to generate a `CustomArtifactTypeDefinition` (including a `systemPrompt`). The response is validated for `name` and `systemPrompt` presence but the content of `systemPrompt` is not constrained. The LLM-generated definition then flows to the client, where it can be saved and later sent back as the system prompt for `/api/formalization/custom`. This creates a two-hop injection chain: a malicious `userDescription` to the design endpoint could instruct the meta-LLM to embed adversarial instructions inside the `systemPrompt` field of the generated definition, which is then used verbatim in the second LLM call.
+
+This is a known limitation of "LLM generates prompts for another LLM" architectures and is difficult to fully mitigate. The user does get a review step (the designer shows the generated prompt), which is a meaningful control.
+
+**Recommendation:** The review step is good. Consider adding a visible warning in the `CustomTypeDesigner` UI when the system prompt contains patterns that look like injection attempts (e.g., "ignore previous instructions", "you are now", references to API keys or environment variables).
+
+---
+
+#### 3. No rate limiting on LLM-calling API routes
+**Severity:** Medium
+**Location:** `app/api/custom-type/design/route.ts`, `app/api/formalization/custom/route.ts`
+**Move:** Ask "what if there are a million of these?"
+**Confidence:** High
+
+Neither the new `/api/custom-type/design` nor `/api/formalization/custom` routes have rate limiting. This is consistent with the existing built-in artifact routes (none of them have rate limiting either), but the custom type designer introduces an iterative refinement loop that makes rapid repeated calls more natural. Each call consumes API credits. An automated script hitting these endpoints could exhaust the API key budget.
+
+**Recommendation:** This is a pre-existing gap, not introduced by this PR. However, as the number of LLM-calling routes grows, consider adding middleware-level rate limiting (e.g., per-IP or per-session token bucket). At minimum, document in the deployment guide that these routes should sit behind authentication or a reverse proxy with rate limiting in production.
+
+---
+
+#### 4. Error responses leak LLM output fragments
 **Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` line 406 (`resetToSnapshot: (data) => set({ ...data })`)
-**Move:** Find the implicit sanitization assumption
-**Confidence:** Low
+**Location:** `app/api/custom-type/design/route.ts:80,83,92`
+**Move:** Check the error path
+**Confidence:** High
 
-This finding persists from Loop 1 (was Finding 2). `resetToSnapshot` spreads the provided `WorkspaceState` directly into the store with no validation. Currently, the only caller (`page.tsx:resetWorkspaceToSnapshot`) sanitizes `verificationStatus` via `sanitizeVerificationStatus()` before calling. However, the store's public API does not enforce this -- a future caller could pass unsanitized data (e.g., `verificationStatus: "verifying"` from a stale session snapshot), leaving the app in a stuck loading state.
+When the LLM returns unparseable JSON, the error response includes `responseText.slice(0, 500)` in the `details` field. This is returned to the client. The leaked content is the LLM's own output (not server internals), so the information disclosure risk is limited. However, if the LLM hallucinates or echoes back parts of the system prompt, this could leak the meta-system prompt to the client.
 
-The `partialize` function would sanitize the value before it reaches localStorage, so this would only affect the in-memory state until the next page load. The blast radius is limited to the current session.
+**Recommendation:** This is low risk since the meta-system prompt is not secret (it's in the source code). No action required, but be aware of this pattern if secret system prompts are ever introduced.
 
-**Recommendation:** Move sanitization into the store's `resetToSnapshot` method as defense-in-depth.
+---
 
-### 2. Non-atomic migration check (TOCTOU)
-
+#### 5. Misleading comment: "added in v2" on fields that extend existing v2 schema
 **Severity:** Informational
-**Location:** `app/lib/stores/workspaceStore.ts` lines 478-493 (`onRehydrateStorage`)
-**Move:** Identify time-of-check to time-of-use gaps
-**Confidence:** Low
+**Location:** `app/lib/types/persistence.ts:32`
+**Move:** Test the serialization boundary (fact-check cross-reference)
+**Confidence:** High
 
-Persists from Loop 1 (was Finding 4). The rehydration callback checks for `workspace-v2` and `workspace-zustand-v1` keys, parses the Zustand key, then conditionally runs `migrateFromV2()`. This is not atomic. In practice this is benign: migration is effectively idempotent, and this is a single-user client app. The `catch` block correctly falls through to migration if the Zustand key is corrupted.
+Per the fact-check report: the comment "added in v2" on `customArtifactTypes` and `customArtifactData` is misleading. `WORKSPACE_VERSION` was already 2 and was not bumped. The new fields are optional (`?`), so existing v2 data loads fine without them. However, the comment implies a version boundary that doesn't exist, which could mislead a future developer into thinking a migration path exists when it doesn't.
 
-**Recommendation:** No action needed.
+**Security implication:** If a future developer adds a v3 migration that depends on the v2->v3 boundary being where custom types were introduced, they might incorrectly assume all v2 data lacks these fields. The optional typing (`?`) makes this safe today, but the misleading comment is a maintenance hazard.
 
-### 3. Debounced write can lose data on tab close
+**Recommendation:** Change the comment to "optional extension to the v2 schema" or similar.
 
+---
+
+#### 6. localStorage persistence of system prompts has no integrity check
 **Severity:** Low
-**Location:** `app/lib/stores/workspaceStore.ts` lines 38-47 (`createDebouncedStorage.setItem`)
-**Move:** Check the error path, not just the happy path
+**Location:** `app/lib/utils/workspacePersistence.ts:121-129`, `app/hooks/useWorkspacePersistence.ts:83-84`
+**Move:** Test the serialization boundary
 **Confidence:** Medium
 
-Persists from Loop 1 (was Finding 5). The debounced storage adapter delays `localStorage.setItem` by 300ms. If the user closes the tab during the debounce window, the pending write is lost. This is a known tradeoff documented in the spike.
+Custom type definitions, including their system prompts, are persisted to localStorage and restored on page load. The `isValidCustomTypeDef` validator checks structural shape but does not constrain the `systemPrompt` content. A malicious browser extension or XSS in a co-hosted page on the same origin could modify localStorage to inject a crafted system prompt that would be sent to the LLM on next formalization.
 
-**Recommendation:** Consider adding a `beforeunload` listener that flushes the pending debounced write synchronously. This is a robustness improvement, not a security fix.
+In a single-user local dev tool, this is low risk. The `isValidCustomTypeDef` function does properly validate the shape, which is good defensive coding.
 
-### 4. Batch artifact update in page.tsx duplicates store logic
+**Recommendation:** No immediate action needed. If the app is ever deployed as a multi-user service, add HMAC signing to persisted data or move persistence server-side.
 
+---
+
+#### 7. Fact-check: ARTIFACT_RESPONSE_KEY comment is misleading about mapping
 **Severity:** Informational
-**Location:** `app/page.tsx` lines 329-348 (inside `handleAllResults` callback)
-**Move:** Trace the trust boundaries
-**Confidence:** Medium
+**Location:** `app/lib/types/artifacts.ts:200`
+**Move:** Fact-check cross-reference
+**Confidence:** High
 
-The `handleAllResults` callback in `page.tsx` manually constructs `ArtifactRecord` objects with version slicing logic (`existing.versions.slice(-MAX_VERSIONS + 1)`) that duplicates the logic inside `setArtifactGenerated`. This was done for batching (single `setState` call instead of N separate calls). While the logic is currently correct and identical to the store's version, having two copies means a future change to the versioning cap or truncation strategy could be applied to one but not the other.
+The comment says "kebab-case -> camelCase" but `semiformal -> proof` and `lean -> leanCode` are not simple case conversions -- they are semantic renames. This is not a security issue but could lead to incorrect assumptions when extending the mapping for custom types.
 
-This is not a security vulnerability. It is noted because divergent logic in the persistence path could lead to unexpected state if the two implementations drift.
+**Recommendation:** Update the comment to note the exceptions: "Maps built-in artifact types to their JSON response key. Most follow kebab-case -> camelCase; exceptions: semiformal -> proof, lean -> leanCode."
 
-**Recommendation:** Consider extracting the version-building logic into a shared helper (e.g., `buildUpdatedVersions(existing, newContent, source)`) that both the store action and the page callback use.
+---
+
+#### 8. Fact-check: formatLabel docstring incomplete
+**Severity:** Informational
+**Location:** `app/components/panels/CustomArtifactPanel.tsx:80`
+**Move:** Fact-check cross-reference
+**Confidence:** High
+
+The docstring says "camelCase or snake_case" but the function's `.replace(/[_-]/g, " ")` also handles kebab-case. Not a security issue.
+
+**Recommendation:** Update docstring to "Convert camelCase, snake_case, or kebab-case keys to a readable label."
+
+---
+
+#### 9. Fact-check: "cross-session library" reference to nonexistent feature
+**Severity:** Informational
+**Location:** `app/lib/types/customArtifact.ts:7`
+**Move:** Fact-check cross-reference
+**Confidence:** High
+
+The module docstring mentions "optionally saved to a cross-session library" but no such feature exists in the codebase. This is not a security issue but could confuse developers.
+
+**Recommendation:** Remove or mark as future work (e.g., "future: cross-session library").
+
+---
 
 ## What Looks Good
 
-- **Complete deserialization validation chain.** After the A1 fix, every field at every nesting level of persisted data is type-checked before entering the store: top-level scalars in `coercePersistedState`, artifact records via `coerceArtifactRecord`, individual versions via `coerceArtifactVersion`, and decomposition nodes via the shared `coerceDecomposition`. This is thorough.
+- **System prompt length limit** (`MAX_SYSTEM_PROMPT_LENGTH = 10_000`): The custom formalization route enforces a maximum system prompt length, preventing abuse via extremely large prompts that would consume excessive tokens.
 
-- **Single source of truth for decomposition coercion.** The A2 fix eliminated the duplicated inline coercion and now both the v2 migration path (`loadWorkspace`) and the Zustand rehydration path (`coercePersistedState`) use the same `coerceDecomposition()` function. This prevents drift.
+- **Input validation on the custom route**: `customSystemPrompt` is checked for presence and type before use. The `sourceText` required check in `handleArtifactRoute` catches empty requests.
 
-- **Quota error handling in debounced storage.** `localStorage.setItem` is wrapped in try/catch with a console.warn on quota exceeded.
+- **Defensive localStorage deserialization**: `loadWorkspace` uses thorough type checking (`isObject`, `isValidCustomTypeDef`, field-by-field coercion) rather than blindly trusting parsed JSON. This is good defense against corrupted or tampered localStorage.
 
-- **`partialize` sanitizes transient states on write.** `verificationStatus: "verifying"` is stripped to `"none"` before persistence. Node verification statuses are sanitized via the memoized `sanitizeDecomposition`.
+- **No `dangerouslySetInnerHTML`**: The `CustomArtifactPanel` renders LLM output via React's JSX interpolation (`{String(value)}`), which auto-escapes HTML. There is no XSS vector in the rendering path.
 
-- **`getSnapshot` uses `structuredClone` for deep copy.** Prevents mutation of the snapshot from affecting the live store. `extractedFiles` correctly strips non-serializable `File` references.
+- **`isCustomType` type guard**: Using the `custom-` prefix convention with a type guard prevents confusion between built-in and custom types, which could otherwise lead to routing errors or privilege confusion.
 
-- **SSR hydration handled correctly.** `skipHydration: true` with `rehydrate()` in a client-side `useEffect` avoids Next.js hydration mismatches.
+- **Request cloning in custom route**: The `request.clone()` pattern in `/api/formalization/custom` correctly handles the need to read the body twice without consuming the stream.
 
-- **No secrets in the diff.** The `ANTHROPIC_API_KEY` is not touched. No credentials, tokens, or sensitive data flow through the changed code.
+- **`transformBody` strips custom fields**: The custom-specific fields (`customSystemPrompt`, `customOutputFormat`) are removed before `buildUserMessage` processes the body, preventing them from leaking into the LLM user message.
 
-- **`currentVersionIndex` bounds-checked on both read and write paths.** `coerceArtifactRecord` clamps the index; `undoArtifact`/`redoArtifact` guard against out-of-bounds; `resolveArtifactContent` uses optional chaining with `?? null`.
-
-- **Artifact version cap (MAX_VERSIONS = 20) prevents unbounded growth.** Both `setArtifactGenerated` and `setArtifactEdited` trim to the cap.
-
-- **All 174 tests pass.** Including hydration and migration tests that exercise the deserialization paths.
+---
 
 ## Summary Table
 
-| # | Finding | Severity | Status | Location | Confidence |
-|---|---------|----------|--------|----------|------------|
-| A1 | ArtifactVersion inner fields not validated | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A2 | Decomposition coercion duplicated inline | Low | FIXED (3ed18f8) | workspaceStore.ts | -- |
-| A4 | Unused GenerationProvenance type | Informational | FIXED (3ed18f8) | artifactStore.ts | -- |
-| 1 | resetToSnapshot accepts unsanitized data | Low | Open (unchanged) | workspaceStore.ts:406 | Low |
-| 2 | Non-atomic migration check (TOCTOU) | Informational | Open (accepted) | workspaceStore.ts:478-493 | Low |
-| 3 | Debounced write can lose data on tab close | Low | Open (accepted) | workspaceStore.ts:38-47 | Medium |
-| 4 | Batch artifact update duplicates store logic | Informational | NEW | page.tsx:329-348 | Medium |
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| 1 | User-controlled system prompt enables indirect prompt injection | Medium | `api/formalization/custom/route.ts:33-35` | High |
+| 2 | LLM-generated definitions flow through without content validation | Medium | `api/custom-type/design/route.ts:76-89` | High |
+| 3 | No rate limiting on LLM-calling API routes | Medium | Both new API routes | High |
+| 4 | Error responses leak LLM output fragments | Low | `api/custom-type/design/route.ts:80,83,92` | High |
+| 5 | Misleading "added in v2" comment | Informational | `lib/types/persistence.ts:32` | High |
+| 6 | localStorage persistence has no integrity check | Low | `lib/utils/workspacePersistence.ts:121-129` | Medium |
+| 7 | ARTIFACT_RESPONSE_KEY comment misleading | Informational | `lib/types/artifacts.ts:200` | High |
+| 8 | formatLabel docstring incomplete | Informational | `panels/CustomArtifactPanel.tsx:80` | High |
+| 9 | "cross-session library" reference to nonexistent feature | Informational | `lib/types/customArtifact.ts:7` | High |
+
+---
 
 ## Overall Assessment
 
-The three fixes from Loop 1 are correct and complete. The `coerceArtifactVersion` function (A1) closes the last gap in the deserialization validation chain. The `coerceDecomposition` reuse (A2) eliminates duplicated logic and ensures consistent node-level validation across both the v2 migration and Zustand rehydration paths. The `GenerationProvenance` removal (A4) is clean dead-code removal.
+The security posture of this feature is **reasonable for a single-user local development tool**. The core design decision -- allowing users to author their own system prompts -- is inherently a trust delegation, but it is appropriate for the use case. The code demonstrates good defensive practices: thorough input validation on the localStorage deserialization path, proper React escaping in rendering, type guards for the custom/builtin boundary, and a length limit on user-supplied prompts.
 
-No new security vulnerabilities were introduced by the fixes. The one new finding (Finding 4, Informational) is a maintainability concern about duplicated version-building logic in `page.tsx`, not a security issue.
-
-The two remaining Low findings (resetToSnapshot sanitization, debounced write data loss) and the Informational TOCTOU are acceptable for a single-user client-side application. None represent exploitable vulnerabilities in the current threat model.
-
-No Critical or High severity issues found. The branch is ready to merge from a security perspective.
+The main concerns are architectural rather than implementation-level: (1) the user-controlled system prompt pattern would become a significant risk if workspace sharing or multi-tenancy is ever added, and (2) the lack of rate limiting is a pre-existing gap that this PR does not worsen but also does not address. None of the findings are blocking for merge. The informational items from the fact-check report should be addressed as documentation cleanup, ideally in this PR.

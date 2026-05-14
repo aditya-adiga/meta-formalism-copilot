@@ -1,9 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
+import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
+import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
+import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -17,11 +21,28 @@ type CounterexamplesPanelProps = {
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps;
 
+// Support legacy persisted data that used "counterexamples" as the array field name
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getScenarios(data: any): CounterexamplesResponse["counterexamples"]["scenarios"] | undefined {
+  return data?.scenarios ?? data?.counterexamples;
+}
+
 export default function CounterexamplesPanel({
   counterexamples, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
 }: CounterexamplesPanelProps) {
+  const scenarios = getScenarios(counterexamples);
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
+
+  // Build search description from claim + top counterexample scenarios
+  const evidenceSearchContent = useMemo(() => {
+    if (!counterexamples) return "";
+    const parts = [counterexamples.claim];
+    for (const cx of getScenarios(counterexamples)?.slice(0, 3) ?? []) {
+      parts.push(cx.scenario);
+    }
+    return parts.filter(Boolean).join(". ");
+  }, [counterexamples]);
 
   return (
     <ArtifactPanelShell
@@ -53,13 +74,10 @@ export default function CounterexamplesPanel({
           </section>
 
           {/* Counterexamples */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
-              Counterexamples ({counterexamples.counterexamples.length})
-            </h3>
+          <CollapsibleSection title="Counterexamples" defaultOpen={false} count={scenarios?.length ?? 0}>
             <div className="space-y-3">
-              {counterexamples.counterexamples.map((cx, i) => (
-                <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("counterexamples", i, newCx)}>
+              {scenarios?.map((cx, i) => (
+                <EditableSection key={cx.id} value={cx} onChange={(newCx) => updateArrayItem("scenarios", i, newCx)}>
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs text-[#9A9590]">{cx.id}</span>
@@ -78,7 +96,7 @@ export default function CounterexamplesPanel({
                 </EditableSection>
               ))}
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* Robustness Assessment */}
           <section>
@@ -87,6 +105,20 @@ export default function CounterexamplesPanel({
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
             </EditableSection>
           </section>
+
+          {/* Evidence search — one search for the whole artifact */}
+          {evidenceSearchContent && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">
+                Evidence
+              </h3>
+              <FindEvidenceButton
+                artifactType="counterexamples"
+                elementId={WHOLE_ARTIFACT_ELEMENT_ID}
+                elementContent={evidenceSearchContent}
+              />
+            </section>
+          )}
         </>
       )}
     </ArtifactPanelShell>

@@ -1,6 +1,8 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
+import CostTooltip from "@/app/components/ui/CostTooltip";
 
 type FormalizationControlsProps = {
   contextText: string;
@@ -12,6 +14,15 @@ type FormalizationControlsProps = {
   loadingState?: ArtifactLoadingState;
   /** Placeholder text shown when contextText is empty (e.g. global context for per-node override) */
   contextPlaceholder?: string;
+  /** Custom artifact type support */
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  onCreateCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onEditCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onDeleteCustomType?: (id: string) => void;
+  /** Source text for the test preview in the designer */
+  sourceText?: string;
+  /** Source text character count, used for cost estimation tooltip. */
+  sourceCharLength?: number;
 };
 
 export default function FormalizationControls({
@@ -23,6 +34,12 @@ export default function FormalizationControls({
   loading,
   loadingState = {},
   contextPlaceholder,
+  customArtifactTypes,
+  onCreateCustomType,
+  onEditCustomType,
+  onDeleteCustomType,
+  sourceText,
+  sourceCharLength,
 }: FormalizationControlsProps) {
   // Derive per-chip loading booleans from loadingState
   const chipLoading: Partial<Record<ArtifactType, boolean>> = {};
@@ -58,20 +75,31 @@ export default function FormalizationControls({
             onChange={onArtifactTypesChange}
             loading={chipLoading}
             disabled={loading}
+            customTypes={customArtifactTypes}
+            onCreateCustomType={onCreateCustomType}
+            onEditCustomType={onEditCustomType}
+            onDeleteCustomType={onDeleteCustomType}
+            sourceText={sourceText}
+            contextText={contextText}
           />
         </div>
       </div>
 
       {/* Docked Formalise button */}
       <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={loading || selectedArtifactTypes.length === 0}
-          className="w-full rounded-full bg-[var(--ink-black)] px-6 py-3 text-base font-semibold text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+        <CostTooltip
+          inputCharLength={(sourceCharLength ?? 0) + contextText.length}
+          artifactTypes={selectedArtifactTypes}
         >
-          {buttonLabel}
-        </button>
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={loading || selectedArtifactTypes.length === 0}
+            className="w-full rounded-full bg-[var(--ink-black)] px-6 py-3 text-base font-semibold text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
+          >
+            {buttonLabel}
+          </button>
+        </CostTooltip>
       </div>
     </div>
   );

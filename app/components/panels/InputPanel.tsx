@@ -1,6 +1,7 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import type { WaitTimeEstimate } from "@/app/hooks/useWaitTimeEstimate";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import FileUpload from "@/app/components/features/source-input/FileUpload";
 import TextInput from "@/app/components/features/source-input/TextInput";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
@@ -22,6 +23,11 @@ type InputPanelProps = {
   onArtifactTypesChange: (types: ArtifactType[]) => void;
   loadingState?: ArtifactLoadingState;
   waitEstimate?: WaitTimeEstimate | null;
+  /** Custom artifact type support */
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  onCreateCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onEditCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onDeleteCustomType?: (id: string) => void;
 };
 
 export default function InputPanel({
@@ -39,6 +45,10 @@ export default function InputPanel({
   onArtifactTypesChange,
   loadingState,
   // waitEstimate available via props for future use
+  customArtifactTypes,
+  onCreateCustomType,
+  onEditCustomType,
+  onDeleteCustomType,
 }: InputPanelProps) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
@@ -84,6 +94,12 @@ export default function InputPanel({
           onGenerate={onFormalise}
           loading={loading}
           loadingState={loadingState}
+          customArtifactTypes={customArtifactTypes}
+          onCreateCustomType={onCreateCustomType}
+          onEditCustomType={onEditCustomType}
+          onDeleteCustomType={onDeleteCustomType}
+          sourceText={sourceText}
+          sourceCharLength={sourceText.length}
         />
       </div>
     </div>

@@ -1,3 +1,5 @@
+import type { CustomArtifactTypeId } from "./customArtifact";
+
 export type PanelId =
   | "source"
   | "context"
@@ -10,9 +12,20 @@ export type PanelId =
   | "property-tests"
   | "dialectical-map"
   | "counterexamples"
-  | "analytics";
+  | "analytics"
+  | CustomArtifactTypeId;
 
 export type PanelGroup = "navigation" | "artifacts" | "meta";
+
+export type SplitOrientation = "horizontal" | "vertical";
+
+export type SplitConfig = {
+  secondaryPanelId: PanelId | null;
+  onSelectSecondaryPanel: (id: PanelId) => void;
+  onCloseSecondary: () => void;
+  orientation: SplitOrientation;
+  onToggleOrientation: () => void;
+};
 
 export type PanelDef = {
   id: PanelId;

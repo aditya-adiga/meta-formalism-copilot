@@ -34,7 +34,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - `layout.tsx` — Sets up fonts (EB Garamond serif + Geist Mono) and metadata
 - `globals.css` — CSS variables (`--ivory-cream`, `--ink-black`, `--paper-shadow`) and Tailwind v4 config via `@theme inline`
 - `components/layout/` — `PanelShell` (Icon Rail + focus pane layout), `IconRail` (sidebar navigation)
-- `components/panels/` — One component per panel: `InputPanel`, `SemiformalPanel`, `LeanPanel`, `GraphPanel`, `NodeDetailPanel`, `CausalGraphPanel`, `StatisticalModelPanel`, `PropertyTestsPanel`, `DialecticalMapPanel`, `AnalyticsPanel`
+- `components/panels/` — One component per panel: `InputPanel`, `SemiformalPanel`, `LeanPanel`, `GraphPanel`, `NodeDetailPanel`, `CausalGraphPanel`, `StatisticalModelPanel`, `PropertyTestsPanel`, `DialecticalMapPanel`, `CustomArtifactPanel`, `AnalyticsPanel`
 - `components/features/` — Feature modules organized by domain:
   - `source-input/` — `TextInput`, `FileUpload` (.txt, .doc, .docx, .pdf)
   - `context-input/` — `ContextInput`, `RefinementButtons`, `RefinementPreview`
@@ -44,20 +44,22 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
   - `artifact-selector/` — Artifact type selection UI
   - `causal-graph/` — Graph visualization components
   - `lean-display/` — Lean code display with syntax highlighting
+  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidencePaperCard` for grounding artifacts in published research
 - `components/ui/` — Shared UI components and icons
 - `hooks/` — Custom hooks: `useWorkspacePersistence`, `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useAnalytics`, etc.
 - `lib/types/` — TypeScript type definitions for panels, sessions, artifacts, decomposition
 - `lib/llm/` — LLM integration (Anthropic SDK, schemas, caching)
 - `lib/formalization/` — Shared artifact generation logic
 - `lib/utils/` — Utilities (PDF parsing, LaTeX parsing, export, text selection)
-- `api/` — Next.js API routes for formalization, editing, verification, decomposition, analytics
+- `lib/stores/` — Zustand stores: `evidenceStore` (evidence search results, persisted to localStorage)
+- `api/` — Next.js API routes for formalization, editing, verification, decomposition, analytics, evidence search
 
 ### Key Patterns
 
 - **Feature-based folder structure**: components grouped by feature domain, not by type
 - **Import alias**: `@/*` maps to the project root (configured in `tsconfig.json`)
 - **Client components**: Panel components use `"use client"` since they manage state
-- **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map — each with a dedicated panel and API route
+- **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map — each with a dedicated panel and API route. Users can also create **custom artifact types** with user-authored system prompts, generated via a generic `/api/formalization/custom` route.
 - **Decomposition workflow**: extract propositions from sources into a dependency graph, then formalize per-node
 - **Session management**: workspace sessions (global) and formalization sessions (per-scope) for tracking artifact history
 

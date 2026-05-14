@@ -1,11 +1,14 @@
-export type VerificationStatus = "none" | "verifying" | "valid" | "invalid";
+export type VerificationStatus = "none" | "verifying" | "valid" | "invalid" | "unavailable";
 export type LoadingPhase = "idle" | "semiformal" | "lean" | "verifying" | "retrying" | "reverifying" | "iterating";
 
 export type SessionScope =
   | { type: "global" }
   | { type: "node"; nodeId: string; nodeLabel: string };
 
-export type ArtifactType =
+import type { CustomArtifactTypeId } from "./customArtifact";
+
+/** The fixed set of artifact types shipped with the app. */
+export type BuiltinArtifactType =
   | "semiformal"
   | "lean"
   | "causal-graph"
@@ -13,6 +16,9 @@ export type ArtifactType =
   | "property-tests"
   | "dialectical-map"
   | "counterexamples";
+
+/** Any artifact type — built-in or user-defined custom type. */
+export type ArtifactType = BuiltinArtifactType | CustomArtifactTypeId;
 
 export type ArtifactData = {
   type: ArtifactType;
