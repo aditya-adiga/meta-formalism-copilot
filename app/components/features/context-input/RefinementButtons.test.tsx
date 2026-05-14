@@ -8,7 +8,7 @@ describe('RefinementButtons', () => {
     render(<RefinementButtons onRefine={() => {}} />)
     expect(screen.getByText('Elaborate')).toBeInTheDocument()
     expect(screen.getByText('Shorten')).toBeInTheDocument()
-    expect(screen.getByText('Formalize')).toBeInTheDocument()
+    expect(screen.getByText('Make Precise')).toBeInTheDocument()
     expect(screen.getByText('Clarify')).toBeInTheDocument()
   })
 
@@ -22,7 +22,7 @@ describe('RefinementButtons', () => {
     await userEvent.click(screen.getByText('Shorten'))
     expect(onRefine).toHaveBeenCalledWith('shorten')
 
-    await userEvent.click(screen.getByText('Formalize'))
+    await userEvent.click(screen.getByText('Make Precise'))
     expect(onRefine).toHaveBeenCalledWith('formalize')
 
     await userEvent.click(screen.getByText('Clarify'))

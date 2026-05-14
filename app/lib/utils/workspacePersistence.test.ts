@@ -367,7 +367,7 @@ describe("custom artifact type persistence", () => {
       verificationStatus: "none", verificationErrors: "",
       decomposition: { nodes: [], selectedNodeId: null, paperText: "", sources: [] },
       customArtifactTypes: [customType],
-      artifacts: { causalGraph: null, statisticalModel: null, propertyTests: null, dialecticalMap: null, counterexamples: null, customArtifactData: { "custom-test1": '{"result":"ok"}' } },
+      artifacts: { causalGraph: null, statisticalModel: null, propertyTests: null, balancedPerspectives: null, counterexamples: null, customArtifactData: { "custom-test1": '{"result":"ok"}' } },
     });
 
     const result = loadWorkspace()!;

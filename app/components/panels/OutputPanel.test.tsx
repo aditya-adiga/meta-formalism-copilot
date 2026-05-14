@@ -43,26 +43,26 @@ describe('OutputPanel', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the Semiformal Proof heading', () => {
+  it('renders the Step-by-Step Proof heading', () => {
     render(<OutputPanel {...defaultProps} />)
-    expect(screen.getByText('Semiformal Proof')).toBeInTheDocument()
+    expect(screen.getByText('Step-by-Step Proof')).toBeInTheDocument()
   })
 
-  it('does not show the Lean4 section when there is no lean code and phase is idle', () => {
+  it('does not show the Proof Code section when there is no lean code and phase is idle', () => {
     render(<OutputPanel {...defaultProps} />)
-    expect(screen.queryByText('Lean4 Code')).not.toBeInTheDocument()
+    expect(screen.queryByText('Proof Code')).not.toBeInTheDocument()
   })
 
-  it('shows the Lean4 section when lean code is present', () => {
+  it('shows the Proof Code section when lean code is present', () => {
     render(<OutputPanel {...defaultProps} leanCode="theorem : True := trivial" />)
-    expect(screen.getByText('Lean4 Code')).toBeInTheDocument()
+    expect(screen.getByText('Proof Code')).toBeInTheDocument()
     expect(screen.getByTestId('lean-display')).toBeInTheDocument()
   })
 
-  it('shows the Lean4 section during lean loading phase even without code', () => {
+  it('shows the Proof Code section during lean loading phase even without code', () => {
     render(<OutputPanel {...defaultProps} loadingPhase="lean" />)
-    expect(screen.getByText('Lean4 Code')).toBeInTheDocument()
-    expect(screen.getByText('Generating Lean4 code...')).toBeInTheDocument()
+    expect(screen.getByText('Proof Code')).toBeInTheDocument()
+    expect(screen.getByText('Generating proof code...')).toBeInTheDocument()
   })
 
   it('shows WholeTextEditBar when semiformal text exists', () => {
@@ -94,19 +94,19 @@ describe('OutputPanel', () => {
   })
 
   describe('VerificationBadge', () => {
-    it('shows "Verifying..." for verifying status', () => {
+    it('shows "Checking..." for verifying status', () => {
       render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="verifying" />)
-      expect(screen.getByText('Verifying...')).toBeInTheDocument()
+      expect(screen.getByText('Checking...')).toBeInTheDocument()
     })
 
-    it('shows "Verified" for valid status', () => {
+    it('shows "Passed" for valid status', () => {
       render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="valid" />)
-      expect(screen.getByText('Verified')).toBeInTheDocument()
+      expect(screen.getByText('Passed')).toBeInTheDocument()
     })
 
-    it('shows "Verification Failed" for invalid status', () => {
+    it('shows "Check Failed" for invalid status', () => {
       render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="invalid" />)
-      expect(screen.getByText('Verification Failed')).toBeInTheDocument()
+      expect(screen.getByText('Check Failed')).toBeInTheDocument()
     })
 
     it('shows "Verifier offline" for unavailable status (not a passing badge)', () => {
@@ -117,9 +117,9 @@ describe('OutputPanel', () => {
 
     it('shows nothing for none status', () => {
       render(<OutputPanel {...defaultProps} leanCode="code" verificationStatus="none" />)
-      expect(screen.queryByText('Verifying...')).not.toBeInTheDocument()
-      expect(screen.queryByText('Verified')).not.toBeInTheDocument()
-      expect(screen.queryByText('Verification Failed')).not.toBeInTheDocument()
+      expect(screen.queryByText('Checking...')).not.toBeInTheDocument()
+      expect(screen.queryByText('Passed')).not.toBeInTheDocument()
+      expect(screen.queryByText('Check Failed')).not.toBeInTheDocument()
     })
   })
 })

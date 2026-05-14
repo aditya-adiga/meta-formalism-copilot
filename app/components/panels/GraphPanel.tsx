@@ -112,8 +112,8 @@ export default function GraphPanel({
   }, [sourceDocuments]);
 
   const buttonLabel = extractionStatus === "extracting"
-    ? "Decomposing..."
-    : `Decompose ${sourceCount} Source${sourceCount !== 1 ? "s" : ""}`;
+    ? "Breaking down..."
+    : `Break down ${sourceCount} source${sourceCount !== 1 ? "s" : ""}`;
 
   const handleExportGraph = useCallback(async () => {
     setExporting(true);
@@ -133,7 +133,7 @@ export default function GraphPanel({
     <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          Decomposition
+          Breakdown
         </h2>
         <div className="flex items-center gap-2">
           {hasNodes && onAddNode && (
@@ -165,7 +165,7 @@ export default function GraphPanel({
               disabled={extractionStatus === "extracting"}
               className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-50"
             >
-              {queueProgress.status === "done" ? "Re-formalize All" : "Formalize All"}
+              {queueProgress.status === "done" ? "Regenerate All" : "Generate All"}
             </button>
           )}
           {queueActive && (
@@ -226,7 +226,7 @@ export default function GraphPanel({
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-2">
           <div className="flex items-center justify-between text-xs text-[#6B6560]">
             <span>
-              {queueProgress.completed} verified
+              {queueProgress.completed} done
               {queueProgress.failed > 0 && `, ${queueProgress.failed} failed`}
               {queueProgress.skipped > 0 && `, ${queueProgress.skipped} skipped`}
               {" / "}
@@ -265,7 +265,7 @@ export default function GraphPanel({
       {showArtifactPicker && (
         <div className="border-b border-[#DDD9D5] bg-[#FDFCFB] px-6 py-3">
           <p className="mb-2 text-xs font-medium text-[#6B6560]">
-            Select formalization types to generate for all nodes:
+            Select output types to generate for all parts:
           </p>
           <ArtifactChipSelector
             selected={queueArtifactTypes}
@@ -310,13 +310,13 @@ export default function GraphPanel({
       <div className="flex min-h-0 flex-1 flex-col">
         {!hasContent && (
           <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590]">
-            Upload a paper in the Source panel first
+            Add your source material in the Source panel first
           </div>
         )}
 
         {hasContent && !hasNodes && extractionStatus !== "extracting" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-[#9A9590]">
-            <p>Click &quot;{buttonLabel}&quot; to extract propositions</p>
+            <p>Click &quot;{buttonLabel}&quot; to extract key claims</p>
             {extractionStatus === "error" && (
               <p className="text-red-600">Extraction failed. Try again.</p>
             )}
@@ -325,7 +325,7 @@ export default function GraphPanel({
 
         {extractionStatus === "extracting" && !hasNodes && (
           <div className="flex flex-1 items-center justify-center text-sm text-[#6B6560]">
-            Extracting propositions...
+            Extracting key claims...
           </div>
         )}
 

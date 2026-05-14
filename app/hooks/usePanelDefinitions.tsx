@@ -21,7 +21,7 @@ import {
   CausalGraphIcon,
   StatisticalModelIcon,
   PropertyTestsIcon,
-  DialecticalMapIcon,
+  BalancedPerspectivesIcon,
   AnalyticsIcon,
   CounterexamplesIcon,
   CustomArtifactIcon,
@@ -44,8 +44,8 @@ type PanelDefsInput = {
   statisticalModelLoading?: boolean;
   hasPropertyTests?: boolean;
   propertyTestsLoading?: boolean;
-  hasDialecticalMap?: boolean;
-  dialecticalMapLoading?: boolean;
+  hasBalancedPerspectives?: boolean;
+  balancedPerspectivesLoading?: boolean;
   hasCounterexamples?: boolean;
   counterexamplesLoading?: boolean;
   /** Custom artifact type definitions for dynamic panel entries */
@@ -64,7 +64,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     hasCausalGraph, causalGraphLoading,
     hasStatisticalModel, statisticalModelLoading,
     hasPropertyTests, propertyTestsLoading,
-    hasDialecticalMap, dialecticalMapLoading,
+    hasBalancedPerspectives, balancedPerspectivesLoading,
     hasCounterexamples, counterexamplesLoading,
     customArtifactTypes = [],
     customArtifactData = {},
@@ -95,16 +95,16 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       },
       {
         id: "decomposition" as PanelId,
-        label: "Decomposition",
+        label: "Breakdown",
         icon: <GraphIcon />,
         group: "navigation" as const,
         statusSummary: hasDecomp
-          ? `${verifiedCount}/${nodeCount} verified`
-          : "No graph",
+          ? `${verifiedCount}/${nodeCount} checked`
+          : "Not started",
       },
       {
         id: "node-detail" as PanelId,
-        label: "Node Detail",
+        label: "Component Detail",
         icon: <NodeDetailIcon />,
         group: "navigation" as const,
         statusSummary: selectedNode ? selectedNode.label : "",
@@ -113,7 +113,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       // --- Artifacts group ---
       {
         id: "semiformal" as PanelId,
-        label: "Semiformal Proof",
+        label: "Step-by-Step Proof",
         icon: <SemiformalIcon />,
         group: "artifacts" as const,
         statusSummary: loadingPhase === "semiformal"
@@ -127,11 +127,11 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       },
       {
         id: "lean" as PanelId,
-        label: "Lean4 Code",
+        label: "Proof Code",
         icon: <LeanIcon />,
         group: "artifacts" as const,
         statusSummary: activeVerificationStatus === "valid"
-          ? "Verified"
+          ? "Passed"
           : activeVerificationStatus === "invalid"
             ? "Failed"
             : activeLeanCode
@@ -141,7 +141,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       },
       {
         id: "causal-graph" as PanelId,
-        label: "Causal Graph",
+        label: "Cause & Effect Map",
         icon: <CausalGraphIcon />,
         group: "artifacts" as const,
         statusSummary: causalGraphLoading ? "Generating..." : hasCausalGraph ? "Graph ready" : "No graph yet",
@@ -157,19 +157,19 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       },
       {
         id: "property-tests" as PanelId,
-        label: "Property Tests",
+        label: "Consistency Checks",
         icon: <PropertyTestsIcon />,
         group: "artifacts" as const,
         statusSummary: propertyTestsLoading ? "Generating..." : hasPropertyTests ? "Tests ready" : "No tests yet",
         hidden: !hasPropertyTests && !propertyTestsLoading,
       },
       {
-        id: "dialectical-map" as PanelId,
-        label: "Dialectical Map",
-        icon: <DialecticalMapIcon />,
+        id: "balanced-perspectives" as PanelId,
+        label: "Balanced Perspectives",
+        icon: <BalancedPerspectivesIcon />,
         group: "artifacts" as const,
-        statusSummary: dialecticalMapLoading ? "Generating..." : hasDialecticalMap ? "Map ready" : "No map yet",
-        hidden: !hasDialecticalMap && !dialecticalMapLoading,
+        statusSummary: balancedPerspectivesLoading ? "Generating..." : hasBalancedPerspectives ? "Map ready" : "No map yet",
+        hidden: !hasBalancedPerspectives && !balancedPerspectivesLoading,
       },
       {
         id: "counterexamples" as PanelId,
@@ -199,7 +199,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
     const metaPanels: PanelDef[] = [
       {
         id: "analytics" as PanelId,
-        label: "LLM Usage",
+        label: "AI Usage",
         icon: <AnalyticsIcon />,
         group: "meta" as const,
         statusSummary: "Cost estimates",
@@ -213,7 +213,7 @@ export function usePanelDefinitions(opts: PanelDefsInput): PanelDef[] {
       hasCausalGraph, causalGraphLoading,
       hasStatisticalModel, statisticalModelLoading,
       hasPropertyTests, propertyTestsLoading,
-      hasDialecticalMap, dialecticalMapLoading,
+      hasBalancedPerspectives, balancedPerspectivesLoading,
       hasCounterexamples, counterexamplesLoading,
       customArtifactTypes, customArtifactData, customLoadingKey]);
 }

@@ -5,7 +5,7 @@ import type {
   CausalGraphResponse,
   StatisticalModelResponse,
   PropertyTestsResponse,
-  DialecticalMapResponse,
+  BalancedPerspectivesResponse,
   CounterexamplesResponse,
 } from "@/app/lib/types/artifacts";
 
@@ -13,7 +13,7 @@ export type ActiveStructuredArtifacts = {
   activeCausalGraph: CausalGraphResponse["causalGraph"] | null;
   activeStatisticalModel: StatisticalModelResponse["statisticalModel"] | null;
   activePropertyTests: PropertyTestsResponse["propertyTests"] | null;
-  activeDialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
+  activeBalancedPerspectives: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   activeCounterexamples: CounterexamplesResponse["counterexamples"] | null;
 };
 
@@ -32,7 +32,7 @@ export function useActiveStructuredArtifacts(
   causalGraph: ActiveStructuredArtifacts["activeCausalGraph"],
   statisticalModel: ActiveStructuredArtifacts["activeStatisticalModel"],
   propertyTests: ActiveStructuredArtifacts["activePropertyTests"],
-  dialecticalMap: ActiveStructuredArtifacts["activeDialecticalMap"],
+  balancedPerspectives: ActiveStructuredArtifacts["activeBalancedPerspectives"],
   counterexamples: ActiveStructuredArtifacts["activeCounterexamples"],
   selectedNode: PropositionNode | null,
   isDecompMode: boolean,
@@ -43,7 +43,7 @@ export function useActiveStructuredArtifacts(
         activeCausalGraph: causalGraph,
         activeStatisticalModel: statisticalModel,
         activePropertyTests: propertyTests,
-        activeDialecticalMap: dialecticalMap,
+        activeBalancedPerspectives: balancedPerspectives,
         activeCounterexamples: counterexamples,
       };
     }
@@ -51,8 +51,8 @@ export function useActiveStructuredArtifacts(
       activeCausalGraph: findNodeArtifact(selectedNode, "causal-graph"),
       activeStatisticalModel: findNodeArtifact(selectedNode, "statistical-model"),
       activePropertyTests: findNodeArtifact(selectedNode, "property-tests"),
-      activeDialecticalMap: findNodeArtifact(selectedNode, "dialectical-map"),
+      activeBalancedPerspectives: findNodeArtifact(selectedNode, "balanced-perspectives"),
       activeCounterexamples: findNodeArtifact(selectedNode, "counterexamples"),
     };
-  }, [isDecompMode, selectedNode, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
+  }, [isDecompMode, selectedNode, causalGraph, statisticalModel, propertyTests, balancedPerspectives, counterexamples]);
 }
