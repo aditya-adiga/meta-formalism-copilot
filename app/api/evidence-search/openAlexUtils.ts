@@ -59,6 +59,8 @@ export type OpenAlexWork = {
   open_access?: OpenAlexOpenAccess | null;
   doi?: string | null;
   relevance_score?: number | null;
+  /** List of OpenAlex Work IDs this paper cites (full URLs like "https://openalex.org/W123") */
+  referenced_works?: string[];
 };
 
 /** Map a raw OpenAlex work object to our EvidencePaper type. */
@@ -80,6 +82,58 @@ export function mapOpenAlexWork(work: OpenAlexWork): EvidencePaper {
     reliability: null,
     relatedness: null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Batch fetch by ID (for overlap detection — retrieves referenced_works)
+// ---------------------------------------------------------------------------
+
+export const OPENALEX_API_URL = "https://api.openalex.org/works";
+const FETCH_BY_ID_TIMEOUT_MS = 10_000;
+
+/** Batch-fetch OpenAlex works by ID, returning only `id` and `referenced_works`.
+ *  Uses the pipe-separated filter syntax: `filter=openalex:W123|W456`.
+ *  OpenAlex supports up to 50 IDs per request. */
+export async function fetchWorksByIds(
+  ids: string[],
+  mailto: string,
+): Promise<OpenAlexWork[]> {
+  if (ids.length === 0) return [];
+
+  // Strip full URL prefix if present — OpenAlex filter wants bare IDs like "W123"
+  const shortIds = ids.map((id) =>
+    id.replace("https://openalex.org/", ""),
+  );
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_BY_ID_TIMEOUT_MS);
+
+  try {
+    const url = new URL(OPENALEX_API_URL);
+    url.searchParams.set("filter", `openalex:${shortIds.join("|")}`);
+    url.searchParams.set("select", "id,referenced_works");
+    url.searchParams.set("per_page", String(ids.length));
+    url.searchParams.set("mailto", mailto);
+
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.error(`[openAlexUtils] fetchWorksByIds returned ${res.status}`);
+      return [];
+    }
+
+    const data = await res.json();
+    return (data.results ?? []) as OpenAlexWork[];
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[openAlexUtils] fetchWorksByIds timeout");
+    } else {
+      console.error("[openAlexUtils] fetchWorksByIds error:", err);
+    }
+    return [];
+  }
 }
 
 /** Deduplicate papers by openAlexId, keeping the first occurrence. */
