@@ -41,7 +41,7 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-          LLM Usage
+          AI Usage
         </h2>
         <button
           onClick={onClear}
@@ -54,19 +54,19 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
       <div className="flex min-h-0 flex-1 flex-col overflow-auto p-6">
         {/* Summary cards */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SummaryCard label="API Calls" value={String(summary.totalCalls)} />
+          <SummaryCard label="AI Calls" value={String(summary.totalCalls)} />
           <SummaryCard
-            label="Total Tokens"
+            label="Total Processed"
             value={formatTokens(summary.totalInputTokens + summary.totalOutputTokens)}
           />
           <SummaryCard label="Est. Cost" value={formatRecordedCost(summary.totalCostUsd)} />
-          <SummaryCard label="Avg Latency" value={formatLatency(summary.averageLatencyMs)} />
+          <SummaryCard label="Avg Response Time" value={formatLatency(summary.averageLatencyMs)} />
         </div>
 
         {/* Detail table */}
         {entries.length === 0 ? (
           <p className="text-center text-sm text-[#9A9590]">
-            No LLM calls yet. Use the app to see usage data here.
+            No AI calls yet. Use the app to see usage data here.
           </p>
         ) : (
           <div className="overflow-auto rounded border border-[#E8E4E0]">
@@ -76,10 +76,10 @@ export default function AnalyticsPanel({ entries, summary, onClear }: AnalyticsP
                   <th className="px-3 py-2">Time</th>
                   <th className="px-3 py-2">Endpoint</th>
                   <th className="px-3 py-2">Model</th>
-                  <th className="px-3 py-2 text-right">In Tok</th>
-                  <th className="px-3 py-2 text-right">Out Tok</th>
+                  <th className="px-3 py-2 text-right">In</th>
+                  <th className="px-3 py-2 text-right">Out</th>
                   <th className="px-3 py-2 text-right">Cost</th>
-                  <th className="px-3 py-2 text-right">Latency</th>
+                  <th className="px-3 py-2 text-right">Response</th>
                 </tr>
               </thead>
               <tbody>

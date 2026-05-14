@@ -100,7 +100,7 @@ export function useAllArtifactEditing(artifacts: {
   );
 
   const dialecticalMap = useArtifactEditing(
-    "dialectical-map",
+    "balanced-perspectives",
     () => artifacts.dialecticalMap,
     (json) => artifacts.setDialecticalMap(json),
   );

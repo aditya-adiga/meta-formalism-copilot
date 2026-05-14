@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Meta-Formalism Copilot",
-  description: "Two-panel interface for input and AI-assisted output editing",
+  description: "Transform ideas and arguments into structured, rigorous analyses with AI assistance",
 };
 
 export default async function RootLayout({

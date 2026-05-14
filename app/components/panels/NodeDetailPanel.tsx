@@ -21,9 +21,9 @@ type NodeDetailPanelProps = {
 };
 
 const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: string }> = {
-  unverified: { text: "Unverified", color: "var(--status-unverified)" },
+  unverified: { text: "Not checked", color: "var(--status-unverified)" },
   "in-progress": { text: "In Progress", color: "var(--status-in-progress)" },
-  verified: { text: "Verified", color: "var(--status-verified)" },
+  verified: { text: "Passed", color: "var(--status-verified)" },
   failed: { text: "Failed", color: "var(--status-failed)" },
 };
 
@@ -79,7 +79,7 @@ export default function NodeDetailPanel({
             </section>
 
             {node.proofText && (
-              <CollapsibleSection title="Proof" defaultOpen={false}>
+              <CollapsibleSection title="Supporting Reasoning" defaultOpen={false}>
                 <div className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)]">
                   {node.proofText}
                 </div>
@@ -87,7 +87,7 @@ export default function NodeDetailPanel({
             )}
 
             {dependencies.length > 0 && (
-              <CollapsibleSection title="Dependencies" count={dependencies.length} defaultOpen={false}>
+              <CollapsibleSection title="Depends On" count={dependencies.length} defaultOpen={false}>
                 <div className="flex flex-col gap-1">
                   {dependencies.map((dep) => {
                     const depStatus = STATUS_LABELS[dep.verificationStatus];
@@ -107,7 +107,7 @@ export default function NodeDetailPanel({
             )}
 
             {node.semiformalProof && (
-              <CollapsibleSection title="Semiformal Proof">
+              <CollapsibleSection title="Step-by-Step Proof">
                 <pre className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--ink-black)] whitespace-pre-wrap">
                   {node.semiformalProof}
                 </pre>
@@ -115,7 +115,7 @@ export default function NodeDetailPanel({
             )}
 
             {node.leanCode && (
-              <CollapsibleSection title="Lean4 Code">
+              <CollapsibleSection title="Proof Code">
                 <pre className="rounded-md border border-[#DDD9D5] bg-white px-4 py-3 font-mono text-sm leading-relaxed text-[var(--ink-black)] whitespace-pre-wrap">
                   {node.leanCode}
                 </pre>
@@ -123,7 +123,7 @@ export default function NodeDetailPanel({
             )}
 
             {node.verificationErrors && (
-              <CollapsibleSection title="Verification Errors" variant="error" defaultOpen={false}>
+              <CollapsibleSection title="Errors Found" variant="error" defaultOpen={false}>
                 <pre className="rounded-md border border-red-300 bg-red-50 px-4 py-3 font-mono text-xs leading-relaxed text-red-700 whitespace-pre-wrap">
                   {node.verificationErrors}
                 </pre>
@@ -141,7 +141,7 @@ export default function NodeDetailPanel({
                 disabled={loading}
                 className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
               >
-                {loading ? "Generating..." : "Generate Lean4 Code"}
+                {loading ? "Generating..." : "Generate Proof Code"}
               </button>
             </div>
           )}
@@ -154,7 +154,7 @@ export default function NodeDetailPanel({
             onGenerate={onFormalise}
             loading={loading}
             loadingState={loadingState}
-            contextPlaceholder={globalContextText || "e.g., Explore this in the context of decision theory within game-theoretic settings..."}
+            contextPlaceholder={globalContextText || "e.g., Analyze this from a decision-making perspective, considering strategic interactions between actors..."}
           />
         </div>
       </div>

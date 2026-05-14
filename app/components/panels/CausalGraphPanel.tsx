@@ -50,7 +50,7 @@ function DetailsView({
         </EditableSection>
       </section>
 
-      <CollapsibleSection title="Variables" defaultOpen={false} count={causalGraph.variables.length}>
+      <CollapsibleSection title="Factors" defaultOpen={false} count={causalGraph.variables.length}>
         <div className="space-y-2">
           {causalGraph.variables.map((v, i) => (
             <EditableSection key={v.id} value={v} onChange={(newV) => updateArrayItem("variables", i, newV)}>
@@ -66,7 +66,7 @@ function DetailsView({
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Causal Edges" defaultOpen={false} count={causalGraph.edges.length}>
+      <CollapsibleSection title="Relationships" defaultOpen={false} count={causalGraph.edges.length}>
         <div className="space-y-2">
           {causalGraph.edges.map((e, i) => (
             <EditableSection key={`${e.from}-${e.to}-${i}`} value={e} onChange={(newE) => updateArrayItem("edges", i, newE)}>
@@ -85,7 +85,7 @@ function DetailsView({
       </CollapsibleSection>
 
       {causalGraph.confounders.length > 0 && (
-        <CollapsibleSection title="Confounders" defaultOpen={false} count={causalGraph.confounders.length}>
+        <CollapsibleSection title="Hidden Factors" defaultOpen={false} count={causalGraph.confounders.length}>
           <div className="space-y-2">
             {causalGraph.confounders.map((c, i) => (
               <EditableSection key={c.id} value={c} onChange={(newC) => updateArrayItem("confounders", i, newC)}>
@@ -125,11 +125,11 @@ export default function CausalGraphPanel({
 
   return (
     <ArtifactPanelShell
-      title="Causal Graph"
+      title="Cause & Effect Map"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No causal graph yet. Generate one from the source panel or node detail."
-      loadingMessage={`Generating causal graph...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
+      emptyMessage="No cause & effect map yet. Generate one from the Source panel or component detail."
+      loadingMessage={`Generating cause & effect map...${waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}`}
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
