@@ -1,142 +1,255 @@
-# Tech Debt Triage Review: feat/zustand-wire-page
+# Tech Debt Triage: `feat/custom-artifact-types` Branch
 
-**Branch:** `feat/zustand-wire-page` (10 commits, 19 files changed vs main)
-**Reviewed:** 2026-04-03 (Loop 3, after fix commit `3ed18f8`)
-**Prior loops:** Loop 1 found 6 items. Loop 2 applied fixes for items 3 and 5.
-
-This branch replaces the custom `useWorkspacePersistence` React hook with a Zustand store for workspace state management, adds artifact versioning (undo/redo), and rewires `page.tsx` to consume the store directly.
+**Branch:** `feat/custom-artifact-types` vs `main`
+**Scope:** 23 files changed, ~1,434 lines added
+**Reviewed:** 2026-04-07
 
 ---
 
-## Triage Summary
+## 1. Tech Debt: `page.tsx` God Component / Prop Drilling Depth
 
-| # | Debt Item | Nature | Carrying Cost | Fix Cost | Status | Recommendation |
-|---|-----------|--------|---------------|----------|--------|----------------|
-| 1 | Dead code: `saveWorkspace` / `ArtifactPersistenceData` / `SaveWorkspaceInput` in `workspacePersistence.ts` | structural | Low | hours / low risk | OPEN | Fix opportunistically |
-| 2 | Dual localStorage keys (`workspace-v2` + `workspace-zustand-v1`) | structural | Medium | hours / low risk | OPEN | Fix opportunistically |
-| 3 | ~~Unused `GenerationProvenance` type in `artifactStore.ts`~~ | structural | -- | -- | RESOLVED in `3ed18f8` | -- |
-| 4 | `page.tsx` still orchestrates all state wiring (~500 lines) | structural | Medium | days / medium risk | OPEN | Defer and monitor |
-| 5 | Duplicated `isObject` helper; coercion logic partially unified | structural | Low | hours / low risk | PARTIALLY RESOLVED | Fix opportunistically |
-| 6 | `resetWorkspaceToSnapshot` loses version history | structural | Low | hours / low risk | OPEN | Carry intentionally |
-| 7 | Module-level mutable state in `sanitizeDecomposition` memoization | algorithmic | Low | minutes / low risk | NEW (introduced in `3ed18f8`) | Fix opportunistically |
-| 8 | `page.tsx` artifact batch-update duplicates `setArtifactGenerated` logic | structural | Low | minutes / low risk | NEW (introduced in `3ed18f8`) | Fix opportunistically |
+**Location:** `app/page.tsx` (now 780 lines), `app/components/panels/InputPanel.tsx`, `app/components/features/formalization-controls/FormalizationControls.tsx`, `app/components/features/artifact-selector/ArtifactChipSelector.tsx`
 
----
+**Nature:** Structural — growing orchestrator component, deep prop threading
 
-## Resolved Items
+### Carrying Cost: High
 
-### 3. GenerationProvenance -- RESOLVED
+The root `page.tsx` was already the largest and most complex file in the codebase. This branch adds 6 new props threaded through 4 component layers (`page.tsx` -> `InputPanel` -> `FormalizationControls` -> `ArtifactChipSelector`), plus 5 new state variables, 3 new callbacks, and expands the already massive `useMemo` dependency array for `renderPanel` to 57+ entries. Every new artifact-related feature will continue to inflate this file and deepen the prop chain. The `renderPanel` function is a growing switch statement that now has a dynamic `default` branch for custom types — a sign the static panel routing pattern is under strain. Cognitive load for any change touching panels or artifacts is high and rising.
 
-The `GenerationProvenance` type was removed from `app/lib/types/artifactStore.ts` in commit `3ed18f8`. The file now contains only the types that are actively used (`ArtifactKey`, `ArtifactVersion`, `ArtifactRecord`, `MAX_VERSIONS`). No dead exports remain. This is cleanly resolved.
+### Fix Cost
 
----
+- **Scope:** Cross-cutting — would touch state management, panel routing, and component boundaries
+- **Effort:** 2-4 days (extract a context provider or use a lightweight state manager like Zustand)
+- **Risk:** Medium — many components depend on props flowing from `page.tsx`
+- **Incremental?** Yes — could start with extracting artifact state into a context/store without changing everything at once
 
-## Partially Resolved Items
+### Urgency Triggers
 
-### 5. Duplicated `isObject` and coercion logic -- PARTIALLY RESOLVED
+- Any additional artifact types (built-in or custom) will compound this
+- Adding per-node custom type support (currently excluded — `formalizeNode.ts` returns `null` for custom types) would require even more prop threading
+- If multiple developers work on panels simultaneously, merge conflicts in `page.tsx` will be frequent
 
-**What was fixed:** The decomposition coercion in `coercePersistedState` (workspaceStore.ts line 128-131) now delegates to `coerceDecomposition` imported from `workspacePersistence.ts`. This was the higher-severity part of the item -- the Zustand rehydration path now gets the same thorough field-by-field node validation as the v2 migration path. Additionally, `coerceArtifactVersion` was added (lines 68-80), providing field-level validation for artifact versions that was previously missing. This addresses the related finding from the API consistency review (F3).
+### Recommendation: Fix opportunistically
 
-**What remains:** The `isObject` type guard is still defined identically in both files:
-- `workspaceStore.ts` line 62
-- `workspacePersistence.ts` line 110
-
-This is a minor duplication (one-liner), and extracting it to a shared util would add a new file for minimal gain. The carrying cost is negligible since both definitions are identical and unlikely to diverge.
-
-**Updated assessment:** The significant part (coercion logic divergence) is fixed. The remaining `isObject` duplication is cosmetic. Downgraded from "Fix opportunistically" to acceptable as-is, though extracting it during any future refactor of these files would be tidy.
+The current state is workable but approaching a tipping point. The next feature that adds state to `page.tsx` should include extracting artifact state into a dedicated context or store. The custom artifact feature is a good forcing function — its CRUD operations and dynamic panel routing don't belong in the root orchestrator.
 
 ---
 
-## Open Items (unchanged)
+## 2. Tech Debt: Misleading "added in v2" Comment on Persistence Schema
 
-### 1. Dead code in `workspacePersistence.ts`
+**Location:** `app/lib/types/persistence.ts:32`
 
-**Location:** `app/lib/utils/workspacePersistence.ts` (lines 54-108)
-**Status:** OPEN, unchanged from Loop 2.
+**Nature:** Documentation / misleading comment (confirmed by fact-check)
 
-`saveWorkspace`, `SaveWorkspaceInput`, and `ArtifactPersistenceData` remain exported and tested but have no production callers. The fix commit did not touch these. Carrying cost remains low. Still recommended to fix opportunistically.
+### Carrying Cost: Low
 
-### 2. Dual localStorage keys coexisting indefinitely
+The comment `// Custom artifact types and their generated data (added in v2)` implies a version bump occurred, but `WORKSPACE_VERSION` remains `2` (same as before this branch). The custom fields are optional (`?`) so backward compatibility is maintained, but if someone relies on version numbers to detect capabilities, this is misleading. The earlier artifact fields (lines 26-31) have an identical comment — so the pattern predates this branch, but extending it here compounds the confusion.
 
-**Location:** `app/lib/stores/workspaceStore.ts` (lines 474-490)
-**Status:** OPEN, unchanged from Loop 2.
+### Fix Cost
 
-The `onRehydrateStorage` callback still checks for the old key on every load without cleaning it up after migration. Carrying cost remains medium. Still recommended to fix opportunistically.
+- **Scope:** Localized — one comment change, possibly a version bump
+- **Effort:** Minutes
+- **Risk:** Low (if just fixing comment); Medium (if bumping version, since migration logic would need updating)
+- **Incremental?** Yes
 
-### 4. `page.tsx` remains the monolithic orchestrator
+### Urgency Triggers
 
-**Location:** `app/page.tsx`
-**Status:** OPEN, slightly changed by `3ed18f8`.
+- If the project ever needs to do a real schema migration (e.g., making custom fields required)
+- If another developer reads this comment and assumes v2 means "has custom types"
 
-The fix commit improved `page.tsx` in two ways: (1) the setter comment was clarified to explain Zustand's `Object.is` mechanism instead of the vague "stable references", and (2) the artifact update callback at lines 329-349 was refactored to batch artifact updates into a single `setState` call instead of N individual `setArtifactGenerated` calls. Both are improvements, but the fundamental issue (500+ lines of orchestration) remains. Still recommended to defer and monitor.
+### Recommendation: Fix now
 
-### 6. `resetWorkspaceToSnapshot` discards version history
-
-**Location:** `app/page.tsx` (lines 130-158)
-**Status:** OPEN, unchanged from Loop 2.
-
-The fix commit improved `migrateFromV2` to use batch `setState` (matching `resetWorkspaceToSnapshot`'s pattern), but `resetWorkspaceToSnapshot` itself still discards version history. Still recommended to carry intentionally.
+Either bump `WORKSPACE_VERSION` to 3 with a migration path, or change the comment to say "added as optional extension to v2 schema" to avoid implying a version transition occurred. Given that all custom fields are optional with `?? []` / `?? {}` fallbacks, just fixing the comment is the lower-risk option.
 
 ---
 
-## New Items Introduced by Fix Commit
+## 3. Tech Debt: Reference to Unimplemented Cross-Session Library
 
-### 7. Module-level mutable state in `sanitizeDecomposition`
+**Location:** `app/lib/types/customArtifact.ts:7-8`
 
-**Location:** `app/lib/stores/workspaceStore.ts` (lines 291-308)
-**Nature:** algorithmic
+**Nature:** Documentation — forward reference to planned but unbuilt feature (confirmed by fact-check as unverifiable)
 
-The fix commit added a memoization optimization for `sanitizeDecomposition` using module-level variables `_lastDecompRef` and `_lastDecompSanitized`. This is a reasonable optimization (avoids re-mapping nodes on every unrelated `set()` call), but it introduces module-level mutable state that:
+### Carrying Cost: Low
 
-1. Would not be reset between tests unless the module is re-imported. If a test mutates decomposition and a subsequent test expects clean state, they could interact.
-2. Creates a subtle reference-equality dependency -- if any code path creates a new decomposition object with identical content but a different reference, the memoization will miss and re-compute.
+The module docstring says definitions are "optionally saved to a cross-session library." No such library exists — custom types are stored in the workspace persistence layer only and are lost when switching workspaces. This sets incorrect expectations for anyone reading the types to understand the system.
 
-Neither issue is likely to cause bugs in practice (the memoization is purely an optimization, and the fallback path produces correct results). But it is worth noting as a pattern to avoid proliferating.
+### Fix Cost
 
-**Carrying Cost:** Low
-**Fix Cost:** Minutes (replace with a WeakRef-based approach, or just remove the memoization if profiling shows it is unnecessary)
-**Recommendation:** Fix opportunistically. Consider whether the optimization is measurable -- if decomposition has fewer than ~100 nodes in practice, the `map` call is negligible and the memoization adds complexity for no user-visible benefit.
+- **Scope:** Localized — one comment edit
+- **Effort:** Minutes
+- **Risk:** None
+- **Incremental?** Yes
 
-### 8. Artifact batch-update in `page.tsx` duplicates `setArtifactGenerated` logic
+### Urgency Triggers
 
-**Location:** `app/page.tsx` (lines 331-349)
-**Nature:** structural
+- When someone tries to implement cross-session sharing and assumes infrastructure exists
+- User-facing confusion if custom types disappear on workspace switch
 
-The fix commit refactored the artifact update callback to batch updates via `setState` instead of calling `setArtifactGenerated` N times. However, the batched version manually reimplements the version-slicing logic from `setArtifactGenerated` (lines 339-346):
+### Recommendation: Fix now
 
-```typescript
-const versions = existing
-  ? [...existing.versions.slice(-MAX_VERSIONS + 1), version]
-  : [version];
-artifactUpdates[key] = { type: key, currentVersionIndex: versions.length - 1, versions };
-```
-
-This is the same logic as `setArtifactGenerated` in workspaceStore.ts (lines 342-355). If the versioning cap or truncation behavior changes, it must be updated in both places.
-
-**Carrying Cost:** Low (the logic is simple and unlikely to change)
-**Fix Cost:** Minutes (extract a helper like `appendGeneratedVersion(existing, content)` and use it in both locations)
-**Recommendation:** Fix opportunistically. A shared helper would be cleaner but is not urgent.
+Change "and optionally saved to a cross-session library" to something like "stored per-workspace; cross-session sharing is planned but not yet implemented." This costs nothing and prevents confusion.
 
 ---
 
-## Debt Addressed by This Branch
+## 4. Tech Debt: Custom Types Not Integrated with Node-Level Formalization
 
-For completeness, the branch resolves the following pre-existing debt:
+**Location:** `app/lib/formalization/formalizeNode.ts:115-116`, `app/hooks/useArtifactGeneration.ts`
 
-1. **Manual debounced localStorage persistence** -- The `useWorkspacePersistence` hook's `scheduleSave`/`stateRef`/`decompRef`/`artifactRef` pattern (~100 lines of ref-juggling) is replaced by Zustand's `persist` middleware with a debounced storage adapter (~20 lines). Net reduction in hand-rolled persistence logic.
+**Nature:** Structural — feature gap / asymmetry
 
-2. **Stale closure risk in `PipelineAccessors`** -- The old pattern required `stateRef` indirection to avoid stale closures in async callbacks. The new pattern uses `useWorkspaceStore.getState()` which always returns fresh state by design. The pipeline accessors in page.tsx (lines 393-401) are now straightforward and correct.
+### Carrying Cost: Medium
 
-3. **No artifact edit history** -- Structured artifacts (causal-graph, statistical-model, etc.) were stored as flat JSON strings with no history. The new `ArtifactRecord` with `versions[]` and `currentVersionIndex` enables undo/redo, capped at 20 versions. Well-tested (14 versioning tests).
+Custom artifact types work at the global (whole-source) level but are silently skipped during per-node formalization (`formalizeNode` returns `null` for custom types). The auto-formalization queue, which processes decomposition nodes, will therefore never generate custom artifacts for individual propositions. There is no UI indication that custom types are global-only. Users who decompose their source and then expect custom artifacts per-node will get nothing without explanation.
 
-4. **Scattered state setters** -- 13 `useCallback`-wrapped setters in `useWorkspacePersistence` are replaced by Zustand's built-in action functions, which are stable references by default. This removes ~40 lines of boilerplate.
+### Fix Cost
 
-5. **Stray `partial-json` dependency** -- Was present in an earlier commit but removed in `270f7de`.
+- **Scope:** Cross-cutting — would need to thread custom type definitions through `formalizeNode`, the queue, and node detail UI
+- **Effort:** 1-2 days
+- **Risk:** Medium — `formalizeNode` has a different request/response flow than `useArtifactGeneration`
+- **Incremental?** Yes — could add a "global only" badge to custom type chips as a quick stopgap
 
-6. **`GenerationProvenance` dead type** -- Removed in `3ed18f8`.
+### Urgency Triggers
 
-7. **Weak artifact version validation** -- `coerceArtifactVersion` added in `3ed18f8` now validates `id`, `content`, `createdAt`, `source`, and `editInstruction` fields individually.
+- When users start using decomposition alongside custom types (the two features intersect naturally)
+- If the auto-formalize queue is promoted as a primary workflow
 
-8. **Decomposition coercion divergence** -- `coercePersistedState` now delegates to the shared `coerceDecomposition` function instead of maintaining a separate, weaker implementation.
+### Recommendation: Carry intentionally
 
-9. **`migrateFromV2` used N individual setters** -- Refactored to a single `setState` call in `3ed18f8`, matching the pattern in `resetWorkspaceToSnapshot`.
+This is a known scope limitation, not accidental debt. The `formalizeNode` comment explicitly says custom types go through `useArtifactGeneration`. However, the lack of user-facing indication is a UX gap. Add a brief tooltip or badge ("global only") to custom type chips as a low-cost fix, and defer full node-level integration until there's user demand.
+
+---
+
+## 5. Tech Debt: `useWorkspacePersistence` Hook Monolith
+
+**Location:** `app/hooks/useWorkspacePersistence.ts` (now 327 lines)
+
+**Nature:** Structural — growing god-hook
+
+### Carrying Cost: Medium
+
+This hook now manages: source text, extracted files, context text, semiformal text, lean code, verification state, 5 built-in artifact types, custom type definitions (CRUD), custom artifact data, decomposition state, workspace snapshots, and auto-save debouncing. It exposes 25+ values/setters through a single `useMemo`. The custom artifact additions added 6 new exported functions and 2 new state fields. Each new artifact type or state dimension inflates this hook further.
+
+### Fix Cost
+
+- **Scope:** Cross-cutting — consumers of the hook would need updating
+- **Effort:** 1-2 days to split into composable hooks (e.g., `useArtifactPersistence`, `useCustomTypePersistence`)
+- **Risk:** Low-medium — the hook is the single source of truth, so splitting requires careful coordination of the save/load cycle
+- **Incremental?** Yes — custom type state could be extracted first since it's relatively self-contained
+
+### Urgency Triggers
+
+- Next feature adding persisted state
+- Performance issues from the growing `useMemo` dependency array (currently mitigated by debounced saves)
+
+### Recommendation: Fix opportunistically
+
+The hook works correctly today but is becoming hard to reason about. When the next feature adds persisted state, extract custom type management into its own composable hook as part of that work.
+
+---
+
+## 6. Tech Debt: `CustomTypeDesigner` as a Monolithic Modal (321 Lines)
+
+**Location:** `app/components/features/artifact-selector/CustomTypeDesigner.tsx`
+
+**Nature:** Structural — large single-file component with mixed concerns
+
+### Carrying Cost: Low
+
+The designer component manages three wizard steps (describe, review, test), API calls, form state, and all the associated UI in a single 321-line file. It works, but the review step alone has 7 form fields rendered inline with repeated styling patterns. If the designer needs additional steps or more complex validation, this file will be difficult to extend.
+
+### Fix Cost
+
+- **Scope:** Localized — internal refactor only
+- **Effort:** Half a day
+- **Risk:** Low
+- **Incremental?** Yes — could extract step components one at a time
+
+### Urgency Triggers
+
+- Adding versioning or diff display for type definitions
+- Adding export/import of custom type definitions
+- Adding the cross-session library feature
+
+### Recommendation: Carry intentionally
+
+321 lines for a wizard modal is within reasonable bounds. The three steps are clear and the logic is straightforward. Refactor when the component needs to grow, not preemptively.
+
+---
+
+## 7. Tech Debt: No Input Sanitization for User-Provided System Prompts
+
+**Location:** `app/api/formalization/custom/route.ts`, `app/components/features/artifact-selector/CustomTypeDesigner.tsx`
+
+**Nature:** Security / robustness
+
+### Carrying Cost: Medium
+
+Users provide system prompts that are sent directly to the LLM. The only validation is a length check (`MAX_SYSTEM_PROMPT_LENGTH = 10_000`). There is no sanitization, content filtering, or rate limiting. While this is an internal/research tool (not public-facing), the system prompt is persisted to localStorage and could contain injection patterns that affect other users if workspaces are ever shared (e.g., via the planned export feature).
+
+### Fix Cost
+
+- **Scope:** Localized — API route + possibly a shared validation utility
+- **Effort:** Hours
+- **Risk:** Low
+- **Incremental?** Yes
+
+### Urgency Triggers
+
+- If workspaces become sharable/exportable
+- If the tool is deployed for multi-user access
+- If LLM provider billing becomes a concern (a malicious prompt could be designed to maximize token usage)
+
+### Recommendation: Defer and monitor
+
+For a single-user research tool, the current length check is adequate. Revisit when workspace sharing or multi-user deployment is on the roadmap. Add a brief comment noting the limitation.
+
+---
+
+## 8. Tech Debt: Repeated Tailwind Class Strings / Inline Styles
+
+**Location:** `app/components/features/artifact-selector/CustomTypeDesigner.tsx`, `app/components/features/artifact-selector/ArtifactTypeModal.tsx`, `app/components/panels/CustomArtifactPanel.tsx`
+
+**Nature:** Styling duplication
+
+### Carrying Cost: Low
+
+The new components repeat long Tailwind class strings for form inputs, buttons, section headers, and card layouts. For example, the input field styling pattern `"w-full rounded border border-[#DDD9D5] bg-white px-3 py-1.5 text-sm text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"` appears 6+ times across the designer. This is consistent with the existing codebase pattern (other panels have similar repetition), but the custom type feature adds more of it.
+
+### Fix Cost
+
+- **Scope:** Localized to new files, but a proper fix would establish shared component primitives
+- **Effort:** Half a day for shared input/button components
+- **Risk:** Low
+- **Incremental?** Yes
+
+### Urgency Triggers
+
+- Theme changes requiring updates to many files
+- Adding more custom type UI features
+
+### Recommendation: Carry intentionally
+
+This matches the existing codebase style. Extracting shared form primitives would be valuable but is a separate initiative, not specific to this branch.
+
+---
+
+## Summary Table
+
+| # | Debt Item | Carrying Cost | Fix Cost | Urgency | Recommendation |
+|---|-----------|--------------|----------|---------|----------------|
+| 1 | `page.tsx` god component / prop drilling | High | 2-4 days, medium risk | Next panel feature | Fix opportunistically |
+| 2 | Misleading "added in v2" comment | Low | Minutes, low risk | Now | **Fix now** |
+| 3 | Reference to unimplemented cross-session library | Low | Minutes, no risk | Now | **Fix now** |
+| 4 | Custom types not integrated with node formalization | Medium | 1-2 days, medium risk | User demand | Carry intentionally |
+| 5 | `useWorkspacePersistence` monolith | Medium | 1-2 days, low-medium risk | Next persisted state addition | Fix opportunistically |
+| 6 | `CustomTypeDesigner` single-file modal | Low | Half day, low risk | Feature expansion | Carry intentionally |
+| 7 | No system prompt sanitization | Medium | Hours, low risk | Multi-user / sharing | Defer and monitor |
+| 8 | Repeated Tailwind class strings | Low | Half day, low risk | Theme changes | Carry intentionally |
+
+## Recommended Fix Order
+
+1. **Items 2 and 3 (now):** Fix the misleading comment and the unimplemented feature reference. These are minutes of work with zero risk and prevent ongoing confusion.
+2. **Item 1 (next feature touching panels):** Extract artifact state from `page.tsx` into a context or store. This is the highest-carrying-cost item and gets worse with every feature.
+3. **Item 5 (alongside item 1):** Split `useWorkspacePersistence` when extracting artifact state — the two cleanups naturally compose.
+4. **Item 4 (when user demand exists):** Add node-level custom type support or at minimum a "global only" indicator.
+5. **Items 6, 7, 8:** Carry or defer as described.
