@@ -100,7 +100,9 @@ const SCORING_SCHEMA = {
                 required: ["score", "studyType", "rationale", "redFlags"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number", minimum: 0, maximum: 1 },
+                  // Range enforced server-side by clampScore (Anthropic's
+                  // structured-output schema rejects minimum/maximum).
+                  score: { type: "number" },
                   studyType: {
                     type: "string",
                     enum: [...STUDY_TYPES],
@@ -117,7 +119,9 @@ const SCORING_SCHEMA = {
                 required: ["score", "rationale"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number", minimum: 0, maximum: 1 },
+                  // Range enforced server-side by clampScore (Anthropic's
+                  // structured-output schema rejects minimum/maximum).
+                  score: { type: "number" },
                   rationale: { type: "string" },
                 },
               },
