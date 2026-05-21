@@ -35,7 +35,7 @@ export default function IntegrationProposalsSection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-xs font-medium text-[#6B6560] hover:text-[var(--ink-black)]"
+        className="flex items-center gap-1 rounded text-xs font-medium text-[#6B6560] hover:text-[var(--ink-black)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30"
       >
         <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>
           &#9654;
@@ -62,7 +62,7 @@ export default function IntegrationProposalsSection({
             <button
               type="button"
               onClick={onApplyApproved}
-              className="text-xs font-medium text-white bg-green-700 hover:bg-green-800 rounded px-3 py-1"
+              className="text-xs font-medium text-white bg-green-700 hover:bg-green-800 rounded px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600/50 active:bg-green-900"
             >
               Apply {approvedCount} approved edit{approvedCount === 1 ? "" : "s"}
             </button>

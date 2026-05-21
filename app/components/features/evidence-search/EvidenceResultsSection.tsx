@@ -68,7 +68,7 @@ export default function EvidenceResultsSection({
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1 text-xs font-medium text-[#6B6560] hover:text-[var(--ink-black)]"
+          className="flex items-center gap-1 rounded text-xs font-medium text-[#6B6560] hover:text-[var(--ink-black)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30"
         >
           <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>
             &#9654;
@@ -87,7 +87,7 @@ export default function EvidenceResultsSection({
               type="button"
               disabled={isScoring}
               onClick={onScore}
-              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
             >
               {isScoring
                 ? "Scoring..."
@@ -102,7 +102,7 @@ export default function EvidenceResultsSection({
               type="button"
               disabled={isAnalyzing}
               onClick={onAnalyzeOverlap}
-              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+              className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
             >
               {isAnalyzing
                 ? "Analyzing..."

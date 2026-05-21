@@ -41,13 +41,13 @@ export default function EvidencePaperCard({
   return (
     <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-1">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm font-medium text-[var(--ink-black)]">
+        <div className="min-w-0 text-sm font-medium text-[var(--ink-black)]">
           {url ? (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="break-words hover:underline">
               {paper.title}
             </a>
           ) : (
-            paper.title
+            <span className="break-words">{paper.title}</span>
           )}
         </div>
 
@@ -122,7 +122,7 @@ export default function EvidencePaperCard({
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="ml-1 text-[var(--ink-black)] font-medium hover:underline"
+              className="ml-1 text-[var(--ink-black)] font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 rounded"
             >
               {expanded ? "Show less" : "Show more"}
             </button>
