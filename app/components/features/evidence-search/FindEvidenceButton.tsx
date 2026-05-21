@@ -27,7 +27,7 @@ export default function FindEvidenceButton({
         type="button"
         disabled={isLoading}
         onClick={() => search(elementContent, contextSummary)}
-        className="text-xs text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded-md px-2 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+        className="text-xs text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded-md px-2 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
       >
         {isLoading
           ? "Searching..."
