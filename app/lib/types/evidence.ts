@@ -70,7 +70,9 @@ export type ReliabilityScore = {
   studyType: StudyType;
   /** Brief explanation of the reliability assessment */
   rationale: string;
-  /** Methodology red flags detected (e.g. p-hacking indicators, small sample) */
+  /** Methodology red flags detected (e.g. small sample, conflicts of interest,
+   *  retraction notices) — see the scoring prompt in app/api/evidence-score/route.ts
+   *  for the exact set the LLM is instructed to surface. */
   redFlags: string[];
 };
 
