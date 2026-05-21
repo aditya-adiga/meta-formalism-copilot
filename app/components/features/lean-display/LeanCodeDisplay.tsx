@@ -114,7 +114,7 @@ export default function LeanCodeDisplay({
                 disabled={!canReVerify}
                 className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
               >
-                Re-verify ↺
+                Re-check ↺
               </button>
             )}
             <button
@@ -146,7 +146,7 @@ export default function LeanCodeDisplay({
           {verificationStatus === "invalid" && verificationErrors && (
             <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-red-800">
-                lake build output
+                Proof checker output
               </h3>
               <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-700">
                 {verificationErrors}
@@ -175,7 +175,7 @@ export default function LeanCodeDisplay({
             <>
               {verificationStatus === "invalid" && (
                 <p className="mb-2 font-mono text-xs text-[#6B6560]">
-                  {code.length} chars · {code.split("\n").length} lines submitted to verifier
+                  {code.length} chars · {code.split("\n").length} lines submitted for checking
                 </p>
               )}
               <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--ink-black)]">
@@ -189,7 +189,7 @@ export default function LeanCodeDisplay({
               onChange={(e) => setLocalCode(e.target.value)}
               className="min-h-full w-full resize-none border-0 bg-transparent font-mono text-sm leading-relaxed text-[var(--ink-black)] focus:outline-none focus:ring-0"
               style={{ caretColor: "#000000" }}
-              aria-label="Lean4 code"
+              aria-label="Proof code"
               spellCheck={false}
             />
           )}
@@ -205,10 +205,10 @@ export default function LeanCodeDisplay({
               value={iterating ? "" : instruction}
               onChange={(e) => setInstruction(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={iterating ? "Iterating\u2026" : "Suggest a fix or instruction\u2026"}
+              placeholder={iterating ? "Working\u2026" : "Suggest a fix or give instructions\u2026"}
               disabled={iterating}
               className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none disabled:cursor-not-allowed"
-              aria-label="Lean4 iteration instruction"
+              aria-label="Proof code instruction"
             />
             <button
               type="button"

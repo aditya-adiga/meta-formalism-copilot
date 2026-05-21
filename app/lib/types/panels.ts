@@ -10,7 +10,7 @@ export type PanelId =
   | "causal-graph"
   | "statistical-model"
   | "property-tests"
-  | "dialectical-map"
+  | "balanced-perspectives"
   | "counterexamples"
   | "analytics"
   | CustomArtifactTypeId;

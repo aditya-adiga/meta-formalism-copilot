@@ -116,7 +116,7 @@ describe("migration from workspace-v2", () => {
       causalGraph: '{"variables":[],"edges":[]}',
       statisticalModel: null,
       propertyTests: '{"tests":[]}',
-      dialecticalMap: '{"positions":[]}',
+      balancedPerspectives: '{"positions":[]}',
       counterexamples: null,
     };
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));
@@ -133,7 +133,7 @@ describe("migration from workspace-v2", () => {
 
     expect(store.getArtifactContent("causal-graph")).toBe('{"variables":[],"edges":[]}');
     expect(store.getArtifactContent("property-tests")).toBe('{"tests":[]}');
-    expect(store.getArtifactContent("dialectical-map")).toBe('{"positions":[]}');
+    expect(store.getArtifactContent("balanced-perspectives")).toBe('{"positions":[]}');
     expect(store.getArtifactContent("statistical-model")).toBeNull();
     expect(store.getArtifactContent("counterexamples")).toBeNull();
 
@@ -180,7 +180,7 @@ describe("migration from workspace-v2", () => {
       causalGraph: null,
       statisticalModel: null,
       propertyTests: null,
-      dialecticalMap: null,
+      balancedPerspectives: null,
       counterexamples: null,
     };
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(oldData));

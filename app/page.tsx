@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { PanelId, SplitOrientation } from "@/app/lib/types/panels";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { SourceDocument, NodeArtifact } from "@/app/lib/types/decomposition";
-import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { CausalGraphResponse, StatisticalModelResponse, PropertyTestsResponse, BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { buildArtifactEditHandlers } from "@/app/lib/stores/artifactEditHandlers";
 import { toNodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { FormalizationSession } from "@/app/lib/types/session";
@@ -16,7 +16,7 @@ import LeanPanel from "@/app/components/panels/LeanPanel";
 import CausalGraphPanel from "@/app/components/panels/CausalGraphPanel";
 import StatisticalModelPanel from "@/app/components/panels/StatisticalModelPanel";
 import PropertyTestsPanel from "@/app/components/panels/PropertyTestsPanel";
-import DialecticalMapPanel from "@/app/components/panels/DialecticalMapPanel";
+import BalancedPerspectivesPanel from "@/app/components/panels/BalancedPerspectivesPanel";
 import CounterexamplesPanel from "@/app/components/panels/CounterexamplesPanel";
 import CustomArtifactPanel from "@/app/components/panels/CustomArtifactPanel";
 import GraphPanel from "@/app/components/panels/GraphPanel";
@@ -56,7 +56,7 @@ function artifactSelector(key: ArtifactKey): (s: StoreState) => string | null {
 const selectCausalGraph = artifactSelector("causal-graph");
 const selectStatisticalModel = artifactSelector("statistical-model");
 const selectPropertyTests = artifactSelector("property-tests");
-const selectDialecticalMap = artifactSelector("dialectical-map");
+const selectBalancedPerspectives = artifactSelector("balanced-perspectives");
 const selectCounterexamples = artifactSelector("counterexamples");
 
 // Provenance selectors — return the inputHash of the current version (or undefined)
@@ -66,7 +66,7 @@ function provenanceSelector(key: ArtifactKey): (s: StoreState) => string | undef
 const selectCausalGraphProvenance = provenanceSelector("causal-graph");
 const selectStatisticalModelProvenance = provenanceSelector("statistical-model");
 const selectPropertyTestsProvenance = provenanceSelector("property-tests");
-const selectDialecticalMapProvenance = provenanceSelector("dialectical-map");
+const selectBalancedPerspectivesProvenance = provenanceSelector("balanced-perspectives");
 const selectCounterexamplesProvenance = provenanceSelector("counterexamples");
 
 function phaseToEndpoint(phase: LoadingPhase): string | null {
@@ -148,7 +148,7 @@ export default function Home() {
       causalGraph: s.getArtifactContent("causal-graph"),
       statisticalModel: s.getArtifactContent("statistical-model"),
       propertyTests: s.getArtifactContent("property-tests"),
-      dialecticalMap: s.getArtifactContent("dialectical-map"),
+      balancedPerspectives: s.getArtifactContent("balanced-perspectives"),
       counterexamples: s.getArtifactContent("counterexamples"),
     };
   }, []);
@@ -192,14 +192,14 @@ export default function Home() {
   const persistedCausalGraph = useWorkspaceStore(selectCausalGraph);
   const persistedStatisticalModel = useWorkspaceStore(selectStatisticalModel);
   const persistedPropertyTests = useWorkspaceStore(selectPropertyTests);
-  const persistedDialecticalMap = useWorkspaceStore(selectDialecticalMap);
+  const persistedBalancedPerspectives = useWorkspaceStore(selectBalancedPerspectives);
   const persistedCounterexamples = useWorkspaceStore(selectCounterexamples);
 
   // Provenance hashes for current artifact versions
   const causalGraphInputHash = useWorkspaceStore(selectCausalGraphProvenance);
   const statisticalModelInputHash = useWorkspaceStore(selectStatisticalModelProvenance);
   const propertyTestsInputHash = useWorkspaceStore(selectPropertyTestsProvenance);
-  const dialecticalMapInputHash = useWorkspaceStore(selectDialecticalMapProvenance);
+  const balancedPerspectivesInputHash = useWorkspaceStore(selectBalancedPerspectivesProvenance);
   const counterexamplesInputHash = useWorkspaceStore(selectCounterexamplesProvenance);
   const semiformalProvenance = useWorkspaceStore((s) => s.semiformalProvenance);
   const setSemiformalProvenance = useWorkspaceStore((s) => s.setSemiformalProvenance);
@@ -223,11 +223,11 @@ export default function Home() {
     catch { return null; }
   }, [persistedPropertyTests]);
 
-  const dialecticalMap = useMemo(() => {
-    if (!persistedDialecticalMap) return null;
-    try { return JSON.parse(persistedDialecticalMap) as import("@/app/lib/types/artifacts").DialecticalMapResponse["dialecticalMap"]; }
+  const balancedPerspectives = useMemo(() => {
+    if (!persistedBalancedPerspectives) return null;
+    try { return JSON.parse(persistedBalancedPerspectives) as import("@/app/lib/types/artifacts").BalancedPerspectivesResponse["balancedPerspectives"]; }
     catch { return null; }
-  }, [persistedDialecticalMap]);
+  }, [persistedBalancedPerspectives]);
 
   const counterexamples = useMemo(() => {
     if (!persistedCounterexamples) return null;
@@ -236,12 +236,6 @@ export default function Home() {
   }, [persistedCounterexamples]);
 
   // --- Artifact editing ---
-  // Handlers split by intent: `onSave` wires panel onContentChange (manual-edit
-  // source); `onAiEdited` is passed into useAllArtifactEditing so Cmd+K/whole-doc
-  // rewrites record ai-edit. Both go through setArtifactEdited, keeping undo/redo
-  // and version history intact. Empty deps → stable identity for the component's
-  // lifetime, so the render memo below can list `artifactEditHandlers` once
-  // instead of every inner callback.
   const artifactEditHandlers = useMemo(() => buildArtifactEditHandlers(), []);
 
   const artifactEditing = useAllArtifactEditing({
@@ -251,8 +245,8 @@ export default function Home() {
     setStatisticalModel: artifactEditHandlers["statistical-model"].onAiEdited,
     propertyTests: persistedPropertyTests,
     setPropertyTests: artifactEditHandlers["property-tests"].onAiEdited,
-    dialecticalMap: persistedDialecticalMap,
-    setDialecticalMap: artifactEditHandlers["dialectical-map"].onAiEdited,
+    balancedPerspectives: persistedBalancedPerspectives,
+    setBalancedPerspectives: artifactEditHandlers["balanced-perspectives"].onAiEdited,
     counterexamples: persistedCounterexamples,
     setCounterexamples: artifactEditHandlers.counterexamples.onAiEdited,
   });
@@ -299,7 +293,7 @@ export default function Home() {
   const causalGraphLoading = artifactLoadingState["causal-graph"] === "generating";
   const statisticalModelLoading = artifactLoadingState["statistical-model"] === "generating";
   const propertyTestsLoading = artifactLoadingState["property-tests"] === "generating";
-  const dialecticalMapLoading = artifactLoadingState["dialectical-map"] === "generating";
+  const balancedPerspectivesLoading = artifactLoadingState["balanced-perspectives"] === "generating";
   const counterexamplesLoading = artifactLoadingState["counterexamples"] === "generating";
 
   // --- Decomposition state ---
@@ -393,7 +387,7 @@ export default function Home() {
         case "causal-graph":
         case "statistical-model":
         case "property-tests":
-        case "dialectical-map":
+        case "balanced-perspectives":
         case "counterexamples":
           useWorkspaceStore.getState().setArtifactGenerated(artifact.type, artifact.content);
           break;
@@ -506,7 +500,7 @@ export default function Home() {
   const causalGraphIsStale = !!(causalGraph && causalGraphInputHash && causalGraphInputHash !== currentInputHash);
   const statisticalModelIsStale = !!(statisticalModel && statisticalModelInputHash && statisticalModelInputHash !== currentInputHash);
   const propertyTestsIsStale = !!(propertyTests && propertyTestsInputHash && propertyTestsInputHash !== currentInputHash);
-  const dialecticalMapIsStale = !!(dialecticalMap && dialecticalMapInputHash && dialecticalMapInputHash !== currentInputHash);
+  const balancedPerspectivesIsStale = !!(balancedPerspectives && balancedPerspectivesInputHash && balancedPerspectivesInputHash !== currentInputHash);
   const counterexamplesIsStale = !!(counterexamples && counterexamplesInputHash && counterexamplesInputHash !== currentInputHash);
   const semiformalIsStale = !!(semiformalText && semiformalProvenance && semiformalProvenance.inputHash !== currentInputHash);
 
@@ -604,9 +598,9 @@ export default function Home() {
 
   const {
     activeCausalGraph, activeStatisticalModel, activePropertyTests,
-    activeDialecticalMap, activeCounterexamples,
+    activeBalancedPerspectives, activeCounterexamples,
   } = useActiveStructuredArtifacts(
-    causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples,
+    causalGraph, statisticalModel, propertyTests, balancedPerspectives, counterexamples,
     selectedNode, isDecompMode,
   );
 
@@ -807,8 +801,8 @@ export default function Home() {
     statisticalModelLoading,
     hasPropertyTests: activePropertyTests !== null,
     propertyTestsLoading,
-    hasDialecticalMap: activeDialecticalMap !== null,
-    dialecticalMapLoading,
+    hasBalancedPerspectives: activeBalancedPerspectives !== null,
+    balancedPerspectivesLoading,
     hasCounterexamples: activeCounterexamples !== null,
     counterexamplesLoading,
     customArtifactTypes,
@@ -819,7 +813,7 @@ export default function Home() {
   // --- Export All handler ---
   const hasExportableContent = Boolean(
     semiformalText.trim() || leanCode.trim() || decomp.nodes.length > 0
-    || causalGraph || statisticalModel || propertyTests || dialecticalMap || counterexamples
+    || causalGraph || statisticalModel || propertyTests || balancedPerspectives || counterexamples
   );
 
   const handleExportAll = useCallback(async () => {
@@ -832,10 +826,10 @@ export default function Home() {
       causalGraph,
       statisticalModel,
       propertyTests,
-      dialecticalMap,
+      balancedPerspectives,
       counterexamples,
     });
-  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, dialecticalMap, counterexamples]);
+  }, [semiformalText, leanCode, decomp.nodes, causalGraph, statisticalModel, propertyTests, balancedPerspectives, counterexamples]);
 
   // --- Panel render function (only creates JSX for the active panel) ---
   const renderPanel = useCallback((panelId: PanelId): React.ReactNode => {
@@ -985,17 +979,17 @@ export default function Home() {
             editWaitEstimate={artifactEditing.propertyTests.editWaitEstimate}
           />
         );
-      case "dialectical-map":
+      case "balanced-perspectives":
         return (
-          <DialecticalMapPanel
-            dialecticalMap={activeDialecticalMap}
-            streamingPreview={streamingJsonPreview["dialectical-map"] as DialecticalMapResponse["dialecticalMap"] | undefined}
-            loading={dialecticalMapLoading}
-            onContentChange={artifactEditHandlers["dialectical-map"].onSave}
-            onAiEdit={artifactEditing.dialecticalMap.handleAiEdit}
-            editing={artifactEditing.dialecticalMap.editing}
-            editWaitEstimate={artifactEditing.dialecticalMap.editWaitEstimate}
-            isStale={dialecticalMapIsStale}
+          <BalancedPerspectivesPanel
+            balancedPerspectives={activeBalancedPerspectives}
+            streamingPreview={streamingJsonPreview["balanced-perspectives"] as BalancedPerspectivesResponse["balancedPerspectives"] | undefined}
+            loading={balancedPerspectivesLoading}
+            onContentChange={artifactEditHandlers["balanced-perspectives"].onSave}
+            onAiEdit={artifactEditing.balancedPerspectives.handleAiEdit}
+            editing={artifactEditing.balancedPerspectives.editing}
+            editWaitEstimate={artifactEditing.balancedPerspectives.editWaitEstimate}
+            isStale={balancedPerspectivesIsStale}
             onRegenerate={handleGenerate}
           />
         );
@@ -1042,12 +1036,12 @@ export default function Home() {
     activeCausalGraph, causalGraphLoading, causalGraphWaitEstimate, streamingJsonPreview,
     activeStatisticalModel, statisticalModelLoading,
     activePropertyTests, propertyTestsLoading,
-    activeDialecticalMap, dialecticalMapLoading,
+    activeBalancedPerspectives, balancedPerspectivesLoading,
     activeCounterexamples, counterexamplesLoading,
     artifactEditHandlers,
     artifactEditing,
     semiformalIsStale, causalGraphIsStale, statisticalModelIsStale,
-    propertyTestsIsStale, dialecticalMapIsStale, counterexamplesIsStale,
+    propertyTestsIsStale, balancedPerspectivesIsStale, counterexamplesIsStale,
     analyticsEntries, analyticsSummary, clearAnalytics,
     waitEstimate,
     addCustomArtifactType, updateCustomArtifactType, handleDeleteCustomType,

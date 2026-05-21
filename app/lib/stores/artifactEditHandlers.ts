@@ -11,7 +11,7 @@ const ARTIFACT_KEYS = [
   "causal-graph",
   "statistical-model",
   "property-tests",
-  "dialectical-map",
+  "balanced-perspectives",
   "counterexamples",
 ] as const satisfies readonly ArtifactKey[];
 

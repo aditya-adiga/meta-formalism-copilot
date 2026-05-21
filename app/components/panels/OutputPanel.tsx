@@ -94,7 +94,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Semiformal Proof
+            Step-by-Step Proof
           </h2>
           {loadingPhase === "semiformal" && waitEstimate && (
             <span className="text-xs text-[#6B6560]">
@@ -118,7 +118,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t-2 border-[var(--ink-black)]">
           <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-              Lean4 Code
+              Proof Code
             </h2>
             <div className="flex items-center gap-2">
               <VerificationBadge status={verificationStatus} />
@@ -130,7 +130,7 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
                   onClick={() => onLeanIterate("")}
                   className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
                 >
-                  Verification failed — Fix with AI
+                  Check failed — Fix with AI
                 </button>
               )}
               {semiformalDirty && loadingPhase === "idle" && (
@@ -138,14 +138,14 @@ export default function OutputPanel({ semiformalText, onSemiformalTextChange, se
                   onClick={onRegenerateLean}
                   className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
                 >
-                  Semiformal changed — Regenerate
+                  Proof changed — Regenerate
                 </button>
               )}
             </div>
           </div>
           {loadingPhase === "lean" && !leanCode ? (
             <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-              Generating Lean4 code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
+              Generating proof code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
             </div>
           ) : (
             <LeanCodeDisplay

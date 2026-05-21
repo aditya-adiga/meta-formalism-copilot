@@ -44,14 +44,14 @@ export default function LeanPanel({
       <div className="flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
         <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Lean4 Code
+            Proof Code
           </h2>
           {sessionBanner}
         </div>
         <div className="flex flex-1 items-center justify-center text-sm text-[#9A9590] px-8 text-center">
           {semiformalReady
-            ? "Review the semiformal proof, then generate Lean4 code from the Semiformal panel."
-            : "Lean4 code will appear here after formalization."}
+            ? "Review the step-by-step proof, then generate proof code from the Proof panel."
+            : "Proof code will appear here after generation."}
         </div>
       </div>
     );
@@ -62,7 +62,7 @@ export default function LeanPanel({
       <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Lean4 Code
+            Proof Code
           </h2>
           {sessionBanner}
         </div>
@@ -83,7 +83,7 @@ export default function LeanPanel({
                 onClick={() => onLeanIterate("")}
                 className="text-xs font-medium text-red-700 border border-red-300 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-400"
               >
-                Verification failed — Fix with AI
+                Check failed — Fix with AI
               </button>
             </CostTooltip>
           )}
@@ -93,7 +93,7 @@ export default function LeanPanel({
                 onClick={onRegenerateLean}
                 className="text-xs font-medium text-amber-700 border border-amber-300 bg-amber-50 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400"
               >
-                Semiformal changed — Regenerate
+                Proof changed — Regenerate
               </button>
             </CostTooltip>
           )}
@@ -101,7 +101,7 @@ export default function LeanPanel({
       </div>
       {loadingPhase === "lean" && !leanCode ? (
         <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
-          Generating Lean4 code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
+          Generating proof code...{waitEstimate ? ` ${waitEstimate.remainingLabel}` : ""}
         </div>
       ) : (
         <LeanCodeDisplay

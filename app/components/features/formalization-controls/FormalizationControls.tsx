@@ -48,10 +48,10 @@ export default function FormalizationControls({
   }
 
   const buttonLabel = loading
-    ? "Formalising..."
+    ? "Generating..."
     : selectedArtifactTypes.length > 1
-      ? `Formalise \u2192 ${selectedArtifactTypes.length} artifacts`
-      : "Formalise";
+      ? `Generate \u2192 ${selectedArtifactTypes.length} outputs`
+      : "Generate";
 
   return (
     <div className="flex shrink-0 flex-col">
@@ -59,7 +59,7 @@ export default function FormalizationControls({
         <textarea
           value={contextText}
           onChange={(e) => onContextChange(e.target.value)}
-          placeholder={contextPlaceholder ?? "e.g., Explore this in the context of decision theory within game-theoretic settings..."}
+          placeholder={contextPlaceholder ?? "What is the context in which you are analyzing this text? What's your relationship to it? e.g., 'I'm evaluating this policy proposal as a city planner'"}
           rows={6}
           className="resize-none rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-sm transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-md"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
@@ -67,8 +67,8 @@ export default function FormalizationControls({
 
         {/* Artifact type chips */}
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4A4540]">
-            Artifact Types
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
+            Output Types
           </h3>
           <ArtifactChipSelector
             selected={selectedArtifactTypes}
