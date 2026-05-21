@@ -44,8 +44,7 @@ export function useEvidenceSearch(
           searchQueries: result.queries,
           papers: result.papers,
           searchedAt: new Date().toISOString(),
-          reliability: null,
-          relatedness: null,
+          scoredAt: null,
         });
       } catch (err) {
         console.error("[useEvidenceSearch]", err);

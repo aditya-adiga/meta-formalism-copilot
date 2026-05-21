@@ -1,6 +1,7 @@
 "use client";
 
 import { useEvidenceSearch } from "@/app/hooks/useEvidenceSearch";
+import { useEvidenceScoring } from "@/app/hooks/useEvidenceScoring";
 import EvidenceResultsSection from "./EvidenceResultsSection";
 import type { EvidenceArtifactType } from "@/app/lib/types/evidence";
 
@@ -18,6 +19,7 @@ export default function FindEvidenceButton({
   contextSummary,
 }: FindEvidenceButtonProps) {
   const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
+  const { isScoring, score, error: scoringError } = useEvidenceScoring(artifactType, elementId);
 
   return (
     <div className="mt-1.5">
@@ -25,7 +27,7 @@ export default function FindEvidenceButton({
         type="button"
         disabled={isLoading}
         onClick={() => search(elementContent, contextSummary)}
-        className="text-xs text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded-md px-2 py-0.5 hover:bg-[#F5F1ED] disabled:opacity-50 disabled:cursor-wait"
+        className="text-xs text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded-md px-2 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
       >
         {isLoading
           ? "Searching..."
@@ -38,7 +40,17 @@ export default function FindEvidenceButton({
         <p className="text-xs text-red-600 mt-1">{error}</p>
       )}
 
-      {slot && <EvidenceResultsSection slot={slot} />}
+      {slot && (
+        <EvidenceResultsSection
+          slot={slot}
+          onScore={() => score(elementContent)}
+          isScoring={isScoring}
+        />
+      )}
+
+      {scoringError && (
+        <p className="text-xs text-red-600 mt-1">{scoringError}</p>
+      )}
     </div>
   );
 }

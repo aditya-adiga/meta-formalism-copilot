@@ -11,7 +11,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { EvidenceSlot } from "@/app/lib/types/evidence";
+import type { EvidenceSlot, PaperScore } from "@/app/lib/types/evidence";
 
 // ---------------------------------------------------------------------------
 // Debounced localStorage adapter (same pattern as workspaceStore)
@@ -54,16 +54,25 @@ const debouncedStorage = createDebouncedStorage();
 interface EvidenceState {
   /** Evidence slots keyed by "artifactType::elementId" */
   slots: Record<string, EvidenceSlot>;
-  /** Per-element loading state */
+  /** Per-element loading state (search or scoring) */
   loading: Record<string, boolean>;
-  /** Per-element error messages */
+  /** Per-element scoring loading state */
+  scoring: Record<string, boolean>;
+  /** Per-element search error messages */
   errors: Record<string, string>;
+  /** Per-element scoring error messages (separate channel from search so the
+   *  two operations don't clear or mask each other's errors) */
+  scoringErrors: Record<string, string>;
 }
 
 interface EvidenceActions {
   setEvidence: (key: string, slot: EvidenceSlot) => void;
   setLoading: (key: string, loading: boolean) => void;
+  setScoring: (key: string, scoring: boolean) => void;
   setError: (key: string, error: string | null) => void;
+  setScoringError: (key: string, error: string | null) => void;
+  /** Apply LLM scores to papers in a slot */
+  applyScores: (key: string, scores: PaperScore[]) => void;
   clearEvidence: (key: string) => void;
   clearAll: () => void;
 }
@@ -71,7 +80,9 @@ interface EvidenceActions {
 const DEFAULT_STATE: EvidenceState = {
   slots: {},
   loading: {},
+  scoring: {},
   errors: {},
+  scoringErrors: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -93,6 +104,11 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           loading: { ...state.loading, [key]: loading },
         })),
 
+      setScoring: (key: string, scoring: boolean) =>
+        set((state: EvidenceState) => ({
+          scoring: { ...state.scoring, [key]: scoring },
+        })),
+
       setError: (key: string, error: string | null) =>
         set((state: EvidenceState) => {
           if (error === null) {
@@ -103,6 +119,44 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           return { errors: { ...state.errors, [key]: error } };
         }),
 
+      setScoringError: (key: string, error: string | null) =>
+        set((state: EvidenceState) => {
+          if (error === null) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { [key]: _removed, ...rest } = state.scoringErrors;
+            return { scoringErrors: rest };
+          }
+          return { scoringErrors: { ...state.scoringErrors, [key]: error } };
+        }),
+
+      applyScores: (key: string, scores: PaperScore[]) =>
+        set((state: EvidenceState) => {
+          const slot = state.slots[key];
+          if (!slot) return {};
+          const scoreMap = new Map(scores.map((s) => [s.openAlexId, s]));
+          const updatedPapers = slot.papers.map((paper) => {
+            const score = scoreMap.get(paper.openAlexId);
+            if (!score) return paper;
+            return {
+              ...paper,
+              reliability: score.reliability,
+              relatedness: score.relatedness,
+            };
+          });
+          // "Scored" is derived from the papers (see isSlotScored), so there is
+          // no separate flag to keep in sync here — just record when scoring ran.
+          return {
+            slots: {
+              ...state.slots,
+              [key]: {
+                ...slot,
+                papers: updatedPapers,
+                scoredAt: new Date().toISOString(),
+              },
+            },
+          };
+        }),
+
       clearEvidence: (key: string) =>
         set((state: EvidenceState) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -110,7 +164,7 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           return { slots: rest };
         }),
 
-      clearAll: () => set({ slots: {}, loading: {}, errors: {} }),
+      clearAll: () => set({ slots: {}, loading: {}, scoring: {}, errors: {}, scoringErrors: {} }),
     }),
     {
       name: "evidence-store-v1",
