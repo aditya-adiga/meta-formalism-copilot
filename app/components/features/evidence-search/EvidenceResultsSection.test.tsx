@@ -43,6 +43,25 @@ describe("EvidenceResultsSection", () => {
     expect(screen.getByText(/pruned \(1\)/i)).toBeInTheDocument();
   });
 
+  it("re-seeds the query editor when a new run changes searchedAt", () => {
+    const base = slot([paper("W1", "retrieved")]);
+    const { rerender } = render(
+      <EvidenceResultsSection slot={base} onRerun={noop} onPrune={noop} onRestore={noop} />,
+    );
+    expect(screen.getByDisplayValue("alpha")).toBeInTheDocument();
+
+    const next = {
+      ...base,
+      searchQueries: ["gamma"],
+      searchedAt: "2026-05-22T00:00:00.000Z",
+    };
+    rerender(
+      <EvidenceResultsSection slot={next} onRerun={noop} onPrune={noop} onRestore={noop} />,
+    );
+    expect(screen.getByDisplayValue("gamma")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("alpha")).not.toBeInTheDocument();
+  });
+
   it("re-runs with the edited queries", async () => {
     const onRerun = vi.fn();
     render(

@@ -129,8 +129,11 @@ export default function EvidenceResultsSection({
             </div>
           )}
 
-          {/* Editable search queries (replaces the old read-only line) */}
+          {/* Editable search queries (replaces the old read-only line).
+              Keyed on searchedAt so the draft re-seeds when a new run (e.g. the
+              top-level "Refresh evidence" LLM regeneration) changes the queries. */}
           <EvidenceQueryEditor
+            key={slot.searchedAt}
             queries={slot.searchQueries}
             isLoading={isLoading}
             onRerun={onRerun}
