@@ -146,4 +146,21 @@ describe("migrateEvidenceState", () => {
     const migrated = migrateEvidenceState(state, 1) as { slots: Record<string, EvidenceSlot> };
     expect(migrated.slots[KEY].papers[0].status).toBe("pruned");
   });
+
+  it("tolerates a slot with a missing papers array", () => {
+    const persisted = {
+      slots: {
+        "statistical-model::artifact": {
+          targetKey: { artifactType: "statistical-model", elementId: "artifact" },
+          searchQueries: ["q"],
+          searchedAt: "2026-05-21T00:00:00.000Z",
+          scoredAt: null,
+          // papers intentionally omitted (corrupted persisted record)
+        },
+      },
+    };
+    expect(() => migrateEvidenceState(persisted, 0)).not.toThrow();
+    const migrated = migrateEvidenceState(persisted, 0) as { slots: Record<string, { papers: unknown[] }> };
+    expect(migrated.slots["statistical-model::artifact"].papers).toEqual([]);
+  });
 });

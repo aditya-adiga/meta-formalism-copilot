@@ -104,7 +104,7 @@ export function migrateEvidenceState(persistedState: unknown, version: number): 
   for (const [key, slot] of Object.entries(state.slots)) {
     slots[key] = {
       ...slot,
-      papers: slot.papers.map((p) => {
+      papers: (Array.isArray(slot.papers) ? slot.papers : []).map((p) => {
         const existing = (p as Partial<EvidencePaper>).status;
         return {
           ...p,
