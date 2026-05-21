@@ -107,6 +107,29 @@ app/page.tsx (Main Layout)
 2. User types instruction (e.g., "make it more concise")
 3. Press Enter to apply to entire output (backend TBD)
 
+### 4. Evidence Search (`features/evidence-search/`)
+
+**Purpose**: Ground statistical-model and counterexamples artifacts in published research from OpenAlex.
+
+**Components**:
+- `FindEvidenceButton.tsx` - Triggers a search ("Find evidence"); becomes "Refresh evidence" once a slot exists. Refresh regenerates queries via the LLM and **merges** new papers into the slot (non-destructive — existing papers win).
+- `EvidenceResultsSection.tsx` - Renders the result list, the "Score papers" control, the collapsible "Show pruned (N)" group, and the query editor.
+- `EvidenceQueryEditor.tsx` - Inline editable list of the search queries (replaces the former read-only "Searched:" line). Editing the queries and clicking "Re-run ⟳" searches again and merges results into the slot.
+- `EvidencePaperCard.tsx` - One paper, with a status chip, score badges, and a Prune/Restore control.
+- `EvidenceScoreBadge.tsx` - Reliability/relatedness score display.
+
+**Data model** (`lib/types/evidence.ts`):
+- An `EvidenceSlot` attaches to one artifact element and holds `searchQueries`, `papers`, and timestamps.
+- Each `EvidencePaper` carries a lifecycle `status`: `retrieved` (default on search) → `evaluated` (set automatically when reliability/relatedness scoring completes) → `integrated` (reserved, no setter yet); plus `pruned` (user dismissed it). Pruning is **soft** — pruned papers move to the collapsed group, can be restored, are excluded from scoring, and stay pruned across re-runs (dedup respects existing status).
+
+**Store** (`lib/stores/evidenceStore.ts`):
+- Zustand store persisted to localStorage at `version: 1`, with a migration that backfills `status` on previously-saved papers (`evaluated` if already scored, else `retrieved`).
+- `mergeEvidence` dedupes by OpenAlex id (existing papers preserved); `prunePaper` / `restorePaper` toggle soft-prune status.
+
+**API** (`api/evidence-search/`, `api/evidence-score/`):
+- `/api/evidence-search` accepts an optional sanitized `queries[]` override; when present it searches those directly and skips LLM query generation.
+- `/api/evidence-score` returns per-paper reliability and relatedness assessments.
+
 ## Panels
 
 ### InputPanel (`panels/InputPanel.tsx`)

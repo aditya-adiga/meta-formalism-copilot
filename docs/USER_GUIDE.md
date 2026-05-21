@@ -255,6 +255,15 @@ Toggle between views with the **Graph / Details** tabs.
 
 Each counterexample has a plausibility rating (high / medium / low) shown with color coding, plus a robustness assessment of the overall claim.
 
+### Grounding in published research (Statistical Model & Counterexamples)
+
+These two artifact types can be grounded in academic papers from OpenAlex.
+
+- Click **Find evidence** to search; results appear inline below the element. The button becomes **Refresh evidence**, which regenerates the search queries and **merges** any new papers in — your existing papers are kept.
+- The search queries are shown as an **editable list**. Edit them and click **Re-run ⟳** to search again; new papers are merged into the existing results (deduplicated, so nothing you already have is lost).
+- Each paper card shows a **status chip**: *Retrieved* (just found) → *Evaluated* (reliability and relatedness have been scored, via the **Score papers** button) → *Integrated* (reserved for a future workflow).
+- Use **Prune** to dismiss a paper you don't want; it moves to a collapsed **Show pruned (N)** group and is excluded from scoring. Click **Restore** there to bring it back. Pruned papers stay pruned even if a later search returns them again.
+
 ---
 
 ## Session Management
