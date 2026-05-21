@@ -13,12 +13,12 @@ export default function RefinementPreview({
 }: RefinementPreviewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-6">
-      <p className="shrink-0 text-xs text-[#6B6560]">Review the refined context</p>
+      <p className="shrink-0 text-xs text-[#4A4540]">Review the refined context</p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         {/* Original - Top Half */}
         <div className="relative flex min-h-0 flex-1 flex-col rounded-md border border-[#DDD9D5] bg-[#F5F1ED] p-3 shadow-sm">
-          <span className="mb-1 text-xs font-medium text-[#6B6560]">Original</span>
+          <span className="mb-1 text-xs font-medium text-[#4A4540]">Original</span>
           <div
             className="min-h-0 flex-1 overflow-auto text-sm text-[var(--ink-black)]"
             style={{ lineHeight: 1.6 }}
@@ -29,9 +29,11 @@ export default function RefinementPreview({
 
         {/* Refined - Bottom Half */}
         <div className="relative flex min-h-0 flex-1 flex-col rounded-md border border-[#DDD9D5] bg-white p-3 shadow-sm">
-          <span className="mb-1 text-xs font-medium text-[#6B6560]">Refined</span>
+          <span className="mb-1 text-xs font-medium text-[#4A4540]">Refined</span>
           <div
-            className="min-h-0 flex-1 overflow-auto text-sm text-[var(--ink-black)]"
+            // pb-10 clears the absolutely-positioned Insert button so it never
+            // obscures the last line of long refined text (UI guideline #3)
+            className="min-h-0 flex-1 overflow-auto pb-10 text-sm text-[var(--ink-black)]"
             style={{ lineHeight: 1.6 }}
           >
             {refinedText}

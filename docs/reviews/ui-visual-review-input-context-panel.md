@@ -112,6 +112,7 @@ border-dashed border-[#6B6560] text-[#4A4540] hover:border-[var(--ink-black)] ho
 
 #### Helper/secondary text uses `#6B6560`, lighter than the project guideline mandates
 
+**Status:** Fixed — in-scope panel sites (`ContextInput` status text, `RefinementButtons`, `RefinementPreview` labels, `ArtifactChipSelector` description + inline link) swept to `#4A4540`. `FormalizationControls` heading and `ContextInput` description were already `#4A4540` on `main`. The `ArtifactTypeModal` / `CustomTypeDesigner` modal sites are out of this review's scope and left unchanged.
 **Severity:** Minor
 **Location:** `ContextInput.tsx:69,83`; `FormalizationControls.tsx:70`; `ArtifactChipSelector.tsx:105,110`; `RefinementButtons.tsx:15`; `RefinementPreview.tsx:16,21,32`
 **Issue type:** Affordance
@@ -157,6 +158,7 @@ Both section-header bars are flex children of capped/`flex` columns without `shr
 
 #### `RefinementPreview` "Insert" button overlaps the bottom of the refined-text scroll area
 
+**Status:** Fixed — added `pb-10` to the refined-text scroll region so the absolute Insert button no longer obscures the last line.
 **Severity:** Minor
 **Location:** `RefinementPreview.tsx:31-46`
 **Issue type:** Positioning

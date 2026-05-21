@@ -104,12 +104,12 @@ export default function ArtifactChipSelector({
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <p className="text-xs text-[#6B6560]">
+        <p className="text-xs text-[#4A4540]">
           Select the output types appropriate for your text and use case.{" "}
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="rounded-sm text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1"
+            className="rounded-sm text-[#4A4540] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1"
           >
             Click here to learn about different formalisms
           </button>
