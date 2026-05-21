@@ -35,7 +35,8 @@ export function useEvidenceScoring(
     async (claimContent: string) => {
       const { setScoring, applyScores, setScoringError } = useEvidenceStore.getState();
       const currentSlot = useEvidenceStore.getState().slots[key];
-      if (!currentSlot || currentSlot.papers.length === 0) return;
+      const activePapers = currentSlot?.papers.filter((p) => p.status !== "pruned") ?? [];
+      if (activePapers.length === 0) return;
       // Guard against concurrent scoring calls (e.g. double-click)
       if (useEvidenceStore.getState().scoring[key]) return;
 
@@ -46,7 +47,7 @@ export function useEvidenceScoring(
           "/api/evidence-score",
           {
             claimContent,
-            papers: currentSlot.papers.map((p) => ({
+            papers: activePapers.map((p) => ({
               openAlexId: p.openAlexId,
               title: p.title,
               authors: p.authors,
