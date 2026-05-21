@@ -32,10 +32,10 @@ export default function IntegrationProposalCard({
           : "border-[#DDD9D5] bg-white"
     }`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-[var(--ink-black)]">
+        <span className="min-w-0 truncate text-sm font-medium text-[var(--ink-black)]">
           {proposal.fieldLabel}
         </span>
-        <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-mono ${editStyle.className}`}>
+        <span className={`shrink-0 inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-mono ${editStyle.className}`}>
           {editStyle.label}
         </span>
       </div>
@@ -76,14 +76,14 @@ export default function IntegrationProposalCard({
             <button
               type="button"
               onClick={() => onApprove(proposal.id)}
-              className="text-[10px] font-medium text-green-700 hover:text-green-900 border border-green-300 rounded px-2 py-0.5 hover:bg-green-50"
+              className="text-[10px] font-medium text-green-700 hover:text-green-900 border border-green-300 rounded px-2 py-0.5 hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600/40 active:bg-green-100"
             >
               Approve
             </button>
             <button
               type="button"
               onClick={() => onReject(proposal.id)}
-              className="text-[10px] font-medium text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-2 py-0.5 hover:bg-[#F5F1ED]"
+              className="text-[10px] font-medium text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-2 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2]"
             >
               Reject
             </button>
