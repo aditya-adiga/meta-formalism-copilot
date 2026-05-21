@@ -78,7 +78,7 @@ describe('LeanCodeDisplay', () => {
         verificationStatus="unavailable"
       />
     )
-    expect(screen.getByText('Re-verify ↺')).toBeInTheDocument()
+    expect(screen.getByText('Re-check ↺')).toBeInTheDocument()
   })
 
   it('shows code metrics when verification is invalid', () => {
