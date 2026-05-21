@@ -121,6 +121,7 @@ export type CounterexamplesResponse = {
       targetAssumption: string;
       explanation: string;
       plausibility: "high" | "medium" | "low";
+      isEmpirical?: boolean;
     }>;
     robustnessAssessment: string;
     summary: string;
