@@ -32,9 +32,11 @@ function ArtifactChip({ label, isActive, isLoading, disabled, dashed, onClick }:
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={isActive}
       className={`
         relative inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm
         transition-colors duration-150 border
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1
         ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
         ${
           isActive
@@ -107,7 +109,7 @@ export default function ArtifactChipSelector({
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer"
+            className="rounded-sm text-[#6B6560] hover:text-[var(--ink-black)] underline transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1"
           >
             Click here to learn about different formalisms
           </button>
@@ -144,8 +146,9 @@ export default function ArtifactChipSelector({
               disabled={disabled}
               className={`
                 inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm
-                transition-colors duration-150 border border-dashed border-[#9A9590]
-                text-[#9A9590] hover:border-[var(--ink-black)] hover:text-[var(--ink-black)]
+                transition-colors duration-150 border border-dashed border-[#6B6560]
+                text-[#4A4540] hover:border-[var(--ink-black)] hover:text-[var(--ink-black)]
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1
                 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
               `}
             >
@@ -157,7 +160,7 @@ export default function ArtifactChipSelector({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="self-start text-sm text-[var(--ink-black)] hover:text-[var(--ink-black)] underline decoration-[#9A9590] underline-offset-2 transition-colors cursor-pointer font-medium"
+          className="self-start rounded-sm text-sm text-[var(--ink-black)] hover:text-[var(--ink-black)] underline decoration-[#9A9590] underline-offset-2 transition-colors cursor-pointer font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)] focus-visible:ring-offset-1"
         >
           Browse types &rarr;
         </button>
