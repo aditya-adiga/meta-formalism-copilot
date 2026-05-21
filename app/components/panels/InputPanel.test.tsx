@@ -31,9 +31,9 @@ describe('InputPanel', () => {
     expect(screen.getByText('Source Inputs')).toBeInTheDocument()
   })
 
-  it('renders the Direct Formalization heading', () => {
+  it('renders the Generate Analysis heading', () => {
     render(<InputPanel {...defaultProps} />)
-    expect(screen.getByText('Direct Formalization')).toBeInTheDocument()
+    expect(screen.getByText('Generate Analysis')).toBeInTheDocument()
   })
 
   it('renders TextInput, FileUpload, and FormalizationControls', () => {

@@ -60,7 +60,7 @@ const ENDPOINT_ESTIMATES: Record<string, { model: string; outputTokens: number }
   "formalization/statistical-model":    { model: "claude-sonnet-4-6", outputTokens: 1150 },
   "formalization/property-tests":       { model: "claude-sonnet-4-6", outputTokens: 2250 },
   "formalization/counterexamples":      { model: "claude-sonnet-4-6", outputTokens: 2000 },
-  "formalization/dialectical-map":      { model: "claude-sonnet-4-6", outputTokens: 2400 },
+  "formalization/balanced-perspectives": { model: "claude-sonnet-4-6", outputTokens: 2400 },
   "edit/whole":                         { model: "deepseek/deepseek-chat-v3-0324", outputTokens: 800 },
 };
 const DEFAULT_ESTIMATE = { model: "claude-sonnet-4-6", outputTokens: 1750 };

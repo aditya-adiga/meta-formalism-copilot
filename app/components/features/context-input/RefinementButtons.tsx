@@ -5,7 +5,7 @@ type RefinementButtonsProps = {
 const REFINEMENT_ACTIONS = [
   { id: "elaborate", label: "Elaborate", icon: "↗" },
   { id: "shorten", label: "Shorten", icon: "↙" },
-  { id: "formalize", label: "Formalize", icon: "✦" },
+  { id: "formalize", label: "Make Precise", icon: "✦" },
   { id: "clarify", label: "Clarify", icon: "◆" },
 ] as const;
 

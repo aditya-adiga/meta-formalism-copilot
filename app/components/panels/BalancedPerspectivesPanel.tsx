@@ -1,38 +1,38 @@
 "use client";
 
-import type { DialecticalMapResponse } from "@/app/lib/types/artifacts";
+import type { BalancedPerspectivesResponse } from "@/app/lib/types/artifacts";
 import { mergeStreamingPreview } from "@/app/lib/utils/mergeStreamingPreview";
 import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 
-type DialecticalMapPanelProps = {
-  dialecticalMap: DialecticalMapResponse["dialecticalMap"] | null;
+type BalancedPerspectivesPanelProps = {
+  balancedPerspectives: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   /** Partial map data from streaming (partial-JSON parsed) */
-  streamingPreview?: DialecticalMapResponse["dialecticalMap"] | null;
+  streamingPreview?: BalancedPerspectivesResponse["balancedPerspectives"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
 } & ArtifactEditingProps;
 
-export default function DialecticalMapPanel({
-  dialecticalMap, streamingPreview, loading,
+export default function BalancedPerspectivesPanel({
+  balancedPerspectives, streamingPreview, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
-}: DialecticalMapPanelProps) {
-  const { updateField, updateArrayItem } = useFieldUpdaters(dialecticalMap, onContentChange);
+}: BalancedPerspectivesPanelProps) {
+  const { updateField, updateArrayItem } = useFieldUpdaters(balancedPerspectives, onContentChange);
 
   const { displayData: displayMap, hasDisplayData } = mergeStreamingPreview(
-    dialecticalMap, streamingPreview,
+    balancedPerspectives, streamingPreview,
     (d) => (d.perspectives?.length ?? 0) > 0 || !!d.topic,
   );
 
   return (
     <ArtifactPanelShell
-      title="Dialectical Map"
+      title="Balanced Perspectives"
       loading={loading && !hasDisplayData}
       hasData={hasDisplayData}
-      emptyMessage="No dialectical map yet. Generate one from the source panel or node detail."
-      loadingMessage="Generating dialectical map..."
+      emptyMessage="No balanced perspectives yet. Generate them from the Source panel or component detail."
+      loadingMessage="Generating balanced perspectives..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
@@ -85,7 +85,7 @@ export default function DialecticalMapPanel({
 
                     {(p.vulnerabilities?.length ?? 0) > 0 && (
                       <div>
-                        <span className="text-xs font-semibold text-amber-700">Vulnerabilities:</span>
+                        <span className="text-xs font-semibold text-amber-700">Weaknesses:</span>
                         <ul className="list-disc pl-5 mt-1 space-y-0.5">
                           {p.vulnerabilities.map((v, j) => (
                             <li key={j} className="text-xs text-amber-700">{v}</li>
@@ -122,7 +122,7 @@ export default function DialecticalMapPanel({
 
           {/* Synthesis */}
           {displayMap.synthesis && (
-          <CollapsibleSection title="Synthesis" defaultOpen={false}>
+          <CollapsibleSection title="Proposed Resolution" defaultOpen={false}>
             <EditableSection value={displayMap.synthesis} onChange={(v) => updateField("synthesis", v)}>
               <div className="rounded border border-green-200 bg-green-50 px-3 py-2 space-y-2">
                 <p className="text-sm text-green-900">{displayMap.synthesis.equilibrium}</p>
