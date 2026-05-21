@@ -60,7 +60,7 @@ export default function FormalizationControls({
           value={contextText}
           onChange={(e) => onContextChange(e.target.value)}
           placeholder={contextPlaceholder ?? "e.g., Explore this in the context of decision theory within game-theoretic settings..."}
-          rows={6}
+          rows={4}
           className="resize-none rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-sm transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-md"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
         />
