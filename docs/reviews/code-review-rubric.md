@@ -1,86 +1,82 @@
 # Code Review Rubric
 
-**Scope:** `feat/custom-artifact-types` vs `main` — 23 files, +1434/-193 | **Reviewed:** 2026-04-07 | **Status: ✅ PASSES REVIEW**
+**Commit:** 0a96cce (findings); fixes applied in a follow-up commit
+**Scope:** `feat/evidence-scoring` vs `main` — 14 files, +853/-42 | **Reviewed:** 2026-05-21 | **Status: ✅ PASSES REVIEW** — all 4 amber items fixed (re-review recommended to confirm)
 
 ---
 
 ## 🔴 Must Fix
 
-Issues that must be resolved before merge. Draft cannot pass review with any red items unresolved.
+Issues that must be resolved before merge.
 
-| # | Finding | Domain | Location | Status |
-|---|---|---|---|---|
-| — | No red items | — | — | — |
+| # | Finding | Domain | Location | Legibility-target | Considered overrides | Status |
+|---|---|---|---|---|---|---|
+| — | No red items | — | — | — | — | — |
 
 ---
 
 ## 🟡 Must Address
 
-Issues that must be fixed or acknowledged by the author with justification for why they stand. Each must carry a resolution or author note.
+Each must be fixed or carry an author note justifying why it stands.
 
-| # | Finding | Domain | Source | Status | Author note |
-|---|---|---|---|---|---|
-| A1 | `usePanelDefinitions` invalidated on every loading state change — passing unstable `artifactLoadingState` object breaks granular memo deps | Performance | Performance reviewer | ✅ Fixed | Derived stable `customLoadingKey` string instead of passing whole object |
-| A2 | `renderPanel` useCallback has excessive dependency array — `customArtifactData` and `customArtifactTypes` are unstable refs that cause re-render cascade | Performance | Performance reviewer | ✅ Fixed | Moved to refs (`customArtifactTypesRef`, `customArtifactDataRef`) |
-| A3 | CustomTypeDesigner action buttons trapped inside scroll container — buttons scroll out of view at 1366x768 on review step | UI Layout | UI visual reviewer | ✅ Fixed | Split modal into pinned header + scrollable body + pinned footer |
-| A4 | `persistence.ts:32` comment says "added in v2" but `WORKSPACE_VERSION` was already 2 and wasn't bumped — misleading version history | Fact-check + API Consistency | Fact-check (Incorrect, high confidence) + API consistency | ✅ Fixed | Changed to "optional, backward-compatible addition to v2" |
-| A5 | `customArtifact.ts:7` references "cross-session library" that doesn't exist — sets incorrect expectations | Fact-check + API Consistency | Fact-check (Unverifiable) + API consistency | ✅ Fixed | Removed cross-session library reference |
-| A6 | Design route (`/api/custom-type/design`) duplicates `handleArtifactRoute` patterns instead of reusing shared infrastructure | API Consistency | API consistency reviewer | ✅ Fixed | Added comment documenting why it diverges (different semantics) |
+| # | Finding | Domain | Source | Legibility-target | Considered overrides | Status | Author note |
+|---|---|---|---|---|---|---|---|
+| A1 | Mock fallback returns `mock: true` via inline `satisfies`, not on the typed `EvidenceScoreResponse`. Consumers (`useEvidenceScoring`) can't observe it, so neutral 0.5 placeholder scores are silently marked `scored` — a silent-pass echoing the Lean-verifier pattern. **Escalated 🟢→🟡 via convergence.** | API Consistency + Architecture | API consistency (Minor/High) + Architecture (Minor #4) | for-author | — | ✅ Fixed | `mock?` added to `EvidenceScoreResponse`; `useEvidenceScoring` now surfaces a "Scoring unavailable" error and skips `applyScores` on mock, so placeholders are never persisted as real scores |
+| A2 | Search and scoring share one `errors[key]` store slot. Loading state was correctly split into a dedicated `scoring` map but the error channel was not; `score()` and `search()` clear each other's errors and scoring errors render through the search hook's slot unlabeled. | Architecture (Coupling) | Architecture (high conf), agreed by tech-debt | for-author | — | ✅ Fixed | Added a dedicated `scoringErrors` map + `setScoringError`; `useEvidenceScoring` uses it and `FindEvidenceButton` renders it separately |
+| A3 | `slot.scored` duplicates the derivable per-paper `reliability !== null`; both are persisted to localStorage and can drift out of sync. | Architecture (Coupling) | Architecture (medium conf) | for-author | — | ✅ Fixed | Removed the stored `scored` field; added derived `isSlotScored(slot)` helper used by all readers (store, hook, results section) |
+| A4 | `callLlm.ts` comment says "Confirmed unsupported: numeric-range keywords" but the strip-set adds 3 pre-emptive keywords (`exclusiveMinimum`/`exclusiveMaximum`/`multipleOf`) that are not confirmed-rejected, and the quoted Anthropic error text is unverifiable from the repo. Comment is honest ("Extend this set…") but slightly imprecise. Low-effort: tighten wording or acknowledge. | Fact-check (Mostly Accurate) | Fact-check Claim 1 | for-author | — | ✅ Fixed | Reworded: "Observed-rejected" scoped to `minimum`/`maximum`; the rest labeled stripped pre-emptively; error text marked paraphrased |
 
 ---
 
 ## 🟢 Consider
 
-Advisory findings from contextual critics, single-critic suggestions, and improvement opportunities. Not required to pass review.
+Advisory — not required to pass review.
 
-| # | Finding | Source |
-|---|---|---|
-| C1 | User-controlled system prompt becomes a prompt injection vector if workspace sharing is ever added — document the trust assumption | Security |
-| C2 | LLM-generated type definitions pass through a two-hop chain without content validation — user review step mitigates | Security |
-| C3 | No rate limiting on LLM-calling API routes (pre-existing gap, not introduced by this PR) | Security |
-| C4 | Double JSON parse in custom route via `request.clone()` — unnecessary serialization cost (cold path) | Performance |
-| C5 | Orphaned `customArtifactData` keys accumulate in localStorage when types are deleted then snapshots restored | Performance |
-| C6 | Custom route uses generic `"result"` response key, breaking naming symmetry with built-in routes | API Consistency |
-| C7 | `isCustomType("custom-")` matches empty suffix — minor robustness gap | API Consistency |
-| C8 | `customArtifactData` split across `artifacts` and top-level in persistence — asymmetric structure | API Consistency |
-| C9 | `ARTIFACT_RESPONSE_KEY` comment says "kebab-case -> camelCase" but `semiformal->proof` and `lean->leanCode` aren't case conversions | Fact-check (Mostly Accurate) |
-| C10 | `formatLabel` docstring says "camelCase or snake_case" but also handles kebab-case | Fact-check (Mostly Accurate) |
-| C11 | ArtifactTypeModal header scrolls away with many custom types (pre-existing, worsened) | UI Visual |
-| C12 | `CustomArtifactIcon` SVG paths exceed 20x20 viewBox — may clip | UI Visual |
-| C13 | Recursive `JsonSection` has no depth guard for deeply nested LLM output | UI Visual |
-| C14 | `page.tsx` god component (780 lines, 57+ memo deps) — highest carrying-cost tech debt item, approaching tipping point | Tech Debt Triage |
-| C15 | `useWorkspacePersistence` monolith (327 lines, 25+ exports) — related to C14, should be split alongside | Tech Debt Triage |
-| C16 | Custom types silently skip node-level formalization with no UI indication | Tech Debt Triage |
-| C17 | No system prompt sanitization beyond length check — acceptable for single-user tool, flag when sharing is added | Tech Debt Triage |
-| C18 | High-priority test gaps: `useWorkspacePersistence` CRUD, `useArtifactGeneration` custom routing, custom API route validation | Test Strategy |
-| C19 | Medium-priority test gaps: design API route, `usePanelDefinitions` with custom types, `CustomArtifactPanel` rendering | Test Strategy |
-| C20 | Systemic gap: no API route tests exist anywhere in the project | Test Strategy |
+| # | Finding | Source | Legibility-target | Considered overrides |
+|---|---|---|---|---|
+| C1 | ✅ **Fixed** — wrapped `JSON.parse(stripCodeFences(text))` in try/catch; a parse failure now returns **502** like the non-array branch. *(Security Low + Test-strategy G16 agreed.)* | Security + Test-strategy | for-author | — |
+| C2 | `responseFormat`/schema omitted from the `callLlm` cache key (`callLlm.ts:120-121`). Benign now (each endpoint's prompt is unique) but a latent cross-endpoint cache-collision footgun. *(Performance Low + Tech-debt #1 agree.)* | Performance + Tech-debt | for-author | — |
+| C3 | Request field `claimContent` diverges from the sibling `evidence-search` route's `elementContent` for the same logical input. | API consistency (Minor) | for-author | — |
+| C4 | `applyScores` is the only store action using an `apply*` verb vs the established `set*`/`clear*` shape (borderline — it has merge semantics). | API consistency (Minor) | for-author | — |
+| C5 | `adaptSchemaForAnthropic` exported from `callLlm.ts` with a single in-module caller (widens public surface); the `[0,1]` schema constraint is degraded to a comment-linked runtime clamp in a different module. | API consistency (Info) + Architecture (Minor #3) | for-author | — |
+| C6 | Request DTO `Pick`s from the storage model, welding the wire contract to the persistence model. | Architecture (Minor #5) | for-author | — |
+| C7 | ✅ **Fixed** — score button bumped from `text-[10px]`/`px-1.5 py-0.5` to `text-xs`/`px-2 py-1` for a larger target. | UI visual | for-author | — |
+| C8 | Red-flag list has no `max-h`/`overflow` cap on LLM-generated content (`EvidencePaperCard.tsx:79-86`). | UI visual | for-author | — |
+| C9 | Score badge rationale delivered only via native `title` (`EvidenceScoreBadge.tsx:27`) — pointer-only, not touch/keyboard accessible. | UI visual | for-author | — |
+| C10 | `sortByScore` sums a `-1` sentinel for unscored dimensions — latent ordering ambiguity, currently masked by the all-or-nothing scoring invariant. | UI visual | for-author | — |
+| C11 | `OpenRouterError` path forwards the raw upstream error body (`err.details`) to the client. Pre-existing convention (sibling `evidence-search/route.ts:188`), not a regression. | Security (Low) | for-author | — |
+| C12 | `title`/`journal`/`authors` input field sizes unbounded (cost-amplification shape; single-tenant, so only the operator pays). | Security (Info) | for-author | — |
+| C13 | Test gaps (23 enumerated, G1–G23). Highest value: (1) `adaptSchemaForAnthropic` pure unit test, (2) `evidenceStore.applyScores` invariant tests, (3) first `/api/evidence-score` route-handler test (establishes the repo's first API-route harness). | Test strategy | for-author | — |
+
+---
+
+## ↩️ Considered Overrides
+
+No prior overrides matched this diff. *(Override log created this run; no rows yet.)*
+
+| Override (PR ref / Date) | Prior finding | Original → Override | Reason | This run's treatment |
+|---|---|---|---|---|
+| — | — | — | — | — |
 
 ---
 
 ## ✅ Confirmed Good
 
-Patterns, implementations, or claims confirmed correct by fact-check and/or critics.
-
-| Item | Verdict | Source |
-|---|---|---|
-| Type system extension (`BuiltinArtifactType \| CustomArtifactTypeId`) is clean and well-designed | ✅ Confirmed | API Consistency, Performance |
-| `custom-` prefix convention with `isCustomType` guard prevents type confusion | ✅ Confirmed | Fact-check, Security |
-| Custom formalization route correctly reuses `handleArtifactRoute` | ✅ Confirmed | API Consistency |
-| Persistence is backward-compatible — optional fields with `?? []`/`?? {}` defaults | ✅ Confirmed | Fact-check, API Consistency |
-| `isValidCustomTypeDef` defensive validation on localStorage load | ✅ Confirmed | Security, Performance |
-| No XSS vectors — React auto-escaping, no `dangerouslySetInnerHTML` | ✅ Confirmed | Security |
-| `MAX_SYSTEM_PROMPT_LENGTH` guard (10,000 chars) on custom route | ✅ Confirmed | Security, Performance |
-| `transformBody` strips custom fields before `buildUserMessage` | ✅ Confirmed | Security |
-| Parallel generation via `Promise.allSettled` — no sequential bottleneck | ✅ Confirmed | Performance |
-| Stale selection cleanup via `useEffect` on `customArtifactTypes` | ✅ Confirmed | API Consistency, Performance |
-| `updateCustomArtifactType` clears stale data when system prompt changes | ✅ Confirmed | Performance |
-| `ARTIFACT_META` keyed by `BuiltinArtifactType` with entry for every member | ✅ Confirmed | Fact-check |
-| `SELECTABLE_ARTIFACT_TYPES` correctly excludes `lean` (deductive pipeline only) | ✅ Confirmed | Fact-check |
-| `ARTIFACT_ROUTE` is `Partial<Record>` — semiformal and lean correctly absent | ✅ Confirmed | Fact-check |
-| Request cloning in custom route handles body stream correctly | ✅ Confirmed | Security, Fact-check |
-| Custom types return `null` from `formalizeNode` (intentional scope boundary) | ✅ Confirmed | Fact-check |
+| Item | Verdict | Source | Legibility-target |
+|---|---|---|---|
+| LLM output treated as untrusted — `clampScore` + `normalizeStudyType` + `validatePaperScore` make the structured-output schema advisory, not load-bearing | ✅ Confirmed | Security, Fact-check | for-orchestrator-synthesis |
+| New `evidence-score` slice faithfully mirrors the `evidence-search` slice (route + testable helper + hook + store actions); reuses `callLlm`/`stripCodeFences`/`fetchApi`; clean dependency direction, no cycles | ✅ Confirmed | Architecture, API consistency | for-orchestrator-synthesis |
+| `adaptSchemaForAnthropic` placed at the correct provider-dispatch seam; non-mutating + recursive as documented | ✅ Confirmed | Architecture, Fact-check | for-orchestrator-synthesis |
+| `scoreValidation.ts` extracted specifically for unit-testing; well covered by `scoreValidation.test.ts` | ✅ Confirmed | Test-strategy, Tech-debt | for-orchestrator-synthesis |
+| Title-row `min-w-0` + `shrink-0` + `break-words` flex handling is correct; focus-visible rings on every touched control; score button has full default/hover/focus/active/disabled coverage + persistent label-updating affordance | ✅ Confirmed | UI visual | for-orchestrator-synthesis |
+| Scoring path is a single batched LLM call — no N+1; double-submit guard present; `sortByScore` memoized over hard-capped N≤8 | ✅ Confirmed | Performance | for-orchestrator-synthesis |
 
 ---
 
-To pass review: all 🔴 items must be resolved. All 🟡 items must be either fixed or carry an author note. 🟢 items are optional.
+## ⏭️ Skipped Core Critics
+
+All core critics ran; no skips applied.
+
+---
+
+To pass review: all 🔴 items resolved (none here). All 🟡 items fixed or carrying an author note. 🟢 items optional.

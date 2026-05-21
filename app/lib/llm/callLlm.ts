@@ -46,13 +46,17 @@ export type ResponseFormat = {
   };
 };
 
-/** JSON-Schema validation keywords that Anthropic's structured-output schema
- *  validator rejects — it supports only a subset of JSON Schema. OpenRouter's
- *  response_format accepts the full draft, so source schemas keep these and we
- *  strip them only when adapting for the Anthropic `output_config` path.
- *  Confirmed unsupported: numeric-range keywords. Anthropic returns e.g.
- *  "output_config.format.schema: For 'number' type, properties maximum,
- *  minimum are not supported". Extend this set if other keywords surface. */
+/** JSON-Schema validation keywords stripped before sending a schema to
+ *  Anthropic's `output_config` path — its structured-output validator supports
+ *  only a subset of JSON Schema, while OpenRouter's response_format accepts the
+ *  full draft, so source schemas keep these and we strip them only here.
+ *
+ *  Observed-rejected: `minimum` and `maximum` — Anthropic returns an error of
+ *  the form "For 'number' type, properties maximum, minimum are not supported"
+ *  (paraphrased; the exact text comes from Anthropic's server). The remaining
+ *  numeric-range keywords are stripped pre-emptively as the same class, not
+ *  because each has been individually observed to be rejected. Extend this set
+ *  if other keywords surface. */
 const ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   "minimum",
   "maximum",

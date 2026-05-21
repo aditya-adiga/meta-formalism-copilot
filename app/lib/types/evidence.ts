@@ -101,17 +101,23 @@ export type EvidencePaper = {
   relatedness: RelatednessScore | null;
 };
 
-/** An evidence slot attached to one artifact element */
+/** An evidence slot attached to one artifact element.
+ *  Whether the slot is "scored" is derived from the papers (see isSlotScored),
+ *  not stored, so the two cannot drift apart in persisted state. */
 export type EvidenceSlot = {
   targetKey: EvidenceTargetKey;
   searchQueries: string[];
   papers: EvidencePaper[];
   searchedAt: string;
-  /** Whether papers in this slot have been scored */
-  scored: boolean;
   /** When scoring was last performed (null if never) */
   scoredAt: string | null;
 };
+
+/** Whether every paper in a slot has been scored. Derived from the papers
+ *  themselves rather than stored, so it cannot drift from the actual scores. */
+export function isSlotScored(slot: EvidenceSlot): boolean {
+  return slot.papers.length > 0 && slot.papers.every((p) => p.reliability !== null);
+}
 
 /** API request shape for evidence search */
 export type EvidenceSearchRequest = {
@@ -145,4 +151,8 @@ export type PaperScore = {
 /** API response shape for evidence scoring */
 export type EvidenceScoreResponse = {
   scores: PaperScore[];
+  /** True when `scores` are neutral placeholders returned because no LLM
+   *  provider key is configured. Consumers must not treat these as a real
+   *  assessment. */
+  mock?: boolean;
 };

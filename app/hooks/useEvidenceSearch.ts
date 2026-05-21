@@ -44,7 +44,6 @@ export function useEvidenceSearch(
           searchQueries: result.queries,
           papers: result.papers,
           searchedAt: new Date().toISOString(),
-          scored: false,
           scoredAt: null,
         });
       } catch (err) {

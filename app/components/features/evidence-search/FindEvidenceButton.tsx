@@ -19,7 +19,7 @@ export default function FindEvidenceButton({
   contextSummary,
 }: FindEvidenceButtonProps) {
   const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
-  const { isScoring, score } = useEvidenceScoring(artifactType, elementId);
+  const { isScoring, score, error: scoringError } = useEvidenceScoring(artifactType, elementId);
 
   return (
     <div className="mt-1.5">
@@ -46,6 +46,10 @@ export default function FindEvidenceButton({
           onScore={() => score(elementContent)}
           isScoring={isScoring}
         />
+      )}
+
+      {scoringError && (
+        <p className="text-xs text-red-600 mt-1">{scoringError}</p>
       )}
     </div>
   );

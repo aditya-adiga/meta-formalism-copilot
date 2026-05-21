@@ -1,297 +1,341 @@
 # Code Fact-Check Report
 
-**Repository:** meta-formalism-copilot
-**Scope:** `feat/custom-artifact-types` branch diff vs `main` (23 files)
-**Checked:** 2026-04-07
-**Total claims checked:** 21
-**Summary:** 16 verified, 2 mostly accurate, 1 stale, 1 incorrect, 1 unverifiable
+**Commit:** 3f916e2
+**Repository:** /home/magfrump/aisc_lct/meta-formalism-copilot
+**Scope:** branch diff `feat/evidence-scoring` (main...HEAD)
+**Checked:** 2026-05-21
+**Total claims checked:** 12
+**Summary:** 8 verified, 2 mostly accurate, 0 stale, 1 incorrect, 1 unverifiable
+
+> No `docs/reviews/hallucination-patterns.md` exists; none of the verdicts below qualify as fabrication patterns, so no log was created.
 
 ---
 
-## Claim 1: "Uniform request shape for all new artifact generation routes (003 §2)"
+## Claim 1: "JSON-Schema validation keywords that Anthropic's structured-output schema validator rejects ... Confirmed unsupported: numeric-range keywords. Anthropic returns e.g. \"output_config.format.schema: For 'number' type, properties maximum, minimum are not supported\". Extend this set if other keywords surface."
 
-**Location:** `app/lib/types/artifacts.ts:2`
-**Type:** Reference
-**Verdict:** Verified
-**Confidence:** High
-
-The comment references decision doc `docs/decisions/003-artifact-generation-api.md`, which exists in the repository and describes the `ArtifactGenerationRequest` type as the uniform shape. The type is indeed used across all artifact routes.
-
-**Evidence:** `docs/decisions/003-artifact-generation-api.md`, `app/lib/types/artifacts.ts:2`
-
----
-
-## Claim 2: "Display metadata for each built-in artifact type"
-
-**Location:** `app/lib/types/artifacts.ts:131`
+**Location:** `app/lib/llm/callLlm.ts:49-62`
 **Type:** Behavioral
-**Verdict:** Verified
-**Confidence:** High
+**Verdict:** Mostly accurate
+**Confidence:** Medium
 
-`ARTIFACT_META` is typed as `Record<BuiltinArtifactType, {...}>` and contains an entry for every member of the `BuiltinArtifactType` union (semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map, counterexamples). The comment was updated from "each artifact type" to "each built-in artifact type" to reflect the type change. This is accurate.
+The comment names a specific set of stripped keywords, and the implementing set matches the listed keywords plus three more:
 
-**Evidence:** `app/lib/types/artifacts.ts:131-178`, `app/lib/types/session.ts:8-16`
+```ts
+// app/lib/llm/callLlm.ts:56-62
+const ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+]);
+```
+
+The comment's "Confirmed unsupported" statement is scoped narrowly to `minimum`/`maximum` (the two that produced the quoted Anthropic error), and the set additionally strips `exclusiveMinimum`, `exclusiveMaximum`, and `multipleOf`. The comment frames these extras correctly via "Extend this set if other keywords surface," so the set is a superset of what is *confirmed* — directionally accurate, but the comment does not assert the extra three are confirmed-rejected (they are pre-emptive). The exact wording of the quoted Anthropic error message is an external-API behavior that cannot be confirmed from the codebase (paraphrased — no quote available because the error string originates from Anthropic's server, not this repo). Mark Mostly accurate: the keywords the code is documented to handle (`minimum`/`maximum`) are handled, but the comment's quoted error text is unverifiable from static analysis.
+
+**Evidence:** `app/lib/llm/callLlm.ts:49-62`, `app/lib/llm/callLlm.ts:171-182`
 
 ---
 
-## Claim 3: "Built-in artifact types selectable as chips (lean excluded — it's step 2 of the deductive pipeline)"
+## Claim 2: "Recursively strip keywords Anthropic's structured-output validator does not support, returning a new schema (the input is not mutated)."
 
-**Location:** `app/lib/types/artifacts.ts:181`
+**Location:** `app/lib/llm/callLlm.ts:64-65`
+**Type:** Behavioral / Invariant
+**Verdict:** Verified
+**Confidence:** High
+
+The function builds a fresh object/array rather than mutating its input:
+
+```ts
+// app/lib/llm/callLlm.ts:66-77
+export function adaptSchemaForAnthropic(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(adaptSchemaForAnthropic);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS.has(k)) continue;
+      out[k] = adaptSchemaForAnthropic(v);
+    }
+    return out;
+  }
+  return value;
+}
+```
+
+`Array.prototype.map` returns a new array, the object branch writes to a fresh `out` object, and primitives are returned by value — no input property is reassigned or deleted. Recursion descends into both arrays and objects. Both the non-mutation and recursive claims hold.
+
+**Evidence:** `app/lib/llm/callLlm.ts:66-77`
+
+---
+
+## Claim 3: "When provided, enforces structured JSON output. Sent to OpenRouter as `response_format`, and to Anthropic as `output_config.format` after stripping keywords Anthropic doesn't support (see adaptSchemaForAnthropic)."
+
+**Location:** `app/lib/llm/callLlm.ts:86-89`
 **Type:** Behavioral / Architectural
 **Verdict:** Verified
 **Confidence:** High
 
-`SELECTABLE_ARTIFACT_TYPES` includes semiformal, causal-graph, statistical-model, property-tests, dialectical-map, and counterexamples — but not `lean`. Lean is excluded because it is generated as part of the semiformal-to-Lean deductive pipeline, confirmed in `useArtifactGeneration.ts:32` where lean is filtered out.
+Both dispatch paths match the claim. Anthropic path sends `output_config.format` with the adapted schema:
 
-**Evidence:** `app/lib/types/artifacts.ts:183-189`, `app/hooks/useArtifactGeneration.ts:32`
+```ts
+// app/lib/llm/callLlm.ts:170-182
+...(responseFormat && {
+  output_config: {
+    format: {
+      type: "json_schema" as const,
+      schema: adaptSchemaForAnthropic(
+        responseFormat.json_schema.schema,
+      ) as Record<string, unknown>,
+    },
+  },
+}),
+```
+
+OpenRouter path sends the raw `response_format`:
+
+```ts
+// app/lib/llm/callLlm.ts:211
+...(responseFormat && { response_format: responseFormat }),
+```
+
+**Evidence:** `app/lib/llm/callLlm.ts:170-182`, `app/lib/llm/callLlm.ts:211`
 
 ---
 
-## Claim 4: "Maps built-in artifact types to their API route paths"
+## Claim 4: "Construct a fresh Anthropic client per call. ... per-call construction means an env-var rotation ... takes effect on the next request without needing a redeploy or process restart."
 
-**Location:** `app/lib/types/artifacts.ts:191`
+**Location:** `app/lib/llm/callLlm.ts:10-13`
 **Type:** Behavioral
 **Verdict:** Verified
 **Confidence:** High
 
-`ARTIFACT_ROUTE` is typed as `Partial<Record<BuiltinArtifactType, string>>` and maps five built-in types to their `/api/formalization/*` paths. Semiformal and lean are absent (partial), which is correct since they have their own dedicated generation paths.
+`makeAnthropicClient` is invoked inside the request path (not memoized at module scope), and the key is read from `process.env` on each call:
 
-**Evidence:** `app/lib/types/artifacts.ts:192-198`
+```ts
+// app/lib/llm/callLlm.ts:142
+const anthropicKey = process.env.ANTHROPIC_API_KEY;
+// app/lib/llm/callLlm.ts:164
+const client = makeAnthropicClient(anthropicKey);
+```
 
----
+`makeAnthropicClient` returns `new Anthropic({ apiKey })` (`callLlm.ts:14-16`), so each request reads the current env value and builds a new client. The rotation claim holds for static-analysis purposes.
 
-## Claim 5: "Maps built-in artifact types to their JSON response key (kebab-case -> camelCase)"
-
-**Location:** `app/lib/types/artifacts.ts:200`
-**Type:** Behavioral
-**Verdict:** Mostly accurate
-**Confidence:** High
-
-The mapping converts kebab-case type names to camelCase response keys for most types (e.g., `"causal-graph"` -> `"causalGraph"`). However, `"semiformal"` maps to `"proof"` and `"lean"` maps to `"leanCode"`, which are not camelCase conversions of the type name — they are semantically different keys. The parenthetical "(kebab-case -> camelCase)" is an oversimplification.
-
-**Evidence:** `app/lib/types/artifacts.ts:201-210`
+**Evidence:** `app/lib/llm/callLlm.ts:14-16`, `app/lib/llm/callLlm.ts:142`, `app/lib/llm/callLlm.ts:161-164`
 
 ---
 
-## Claim 6: "All custom artifact type IDs are prefixed with 'custom-' to distinguish them from built-in types."
+## Claim 5: "Range enforced server-side by clampScore (Anthropic's structured-output schema rejects minimum/maximum)." (route schema, both reliability.score and relatedness.score)
 
-**Location:** `app/lib/types/customArtifact.ts:10`
-**Type:** Invariant
-**Verdict:** Verified
-**Confidence:** High
-
-The TypeScript template literal type `custom-${string}` enforces this at the type level. The `isCustomType` guard checks `type.startsWith("custom-")`. The `generateId()` function in `CustomTypeDesigner.tsx` produces `custom-${crypto.randomUUID()}`. The `isValidCustomTypeDef` validator also checks `v.id.startsWith("custom-")`.
-
-**Evidence:** `app/lib/types/customArtifact.ts:11`, `app/lib/types/customArtifact.ts:33-34`, `app/components/features/artifact-selector/CustomTypeDesigner.tsx:16`, `app/lib/utils/workspacePersistence.ts:124`
-
----
-
-## Claim 7: "Custom types let users design their own formalization prompts via an LLM-assisted iterative flow, then use them alongside the built-in types. Definitions are stored in the workspace persistence layer and optionally saved to a cross-session library."
-
-**Location:** `app/lib/types/customArtifact.ts:3-7`
-**Type:** Architectural
-**Verdict:** Mostly accurate
-**Confidence:** Medium
-
-The first two sentences are verified: `CustomTypeDesigner.tsx` implements an LLM-assisted design flow (describe -> review/refine -> test -> save), and custom types appear alongside built-in types in the chip selector and modal. Definitions are stored in the workspace persistence layer (`useWorkspacePersistence` -> `saveWorkspace` -> `localStorage`). However, the claim "optionally saved to a cross-session library" is not implemented — there is no separate library storage mechanism. Custom types are persisted only within the current workspace.
-
-**Evidence:** `app/components/features/artifact-selector/CustomTypeDesigner.tsx`, `app/lib/utils/workspacePersistence.ts:104`, grep for "cross-session" and "library" shows no implementation beyond this comment.
-
----
-
-## Claim 8: "Type guard: returns true if an ArtifactType string is a custom type ID."
-
-**Location:** `app/lib/types/customArtifact.ts:32`
+**Location:** `app/api/evidence-score/route.ts:104-105` and `app/api/evidence-score/route.ts:122-123`
 **Type:** Behavioral
 **Verdict:** Verified
 **Confidence:** High
 
-`isCustomType` checks `type.startsWith("custom-")` and narrows the type to `CustomArtifactTypeId`. This correctly identifies custom type IDs. The test file `customArtifact.test.ts` confirms the behavior for both positive and negative cases.
+The schema declares `score` as a bare `number` with no `minimum`/`maximum`, and range enforcement happens server-side in `clampScore`:
 
-**Evidence:** `app/lib/types/customArtifact.ts:33-35`, `app/lib/types/customArtifact.test.ts:1-32`
+```ts
+// app/api/evidence-score/scoreValidation.ts:14-17
+export function clampScore(score: unknown): number {
+  const n = typeof score === "number" && isFinite(score) ? score : 0;
+  return Math.max(0, Math.min(1, n));
+}
+```
+
+`validatePaperScore` routes both `rel?.score` and `relat?.score` through `clampScore` (`scoreValidation.ts:38,46`). The "Anthropic rejects minimum/maximum" sub-claim is consistent with the keyword-strip set in Claim 1. The clamp-to-[0,1] behavior is directly tested (`scoreValidation.test.ts:15-36`).
+
+**Evidence:** `app/api/evidence-score/route.ts:98-126`, `app/api/evidence-score/scoreValidation.ts:14-17`, `app/api/evidence-score/scoreValidation.ts:35-48`
 
 ---
 
-## Claim 9: "Unique identifier, always starts with 'custom-'"
+## Claim 6: "Clamp a score to [0, 1]" (clampScore docstring)
 
-**Location:** `app/lib/types/customArtifact.ts:14`
-**Type:** Invariant
+**Location:** `app/api/evidence-score/scoreValidation.ts:13`
+**Type:** Behavioral
 **Verdict:** Verified
 **Confidence:** High
 
-The `id` field is typed as `CustomArtifactTypeId` which is `custom-${string}`, enforced at the type level. Runtime validation in `isValidCustomTypeDef` also checks the prefix.
+`Math.max(0, Math.min(1, n))` clamps to the closed interval [0,1], and non-finite/non-number input falls back to `0`:
 
-**Evidence:** `app/lib/types/customArtifact.ts:11,15`, `app/lib/utils/workspacePersistence.ts:124`
+```ts
+// app/api/evidence-score/scoreValidation.ts:15-16
+const n = typeof score === "number" && isFinite(score) ? score : 0;
+return Math.max(0, Math.min(1, n));
+```
+
+Tests confirm `1.5 -> 1`, `-0.5 -> 0`, `NaN/Infinity -> 0`, and non-numbers `-> 0` (`scoreValidation.test.ts:15-36`).
+
+**Evidence:** `app/api/evidence-score/scoreValidation.ts:13-17`, `app/api/evidence-score/scoreValidation.test.ts:8-37`
 
 ---
 
-## Claim 10: "Custom artifact types and their generated data (added in v2)"
+## Claim 7: "Validate and clean a single paper score from LLM output. Returns null if the score is structurally invalid (missing openAlexId)."
 
-**Location:** `app/lib/types/persistence.ts:32`
-**Type:** Configuration
+**Location:** `app/api/evidence-score/scoreValidation.ts:27-28`
+**Type:** Behavioral
+**Verdict:** Verified
+**Confidence:** High
+
+The only early-return-null path is the missing/non-string `openAlexId` guard:
+
+```ts
+// app/api/evidence-score/scoreValidation.ts:30
+if (!raw.openAlexId || typeof raw.openAlexId !== "string") return null;
+```
+
+Missing `reliability`/`relatedness` do not return null — they default (score `0`, studyType `"unknown"`, empty rationale/redFlags), confirmed by test "handles missing reliability and relatedness gracefully" (`scoreValidation.test.ts:97-106`) and "returns null when openAlexId is missing" (`scoreValidation.test.ts:91-95`). Note `openAlexId: ""` returns null because `!raw.openAlexId` is truthy-negated for empty string — consistent with the test at line 93.
+
+**Evidence:** `app/api/evidence-score/scoreValidation.ts:29-50`, `app/api/evidence-score/scoreValidation.test.ts:91-106`
+
+---
+
+## Claim 8: "Methodology red flags detected (e.g. p-hacking indicators, small sample)"
+
+**Location:** `app/lib/types/evidence.ts:73`
+**Type:** Behavioral
 **Verdict:** Incorrect
 **Confidence:** High
 
-The comment says "added in v2" but `WORKSPACE_VERSION` has been 2 since before this branch — it was not incremented for this change. The custom fields are optional (`?`) and backward-compatible with existing v2 data. A more accurate statement would be "added to the v2 schema" or "extends v2". The comment implies a version bump occurred, but v2 already existed on main and no version change was made.
+The `ReliabilityScore.redFlags` doc comment offers "p-hacking indicators" as an example of a detected red flag, but the scoring system prompt explicitly forbids flagging p-hacking:
 
-**Evidence:** `app/lib/types/persistence.ts:4` (`WORKSPACE_VERSION = 2`), git diff shows no change to `WORKSPACE_VERSION`
+```ts
+// app/api/evidence-score/route.ts:36
+//   - Identify red flags detectable from title/abstract: stated small sample sizes (e.g. n < 20), self-described "exploratory" or "pilot" studies, disclosed conflicts of interest, retraction notices. Do NOT flag p-hacking or variable counts unless explicitly stated in the abstract.
+```
+
+The prompt directs the LLM to NOT flag p-hacking (unless explicitly stated in the abstract), so "p-hacking indicators" is a misleading example for a field that the LLM-driven pipeline is instructed to avoid producing. "Small sample" is consistent with the prompt ("stated small sample sizes"). A reader acting on the type comment would expect p-hacking detection that the prompt deliberately suppresses. Recommend changing the example to one the prompt actually requests (e.g., "small sample, conflicts of interest, retraction notices").
+
+**Evidence:** `app/lib/types/evidence.ts:73`, `app/api/evidence-score/route.ts:36`
 
 ---
 
-## Claim 11: "Fires parallel artifact generation requests for selected types."
+## Claim 9: "Triggers LLM-based reliability and relatedness scoring for all papers in the slot, then applies scores back to the store. Scoring is separate from search so users can choose when to spend LLM tokens on assessment."
 
-**Location:** `app/hooks/useArtifactGeneration.ts:14`
-**Type:** Behavioral
+**Location:** `app/hooks/useEvidenceScoring.ts:13-19`
+**Type:** Behavioral / Architectural
 **Verdict:** Verified
 **Confidence:** High
 
-The function maps all selected types into an array of promises and resolves them via `Promise.allSettled`, confirming parallel execution.
+The hook posts all papers in the slot to `/api/evidence-score` and applies results via `applyScores`:
 
-**Evidence:** `app/hooks/useArtifactGeneration.ts:45-81`
+```ts
+// app/hooks/useEvidenceScoring.ts:44-58
+const result = await fetchApi<EvidenceScoreResponse>(
+  "/api/evidence-score",
+  {
+    claimContent,
+    papers: currentSlot.papers.map((p) => ({ ... })),
+  },
+);
+applyScores(key, result.scores);
+```
+
+Scoring is a distinct hook/route from search: `useEvidenceSearch` populates the slot and sets `scored: false` (`useEvidenceSearch.ts:47-48`), and scoring is only triggered by the separate "Score papers" button wired through `onScore` (`FindEvidenceButton.tsx:44-49`). The "all papers in the slot" claim holds — the map iterates `currentSlot.papers` with no filter. The "separate so users choose when to spend tokens" claim accurately describes the two-button architecture.
+
+**Evidence:** `app/hooks/useEvidenceScoring.ts:33-68`, `app/hooks/useEvidenceSearch.ts:44-48`, `app/components/features/evidence-search/FindEvidenceButton.tsx:40-49`
 
 ---
 
-## Claim 12: "'semiformal' calls the existing semiformal route (returns { proof })"
+## Claim 10: "Only mark as fully scored if every paper received a score" (applyScores)
 
-**Location:** `app/hooks/useArtifactGeneration.ts:17`
-**Type:** Behavioral
+**Location:** `app/lib/stores/evidenceStore.ts:131`
+**Type:** Behavioral / Invariant
 **Verdict:** Verified
 **Confidence:** High
 
-When `type === "semiformal"`, the code calls `generateSemiformal(request.sourceText, request.context)` and returns the result as `proof`. The `ARTIFACT_RESPONSE_KEY` maps semiformal to `"proof"`.
+`scored` is set to `allScored`, which requires every paper to have non-null `reliability`:
 
-**Evidence:** `app/hooks/useArtifactGeneration.ts:47-50`, `app/lib/types/artifacts.ts:202`
+```ts
+// app/lib/stores/evidenceStore.ts:132
+const allScored = updatedPapers.every((p) => p.reliability !== null);
+```
+
+A paper's `reliability` is only populated when a matching score exists in the score map (`evidenceStore.ts:121-129`); papers with no returned score keep their prior `reliability` (null after search). So `scored` becomes true only when all papers were scored, matching the comment. (The check keys on `reliability` alone, not `relatedness`, but `PaperScore` always carries both together so this is not a divergence.)
+
+**Evidence:** `app/lib/stores/evidenceStore.ts:117-144`
 
 ---
 
-## Claim 13: "'lean' is never generated here — it's step 2 of the deductive pipeline"
+## Claim 11: "Separate from the main workspaceStore because evidence is metadata *about* artifacts ... Persists to localStorage with the same debounced write pattern as workspaceStore to avoid excessive serialization."
 
-**Location:** `app/hooks/useArtifactGeneration.ts:18`
+**Location:** `app/lib/stores/evidenceStore.ts:1-10`
 **Type:** Architectural
 **Verdict:** Verified
 **Confidence:** High
 
-Line 32 explicitly filters out "lean": `const types = selectedTypes.filter((t) => t !== "lean")`.
+The evidence store's debounced adapter matches workspaceStore's pattern — a 300ms `setTimeout` that `clearTimeout`s a pending write:
 
-**Evidence:** `app/hooks/useArtifactGeneration.ts:32`
+```ts
+// app/lib/stores/evidenceStore.ts:24-33
+setItem: (name: string, value: string) => {
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(() => {
+    try { localStorage.setItem(name, value); }
+    catch (e) { console.warn("Failed to persist evidence store:", e); }
+    pending = null;
+  }, 300);
+},
+```
+
+`workspaceStore.ts` uses the same construction: "writes are debounced by 300ms" with `clearTimeout`/`setTimeout(..., 300)` (`workspaceStore.ts:28,40-48`). The "same pattern" and "300ms debounce" claims hold. The store is indeed a separate Zustand `create` instance from workspaceStore (paraphrased — no quote available because the separateness is established by two distinct `create(...)` calls in different files, not a single snippet).
+
+**Evidence:** `app/lib/stores/evidenceStore.ts:20-41`, `app/lib/stores/evidenceStore.ts:87-88`, `app/lib/stores/workspaceStore.ts:28,36-48`
 
 ---
 
-## Claim 14: "Custom types (prefixed 'custom-') use /api/formalization/custom with the system prompt in the request body"
+## Claim 12: "Too many papers (max ${MAX_PAPERS_PER_REQUEST})" — MAX_PAPERS_PER_REQUEST = 10 as the scoring request limit, relative to the evidence-search MAX_RESULTS
 
-**Location:** `app/hooks/useArtifactGeneration.ts:19-20`
-**Type:** Behavioral
+**Location:** `app/api/evidence-score/route.ts:21`
+**Type:** Configuration
 **Verdict:** Verified
 **Confidence:** High
 
-The code checks `isCustomType(type)`, looks up the definition from `customDefsMap`, and calls `fetchApi("/api/formalization/custom", { ...request, customSystemPrompt: def.systemPrompt, customOutputFormat: def.outputFormat })`.
+The scoring route caps inbound papers at 10:
 
-**Evidence:** `app/hooks/useArtifactGeneration.ts:53-65`
+```ts
+// app/api/evidence-score/route.ts:21
+const MAX_PAPERS_PER_REQUEST = 10;
+// app/api/evidence-score/route.ts:151-156
+if (body.papers.length > MAX_PAPERS_PER_REQUEST) {
+  return NextResponse.json(
+    { error: `Too many papers (max ${MAX_PAPERS_PER_REQUEST})` },
+    { status: 400 },
+  );
+}
+```
 
----
+The evidence-search route returns at most 8 papers:
 
-## Claim 15: "All other built-in types use ARTIFACT_ROUTE and return JSON keyed by their type"
+```ts
+// app/api/evidence-search/route.ts:20
+const MAX_RESULTS = 8;
+// app/api/evidence-search/route.ts:181
+const papers = deduplicatePapers(relevantWorks.map(mapOpenAlexWork)).slice(0, MAX_RESULTS);
+```
 
-**Location:** `app/hooks/useArtifactGeneration.ts:21`
-**Type:** Behavioral
-**Verdict:** Verified
-**Confidence:** High
+The `MAX_PAPERS_PER_REQUEST = 10` value and the error-message interpolation are both accurate. Observation (not a documentation defect): because search caps a slot at 8 papers and scoring sends the whole slot (`useEvidenceScoring.ts:48`), the 10-paper limit can never be reached through the normal UI flow — it only guards direct API callers. No comment claims the two constants are coupled, so there is no documentation mismatch; flagging the headroom for the orchestrator.
 
-After the semiformal and custom type branches, the code falls through to `ARTIFACT_ROUTE[type as BuiltinArtifactType]` and uses `ARTIFACT_RESPONSE_KEY[type as BuiltinArtifactType]` to extract the response.
-
-**Evidence:** `app/hooks/useArtifactGeneration.ts:68-74`
-
----
-
-## Claim 16: "Generic route for custom artifact types. The system prompt and output format are provided in the request body (since they're user-defined, not baked into a route file like built-in types)."
-
-**Location:** `app/api/formalization/custom/route.ts:7-9`
-**Type:** Architectural
-**Verdict:** Verified
-**Confidence:** High
-
-The route extracts `customSystemPrompt` and `customOutputFormat` from the request body and passes them into `handleArtifactRoute` as the `systemPrompt` and `parseResponse` config. Built-in routes like `causal-graph/route.ts` have their system prompts hardcoded in the route file.
-
-**Evidence:** `app/api/formalization/custom/route.ts:14-48`, `app/lib/formalization/artifactRoute.ts:33-44`
-
----
-
-## Claim 17: "Reuses handleArtifactRoute with a transformBody that extracts the custom fields from the request and injects them as route config."
-
-**Location:** `app/api/formalization/custom/route.ts:11-12`
-**Type:** Architectural
-**Verdict:** Verified
-**Confidence:** High
-
-The route calls `handleArtifactRoute(request, config)` where config includes a `transformBody` function that destructures out `customSystemPrompt` and `customOutputFormat`, passing only the standard `ArtifactGenerationRequest` fields to `buildUserMessage`.
-
-**Evidence:** `app/api/formalization/custom/route.ts:33-48`
-
----
-
-## Claim 18: "We need to peek at the body to get the custom config, then let handleArtifactRoute re-parse it. Clone the request so the body can be consumed twice."
-
-**Location:** `app/api/formalization/custom/route.ts:15-17`
-**Type:** Behavioral
-**Verdict:** Verified
-**Confidence:** High
-
-The code calls `request.clone()` to create a copy, reads the body from the clone for validation, then passes the original `request` to `handleArtifactRoute` which reads the body again via `request.json()` at line 55 of `artifactRoute.ts`.
-
-**Evidence:** `app/api/formalization/custom/route.ts:18-20`, `app/lib/formalization/artifactRoute.ts:55`
-
----
-
-## Claim 19: "formalizeNode only handles built-in types (custom types go through useArtifactGeneration)"
-
-**Location:** `app/lib/formalization/formalizeNode.ts:115`
-**Type:** Architectural
-**Verdict:** Verified
-**Confidence:** High
-
-The `generateNonDeductiveArtifacts` function explicitly returns `null` for custom types via `if (isCustomType(type)) return null`. Custom type generation is handled in `useArtifactGeneration.ts:53-65` for global-scope generation, and custom types in per-node formalization are silently skipped.
-
-**Evidence:** `app/lib/formalization/formalizeNode.ts:116`, `app/hooks/useArtifactGeneration.ts:53-65`
-
----
-
-## Claim 20: "Convert camelCase or snake_case keys to a readable label"
-
-**Location:** `app/components/panels/CustomArtifactPanel.tsx:80`
-**Type:** Behavioral
-**Verdict:** Mostly accurate
-**Confidence:** High
-
-The function also handles kebab-case (the regex replaces both `_` and `-` with spaces). The test file `CustomArtifactPanel.test.ts` explicitly tests kebab-case conversion. The docstring should mention kebab-case as well.
-
-**Evidence:** `app/components/panels/CustomArtifactPanel.tsx:81-86`, `app/components/panels/CustomArtifactPanel.test.ts:15-18`
-
----
-
-## Claim 21: "Definitions are stored in the workspace persistence layer and optionally saved to a cross-session library."
-
-**Location:** `app/lib/types/customArtifact.ts:6-7`
-**Type:** Architectural
-**Verdict:** Unverifiable
-**Confidence:** Low
-
-As noted in Claim 7, the "cross-session library" feature is not implemented in the current codebase. This may be a planned feature. There is no code, type definition, or storage mechanism for a separate library beyond the workspace persistence. The "optionally" qualifier makes this technically not falsifiable, but it describes a feature that does not exist.
-
-**Evidence:** Searched entire codebase for "library" and "cross-session" references — only this comment matches.
+**Evidence:** `app/api/evidence-score/route.ts:21`, `app/api/evidence-score/route.ts:151-156`, `app/api/evidence-search/route.ts:20`, `app/api/evidence-search/route.ts:181`, `app/hooks/useEvidenceScoring.ts:48`
 
 ---
 
 ## Claims Requiring Attention
 
 ### Incorrect
-- **Claim 10** (`app/lib/types/persistence.ts:32`): Comment says "added in v2" but WORKSPACE_VERSION was already 2 and was not changed. The custom fields extend the existing v2 schema.
+- **Claim 8** (`app/lib/types/evidence.ts:73`): `redFlags` doc comment cites "p-hacking indicators" as an example, but the scoring prompt (`route.ts:36`) explicitly instructs the LLM NOT to flag p-hacking. Replace the example with one the prompt actually requests (small sample, conflicts of interest, retraction notices). **Legibility-target: for-author.**
 
 ### Stale
-(none)
+- None.
 
 ### Mostly Accurate
-- **Claim 5** (`app/lib/types/artifacts.ts:200`): "kebab-case -> camelCase" is an oversimplification — semiformal maps to "proof" and lean maps to "leanCode", which are not camelCase conversions of their type names.
-- **Claim 20** (`app/components/panels/CustomArtifactPanel.tsx:80`): docstring says "camelCase or snake_case" but the function also handles kebab-case.
+- **Claim 1** (`app/lib/llm/callLlm.ts:49-62`): the strip-set is a superset of the confirmed-rejected keywords (`minimum`/`maximum`); `exclusiveMinimum`/`exclusiveMaximum`/`multipleOf` are pre-emptive and the quoted Anthropic error string is not verifiable from this repo. Comment is honest about this ("Extend this set if other keywords surface") but the "Confirmed unsupported" framing strictly applies only to the first two. **Legibility-target: for-author.**
 
 ### Unverifiable
-- **Claim 21** (`app/lib/types/customArtifact.ts:6-7`): "optionally saved to a cross-session library" — no implementation exists for this feature.
+- **Claim 1 (sub-part)** (`app/lib/llm/callLlm.ts:53-55`): the exact Anthropic error message text quoted in the comment originates from Anthropic's server and cannot be confirmed against the codebase; would require a live API call with a `minimum`/`maximum` schema to verify verbatim. **Legibility-target: for-orchestrator-synthesis.**
+
+### Verified (for-orchestrator-synthesis)
+- Claims 2, 3, 4, 5, 6, 7, 9, 10, 11, 12 — all **Legibility-target: for-orchestrator-synthesis.**
+
+## Goal-Alignment Note
+- Answered: yes
+- Out of scope: Code-quality observations (e.g. `responseFormat` not being part of the cache key in `callLlm`, the 10-vs-8 headroom) were noted only where a documentation claim touched them; full review of those belongs to the performance/security/api-consistency critics.
+- Escalate: Claim 8 is a genuine doc/behavior contradiction (p-hacking) worth a one-line fix before merge; the orchestrator may also want the api-consistency or performance critic to weigh in on the unused 10-paper headroom (Claim 12) and the cache-key composition in `callLlm.ts`.

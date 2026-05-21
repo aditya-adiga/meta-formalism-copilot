@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EvidencePaper, EvidenceSlot } from "@/app/lib/types/evidence";
+import { isSlotScored, type EvidencePaper, type EvidenceSlot } from "@/app/lib/types/evidence";
 import EvidencePaperCard from "./EvidencePaperCard";
 
 /** Sort papers by combined score (reliability + relatedness) descending.
@@ -29,12 +29,13 @@ export default function EvidenceResultsSection({
 }: EvidenceResultsSectionProps) {
   const [open, setOpen] = useState(true);
   const count = slot.papers.length;
+  const scored = isSlotScored(slot);
 
   // Sort papers by score when scores are available
   const displayPapers = useMemo(() => {
-    if (slot.scored) return sortByScore(slot.papers);
+    if (scored) return sortByScore(slot.papers);
     return slot.papers;
-  }, [slot.papers, slot.scored]);
+  }, [slot.papers, scored]);
 
   return (
     <div className="mt-2 border-t border-[#DDD9D5] pt-2">
@@ -50,7 +51,7 @@ export default function EvidenceResultsSection({
           {count === 0
             ? "No papers found"
             : `${count} paper${count === 1 ? "" : "s"} found`}
-          {slot.scored && (
+          {scored && (
             <span className="text-[10px] text-[#9A9590] ml-1">(scored)</span>
           )}
         </button>
@@ -61,11 +62,11 @@ export default function EvidenceResultsSection({
             type="button"
             disabled={isScoring}
             onClick={onScore}
-            className="text-[10px] text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-1.5 py-0.5 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
+            className="text-xs text-[#6B6560] hover:text-[var(--ink-black)] border border-[#DDD9D5] rounded px-2 py-1 hover:bg-[#F5F1ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:opacity-50 disabled:cursor-wait"
           >
             {isScoring
               ? "Scoring..."
-              : slot.scored
+              : scored
                 ? "Re-score"
                 : "Score papers"}
           </button>

@@ -1,168 +1,117 @@
-# API Consistency Review: `feat/custom-artifact-types`
+# API Consistency Review — feat/evidence-scoring
 
-**Reviewer:** Claude (automated)
-**Date:** 2026-04-07
-**Branch:** `feat/custom-artifact-types` (8 commits, 23 files changed)
-**Scope:** API routes, type system, persistence layer, component interfaces
-
----
+**Scope:** `git diff main...HEAD` — new `/api/evidence-score` route, `adaptSchemaForAnthropic` export in `callLlm.ts`, `lib/types/evidence.ts` additions, `evidenceStore` actions, `useEvidenceScoring` hook.
+**Date:** 2026-05-21
+**Commit:** 0a96cce
+**Based on:** code-fact-check report (`docs/reviews/code-fact-check-report.md`) — 8 verified incl. `validatePaperScore` null-on-missing-`openAlexId` contract and `MAX_PAPERS_PER_REQUEST=10`; Claim 8 fixed in review HEAD; Claim 1 (callLlm.ts) Mostly Accurate.
 
 ## Baseline Conventions
 
-Surveyed 5 sibling modules to establish baseline:
+Surveyed the closest siblings: `/api/evidence-search` (the direct neighbor), the formalization routes via `app/lib/formalization/artifactRoute.ts`, the shared `fetchApi` helper (`app/lib/formalization/api.ts`), the `evidenceStore`, and `useEvidenceSearch`.
 
-1. **API routes** (`causal-graph/route.ts`, `statistical-model/route.ts`, etc.) all delegate to `handleArtifactRoute()` with a fixed config object. They return `{ [responseKey]: data }` on success, `{ error, details? }` on failure with status 400/502.
-2. **Error shape** is consistently `{ error: string, details?: string }` across all routes. 400 for missing required fields, 502 for LLM/parse failures.
-3. **Type system** uses `ArtifactType` as a union literal. `ARTIFACT_META`, `ARTIFACT_ROUTE`, and `ARTIFACT_RESPONSE_KEY` are keyed by this type. `SELECTABLE_ARTIFACT_TYPES` is the subset users can toggle.
-4. **Persistence** uses `WORKSPACE_VERSION = 2` with `WORKSPACE_KEY = "workspace-v2"`. All artifact data is stored as `string | null` at the top level of `PersistedWorkspace`. No nested data objects.
-5. **Component prop threading** passes artifact data through `page.tsx` -> panel components -> feature components. Each artifact type has its own named setter (e.g., `setCausalGraph`, `setPropertyTests`).
+- **Route shape.** POST handlers parse `await request.json() as Partial<XRequest>`, validate fields manually, and return `NextResponse.json(...)`. Established by `evidence-search/route.ts:143-184` and `artifactRoute.ts:55-132`.
+- **Error response shape.** Every route returns `{ error: string }` for client/server errors. `OpenRouterError` adds `{ error, details }` at status 502. Established in `evidence-search/route.ts:147-194` and `artifactRoute.ts:115-131`.
+- **Status codes.** 400 for request validation; 502 for upstream LLM / invalid-LLM-JSON; 500 for unexpected. `evidence-search` uses 400/502/500; `artifactRoute` uses 400/502 (collapses unexpected into 502).
+- **Response envelope.** Flat object keyed by domain noun, no wrapper. `evidence-search` → `{ queries, papers }`; formalization → `{ [responseKey]: parsed }` (`artifactRoute.ts:96-105`).
+- **Field naming.** camelCase throughout request and response bodies: `elementContent`, `artifactType`, `elementId`, `contextSummary`, `openAlexId`, `oaUrl`, `searchedAt`. No snake_case anywhere in the JS-facing contract.
+- **Mock fallback.** Routes degrade silently when no key is present. `evidence-search` falls back to a query without a flag; the Lean verifier returns `{ valid, mock: true }` (per repo CLAUDE.md). There is **no** existing route that returns `mock: true` in its typed JSON response body — `mock` is a documented out-of-band debug flag, not part of any `XResponse` type.
+- **Store actions.** `evidenceStore` actions are `setEvidence`, `setLoading`, `setError`, `clearEvidence`, `clearAll` — `set<Noun>` / `clear<Noun>` verb-noun shape; per-element maps keyed by `serializeTargetKey`.
+- **Hooks.** `useEvidenceSearch` returns `{ slot, isLoading, error, <action> }`, reads state via `useShallow`, and writes through `useEvidenceStore.getState()` inside a `useCallback`.
+- **`callLlm` public surface.** Exports are configuration/primitive-level: `OPENROUTER_API_URL`, `DEFAULT_ANTHROPIC_MODEL`, `makeAnthropicClient`, `OpenRouterError`, `LlmCallUsage`, `ResponseFormat`, `CacheKey`, `callLlm`. No exported pure schema-transform helpers existed before this diff.
 
----
+## Name-Pattern Audit
+
+| New name | Category | Closest existing | Precedent path | Verdict |
+|----------|----------|------------------|----------------|---------|
+| `POST /api/evidence-score` | route | `POST /api/evidence-search`, `POST /api/custom-type/design`, `POST /api/decomposition/extract` | `app/api/evidence-search/route.ts`, `app/api/**/route.ts` | Consistent — `evidence-<verb>` hyphenated noun-verb, matches `evidence-search` exactly |
+| `EvidenceScoreRequest` / `EvidenceScoreResponse` | type | `EvidenceSearchRequest`, `EvidenceSearchResponse` | `app/lib/types/evidence.ts:116-148` | Consistent — `Evidence<Op>Request/Response` mirror of the search pair |
+| `PaperScore` | type | `EvidencePaper`, `EvidenceSlot` | `app/lib/types/evidence.ts` | Consistent — bare-noun, no DTO/I prefix |
+| `ReliabilityScore`, `RelatednessScore` | type | `EvidencePaper`, `EvidenceSlot` | `app/lib/types/evidence.ts` | Consistent — bare-noun PascalCase |
+| `StudyType` / `STUDY_TYPES` / `STUDY_TYPE_LABELS` | type/const | `EvidenceArtifactType` / `EVIDENCE_ARTIFACT_TYPES` | `app/lib/types/evidence.ts` | Consistent — `as const` array + derived union; SCREAMING_SNAKE const matches `EVIDENCE_ARTIFACT_TYPES` |
+| `claimContent` (request field) | field | `elementContent` (evidence-search request) | `app/api/evidence-search/route.ts:147`, `app/lib/types/evidence.ts` | Inconsistent (Minor) — sibling search route names the same logical input `elementContent`; see Finding 2 |
+| `setScoring` | store action | `setLoading`, `setEvidence`, `setError` | `app/lib/stores/evidenceStore.ts:99-114` | Consistent — `set<Noun>` shape |
+| `applyScores` | store action | `setEvidence`, `clearEvidence`, `setLoading` | `app/lib/stores/evidenceStore.ts:65-68` | Inconsistent (Minor) — only action with an `apply*` verb; see Finding 3 |
+| `scored` / `scoredAt` (slot fields) | field | `searchedAt`, `searchQueries` (slot) | `app/lib/types/evidence.ts:107-113` | Consistent — `<verb>edAt` ISO-string timestamp matches `searchedAt` |
+| `useEvidenceScoring` | hook | `useEvidenceSearch` | `app/hooks/useEvidenceSearch.ts` | Consistent — `useEvidence<Op>`; returns `{ slot, isScoring, error, score, hasScores }` paralleling search hook |
+| `adaptSchemaForAnthropic` | exported function | `makeAnthropicClient` (only other exported fn) | `app/lib/llm/callLlm.ts:14,66` | See Finding 4 — surface placement, not naming, is the question |
+| `mock` (response field) | field | _(no typed response carries a `mock` field)_ | none — searched `app/lib/types/evidence.ts`, all `XResponse` types in `app/api/**` and `app/lib/types/**` | New field on a typed response; see Finding 1 |
 
 ## Findings
 
-#### 1. Misleading version comment in persistence.ts
-**Severity:** Inconsistent
-**Location:** `app/lib/types/persistence.ts:32`
-**Move:** Assess versioning impact
-**Confidence:** High
+#### `mock: true` is added to the response body via an inline intersection, not the `EvidenceScoreResponse` contract
 
-The comment `// Custom artifact types and their generated data (added in v2)` is misleading. `WORKSPACE_VERSION` was already 2 on main and was not bumped by this branch. The new fields (`customArtifactTypes`, `customArtifactData`) are optional (`?`), so they are backward-compatible with existing v2 data -- but the comment implies they were part of the original v2 schema. This was also flagged as **INCORRECT** in the fact-check report.
-
-**Recommendation:** Change the comment to `// Custom artifact types (backward-compatible addition to v2)` or similar. No version bump is actually needed since the fields are optional and `loadWorkspace()` defaults them to `[]`/`{}` when absent.
-
----
-
-#### 2. ARTIFACT_RESPONSE_KEY comment oversimplifies the mapping
 **Severity:** Minor
-**Location:** `app/lib/types/artifacts.ts:200`
-**Move:** Check naming against the grain
+**Location:** `app/api/evidence-score/route.ts:200-214`
+**Move:** #1 (baseline) / #7 (asymmetry)
 **Confidence:** High
 
-The comment says `kebab-case -> camelCase` but the mapping includes `semiformal -> "proof"` and `lean -> "leanCode"`, which are not kebab-to-camelCase conversions -- they are semantic renames. This was flagged as **MOSTLY ACCURATE** in the fact-check report. The comment predates this branch (it existed on main), but the branch updated its wording from "Maps artifact types to their JSON response key" to "Maps built-in artifact types to their JSON response key" without correcting the parenthetical.
+When `callLlm` returns no text (no key configured), the route returns `{ scores, mock: true } satisfies EvidenceScoreResponse & { mock: boolean }`. The success path returns `EvidenceScoreResponse` (`{ scores }`) with no `mock` key. So the route's actual response shape is a union that the published `EvidenceScoreResponse` type does not describe — a consumer typing the result as `EvidenceScoreResponse` (as `useEvidenceScoring` does via `fetchApi<EvidenceScoreResponse>`) can never observe the `mock` flag and silently treats neutral 0.5 placeholder scores as real LLM scores. This mirrors the known silent-pass concern with the Lean verifier mock (repo CLAUDE.md). No existing typed `XResponse` carries a `mock` field, so this is a new convention being introduced ad hoc rather than an inconsistency with an established one. The asymmetry (success vs. mock branch return different shapes) is the consumer-facing risk: `hasScores`/`scored` will read true off mock data.
 
-**Recommendation:** Change to `Maps built-in artifact types to their JSON response key (varies by type; not a mechanical conversion)` or remove the parenthetical entirely.
+**Recommendation:** Either add `mock?: boolean` to `EvidenceScoreResponse` so the contract is honest and `useEvidenceScoring` can branch on it (e.g., not mark the slot `scored` when `mock`), or drop the flag and document the mock branch as indistinguishable. Prefer the former for parity with the verifier's explicit `unavailable`/`mock` handling.
 
----
+#### Request field `claimContent` diverges from the sibling route's `elementContent` for the same logical input
 
-#### 3. Unverifiable cross-session library reference
+**Severity:** Minor
+**Location:** `app/api/evidence-score/route.ts:96-117`, `app/lib/types/evidence.ts:130-135`
+**Move:** #2 (naming) / #7 (asymmetry)
+**Confidence:** Medium
+
+Precedent: `elementContent` used in `app/api/evidence-search/route.ts:147-158` and `EvidenceSearchRequest` in `app/lib/types/evidence.ts`.
+
+The two evidence routes are a search/score pair operating on the same artifact element. `evidence-search` names the text input `elementContent`; `evidence-score` names the equivalent input `claimContent`. A consumer wiring both routes for one element must remember that the same string is `elementContent` in one body and `claimContent` in the other. The `useEvidenceScoring` hook passes the caller's `claimContent` argument straight through, so the divergence propagates to the hook surface too. The choice is defensible — "claim" is arguably more precise for scoring against a proposition — but it is an inconsistency with the immediately adjacent route. The `MAX_CLAIM_LENGTH = 5000` / `MAX_ELEMENT_CONTENT_LENGTH = 5000` constant pair shows the same logical field renamed across the two files.
+
+**Recommendation:** Pick one name for the element/claim text across both evidence routes (lowest-churn: rename to `elementContent` to match the existing search contract), or add a one-line comment in `EvidenceScoreRequest` noting the deliberate rename so future readers don't treat it as a bug.
+
+#### `applyScores` is the only store action using an `apply*` verb instead of `set*`/`clear*`
+
+**Severity:** Minor
+**Location:** `app/lib/stores/evidenceStore.ts:67-68, 117-143`
+**Move:** #2 (naming)
+**Confidence:** Medium
+
+Precedent: `setEvidence`, `setLoading`, `setScoring`, `setError`, `clearEvidence`, `clearAll` used in `app/lib/stores/evidenceStore.ts:65-118`.
+
+Every other action in this store (and the diff's own `setScoring`) follows `set<Noun>` / `clear<Noun>`. `applyScores` introduces a third verb. The behavior justifies a distinct verb somewhat — it merges scores into existing papers and recomputes `scored`/`scoredAt` rather than replacing a value — so this is a borderline call, not a clear violation. But a consumer scanning the action list will not predict `applyScores` from the established vocabulary, and `setScores` would have read as a plain setter which it is not.
+
+**Recommendation:** Acceptable to keep given the merge semantics, but consider `mergeScores` or document the non-setter behavior in the action's JSDoc so the verb choice is legibly intentional rather than accidental.
+
+#### `adaptSchemaForAnthropic` is exported from `callLlm.ts`; confirm it belongs on the public surface
+
 **Severity:** Informational
-**Location:** `app/lib/types/customArtifact.ts:7`
-**Move:** Trace the consumer contract
-**Confidence:** High
-
-The module docstring says definitions are "optionally saved to a cross-session library." No such library feature exists in this branch or on main. This was flagged as **UNVERIFIABLE** in the fact-check report. It appears to be aspirational documentation for a feature not yet built.
-
-**Recommendation:** Either remove the "and optionally saved to a cross-session library" clause or add a comment marking it as a planned future feature (e.g., `(planned: cross-session library)`).
-
----
-
-#### 4. Custom design route does not use handleArtifactRoute
-**Severity:** Inconsistent
-**Location:** `app/api/custom-type/design/route.ts:35-109`
-**Move:** Establish baseline conventions
+**Location:** `app/lib/llm/callLlm.ts:66-78`
+**Move:** #1 (baseline) / #3 (consumer contract)
 **Confidence:** Medium
 
-All 5 existing formalization routes delegate to `handleArtifactRoute()`. The new `/api/custom-type/design` route manually calls `callLlm()`, manually handles mock responses, manually parses JSON, and manually formats errors. While the route has a different semantic purpose (designing a type definition rather than generating an artifact), it duplicates the error handling and JSON parsing patterns from `handleArtifactRoute`. The custom formalization route (`/api/formalization/custom`) correctly reuses `handleArtifactRoute`, which is good.
+The new `export function adaptSchemaForAnthropic` is a pure schema-transform used in exactly one place — inside `callLlm` itself (`callLlm.ts:171-179`). The existing exports from this module are either runtime configuration (`OPENROUTER_API_URL`, `DEFAULT_ANTHROPIC_MODEL`), a factory (`makeAnthropicClient`), an error class, types, or the primary `callLlm` entry point — none are internal pre-processing helpers. Exporting `adaptSchemaForAnthropic` widens the module's public contract: any future change to which JSON-Schema keywords Anthropic rejects (the `ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS` set) is now a potential breaking change for out-of-module callers. Grepping the diff, the only consumer is the route's reliance on `callLlm` doing the stripping internally; nothing imports `adaptSchemaForAnthropic` directly. If the export exists solely for unit testing, that is a reasonable motive but should be explicit. This is not a naming finding (the name itself, `adapt<X>ForAnthropic`, is clear and parallels `makeAnthropicClient`'s Anthropic-scoping); it is a surface-breadth observation.
 
-**Recommendation:** Consider whether `handleArtifactRoute` could be parameterized to serve this use case (its `transformBody` + `mockResponse` + `parseResponse` options are already flexible). If the design route's needs genuinely differ (e.g., multi-field validation), document why it diverges. As-is, the duplicated error patterns will drift over time.
-
----
-
-#### 5. Custom route response key is "result" -- breaks naming symmetry
-**Severity:** Inconsistent
-**Location:** `app/api/formalization/custom/route.ts:149`
-**Move:** Look for the asymmetry
-**Confidence:** Medium
-
-Built-in routes use semantically meaningful response keys: `causalGraph`, `statisticalModel`, `proof`, etc. The custom route uses a generic `"result"` key. This means consumer code must special-case custom types when extracting response data (which `useArtifactGeneration.ts:56` does via `data.result ?? null`). If a custom type's LLM output happens to include a top-level `result` field, there would be no collision since it is nested, but the asymmetry is a code smell.
-
-**Recommendation:** This is acceptable for now since custom types are inherently generic. Consider documenting the convention: custom types always use `"result"` as their response key.
-
----
-
-#### 6. updateCustomArtifactType accepts Partial but handleEditCustomType passes full definition
-**Severity:** Minor
-**Location:** `app/hooks/useWorkspacePersistence.ts:164` and `app/page.tsx:619`
-**Move:** Verify the nullability contract
-**Confidence:** High
-
-`updateCustomArtifactType` is typed as `(id: string, updates: Partial<CustomArtifactTypeDefinition>)`, but `page.tsx` always calls it as `updateCustomArtifactType(def.id, def)` -- passing the full definition. Meanwhile, `addCustomArtifactType` takes a full `CustomArtifactTypeDefinition`. The asymmetry between "add takes full, update takes partial" is a reasonable API design, but the actual call site always passes a full definition. The `Partial` signature also means `updatedAt` can be omitted by callers, but the implementation always overwrites it anyway (`updatedAt: new Date().toISOString()`).
-
-**Recommendation:** No change needed -- the `Partial` signature is forward-compatible. But consider adding a JSDoc note that `updatedAt` is always auto-set regardless of input.
-
----
-
-#### 7. customArtifactData uses flat Record but persistence uses nested optional
-**Severity:** Inconsistent
-**Location:** `app/hooks/useWorkspacePersistence.ts:23` vs `app/lib/types/persistence.ts:35`
-**Move:** Verify the nullability contract
-**Confidence:** Medium
-
-In `WorkspaceState`, `customArtifactData` is `Record<string, string | null>` (required). In `PersistedWorkspace`, it is `Record<string, string | null> | undefined` (optional at the field level). In `ArtifactPersistenceData`, it is `Record<string, string | null> | undefined` (optional). This three-way inconsistency is handled correctly at load time (defaulting to `{}`), but the persistence type nests `customArtifactData` inside `artifacts` in `SaveWorkspaceInput` while `customArtifactTypes` is a sibling of `artifacts`. This split means custom type definitions and their data travel through different paths during save/load.
-
-**Recommendation:** Consider whether `customArtifactData` should live alongside `customArtifactTypes` in `SaveWorkspaceInput` (outside `artifacts`) for conceptual clarity. Currently it works but is asymmetric.
-
----
-
-#### 8. isCustomType type guard matches "custom-" prefix including empty suffix
-**Severity:** Minor
-**Location:** `app/lib/types/customArtifact.ts:33-34` and `app/lib/types/customArtifact.test.ts:10`
-**Move:** Verify the nullability contract
-**Confidence:** Medium
-
-`isCustomType("custom-")` returns `true`, and a test explicitly asserts this. While `generateId()` in `CustomTypeDesigner.tsx` uses `crypto.randomUUID()` (so empty suffix is unlikely in practice), the type guard would match a malformed ID. This is a minor robustness concern for persistence -- a corrupted localStorage entry with `id: "custom-"` would pass `isValidCustomTypeDef` and `isCustomType`.
-
-**Recommendation:** Consider tightening the guard to `type.startsWith("custom-") && type.length > 7` or adjusting the test expectation. Low priority.
-
----
-
-#### 9. No explicit type-narrowing for PanelId when routing to custom panels
-**Severity:** Minor
-**Location:** `app/page.tsx:725-732`
-**Move:** Trace the consumer contract
-**Confidence:** Medium
-
-The `renderPanel` switch statement falls through to a `default` case that checks `isCustomType(panelId)`. Since `PanelId` now includes `CustomArtifactTypeId`, this is type-safe. However, if `def` is not found (e.g., the custom type was deleted but `panelId` still references it), the code falls through to `return undefined`, which renders a blank panel. This is handled upstream by the `useEffect` that filters stale custom type IDs from `selectedArtifactTypes`, but `activePanelId` is cleaned separately in `handleDeleteCustomType` which resets to "source". The cleanup paths are correct but distributed across multiple locations.
-
-**Recommendation:** Add a brief comment in `renderPanel`'s default case noting that the `!def` path is a safeguard for race conditions during deletion. No functional change needed.
-
----
+**Recommendation:** If the export is only for tests, keep it but add a `/** Exported for unit testing; not part of the stable call-layer API. */` note, or test the behavior through `callLlm`. If it is intended for reuse by other routes, leave exported as-is — the name and signature are fine.
 
 ## What Looks Good
 
-- **Type system extension is clean.** Splitting `ArtifactType` into `BuiltinArtifactType | CustomArtifactTypeId` is well-designed. The `custom-` prefix convention with a type guard avoids needing a registry or enum.
-- **Custom formalization route reuses `handleArtifactRoute`.** This ensures error handling, mock support, and response formatting stay consistent with built-in types.
-- **Persistence backward compatibility is correct.** Optional fields with `??` defaults mean existing v2 workspaces load without issue.
-- **Validation on load is thorough.** `isValidCustomTypeDef` filters corrupt definitions, and `customArtifactData` entries are type-checked individually.
-- **Test coverage is meaningful.** Tests for `isCustomType`, `formatLabel`, `isValidCustomTypeDef`, and round-trip persistence cover the critical paths.
-- **`MAX_SYSTEM_PROMPT_LENGTH` guard** in the custom route prevents trivially large payloads.
-- **Stale selection cleanup** via `useEffect` on `customArtifactTypes` prevents orphaned custom type IDs in the selection state.
-
----
+- **Route/type/hook naming is otherwise a clean mirror of the search pair.** `evidence-score` ↔ `evidence-search`, `EvidenceScoreRequest/Response` ↔ `EvidenceSearchRequest/Response`, `useEvidenceScoring` ↔ `useEvidenceSearch`. A consumer who learned the search side will navigate the score side with no surprises.
+- **Error format matches the baseline exactly.** 400 for validation (`route.ts:99-117`), 502 with `{ error, details }` for `OpenRouterError`, 500 with `{ error }` for unexpected — identical to `evidence-search/route.ts:185-195`. `fetchApi` reads `data.error`, so the hook surfaces messages correctly.
+- **Response envelope is flat and noun-keyed** (`{ scores }`), consistent with `{ queries, papers }`.
+- **`STUDY_TYPES` follows the `as const` + derived-union + SCREAMING_SNAKE pattern** already used by `EVIDENCE_ARTIFACT_TYPES`, including a paired `STUDY_TYPE_LABELS` record.
+- **`scored`/`scoredAt` parallels `searchedAt`** and the slot type evolution (replacing the reserved `reliability`/`relatedness` number fields with per-paper scores) is internally consistent — the per-paper `ReliabilityScore`/`RelatednessScore` move the scoring granularity to where the data lives.
+- **Backward-compatible additions.** New optional/nullable fields (`reliability: ReliabilityScore | null`, `relatedness: ... | null` on `EvidencePaper`), a new route, and a new store action — no removed response fields or new required request params on existing surfaces. The `EvidenceSlot` field change (number → struct) is a persisted-shape change but is gated by the `evidence-store-v1` persist key and is internal to this feature.
+- **`setScoring` correctly mirrors `setLoading`** including the per-element keyed map and the `clearAll` reset (`evidenceStore.ts:153`), and the hook guards against concurrent scoring via a `getState().scoring[key]` check (`useEvidenceScoring.ts:38`).
+- **`validatePaperScore` null-on-missing-`openAlexId` contract** (fact-check verified) and server-side `clampScore` enforcement of the 0–1 range are a sound defensive boundary given the schema can't express `minimum`/`maximum`.
 
 ## Summary Table
 
-| # | Finding | Severity | Confidence | Action |
-|---|---------|----------|------------|--------|
-| 1 | Misleading "added in v2" comment | Inconsistent | High | Fix comment wording |
-| 2 | ARTIFACT_RESPONSE_KEY comment oversimplifies | Minor | High | Clarify or remove parenthetical |
-| 3 | Unverifiable cross-session library reference | Informational | High | Remove or mark as planned |
-| 4 | Design route duplicates handleArtifactRoute patterns | Inconsistent | Medium | Consider reuse or document divergence |
-| 5 | Generic "result" response key for custom route | Inconsistent | Medium | Document convention |
-| 6 | Partial update API vs full-definition call site | Minor | High | Add JSDoc note |
-| 7 | customArtifactData split across artifacts/types | Inconsistent | Medium | Consider restructuring |
-| 8 | isCustomType matches empty suffix | Minor | Medium | Consider tightening guard |
-| 9 | Custom panel deletion cleanup is distributed | Minor | Medium | Add clarifying comment |
-
----
+| # | Finding | Severity | Location | Confidence |
+|---|---------|----------|----------|------------|
+| 1 | `mock: true` not in `EvidenceScoreResponse` contract; success/mock shape asymmetry | Minor | `evidence-score/route.ts:200-214` | High |
+| 2 | `claimContent` vs sibling `elementContent` for same input | Minor | `evidence-score/route.ts:96-117` | Medium |
+| 3 | `applyScores` is the lone `apply*` action vs `set*`/`clear*` | Minor | `evidenceStore.ts:67-68,117-143` | Medium |
+| 4 | `adaptSchemaForAnthropic` exported, single in-module caller | Informational | `callLlm.ts:66-78` | Medium |
 
 ## Overall Assessment
 
-The branch introduces a well-structured extension to the artifact type system. The core design decision -- prefix-based discrimination with `custom-` -- is clean and avoids registry overhead. The main consistency concerns are:
+This change is broadly consistent with the codebase's API patterns — the strongest signal being that `evidence-score` is a near-exact structural mirror of `evidence-search` across route path, request/response types, error format, status codes, store wiring, and hook shape, which is exactly what a consumer who already learned the search side expects. No breaking changes to existing consumers: all additions are new surfaces or new optional/nullable fields. The findings are all Minor or Informational and fixable in place; none indicate the author failed to read existing conventions. The one with real consumer-impact teeth is Finding 1 — the `mock: true` flag living outside the typed contract means placeholder 0.5 scores can be silently mistaken for real assessments (and marked `scored`), echoing the known Lean-verifier silent-pass pattern; surfacing `mock` in the type and having the hook decline to mark the slot scored would close that gap. The `claimContent`/`elementContent` split (Finding 2) is the kind of small cross-route inconsistency that accumulates cognitive load and is cheap to resolve now.
 
-1. **Comment accuracy** (findings 1-3): three documentation inaccuracies that should be fixed before merge.
-2. **Architectural divergence** (finding 4): the design route duplicates patterns that `handleArtifactRoute` already encapsulates. Worth addressing if the route will evolve.
-3. **Minor asymmetries** (findings 5, 7): acceptable for now but worth noting for future maintainers.
-
-No breaking changes to existing APIs. The persistence format is backward-compatible. **Recommend merge after fixing findings 1-3** (documentation corrections).
+## Goal-Alignment Note
+- Answered: yes — API-consistency review of all five named surfaces against siblings, report saved per skill structure.
+- Out of scope: behavioral correctness of the LLM scoring prompt, security (key handling/injection), performance, and UI components (`EvidencePaperCard`, `EvidenceScoreBadge`, etc.) — left to their respective critics.
+- Escalate: Finding 1 (mock flag outside the typed contract → silent-pass risk) is the only finding with a behavioral/data-integrity dimension worth the orchestrator weighing against security/architecture critics' input on the mock-fallback pattern.
+- Questions I would have asked: omitted — scope was clear.

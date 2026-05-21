@@ -1,255 +1,156 @@
-# Tech Debt Triage: `feat/custom-artifact-types` Branch
+# Tech Debt Triage — feat/evidence-scoring
 
-**Branch:** `feat/custom-artifact-types` vs `main`
-**Scope:** 23 files changed, ~1,434 lines added
-**Reviewed:** 2026-04-07
+**Commit:** 0a96cce
+**Scope:** `git diff main...HEAD` — 14 files, +851/-42. LLM evidence-paper scoring across route + hook + store + types + UI, plus a shared `callLlm.ts` schema-adaptation helper.
+**Mode:** Advisory / contextual critic in a code-review pipeline. Findings tagged with a **Legibility-target** (`for-author` default).
 
----
-
-## 1. Tech Debt: `page.tsx` God Component / Prop Drilling Depth
-
-**Location:** `app/page.tsx` (now 780 lines), `app/components/panels/InputPanel.tsx`, `app/components/features/formalization-controls/FormalizationControls.tsx`, `app/components/features/artifact-selector/ArtifactChipSelector.tsx`
-
-**Nature:** Structural — growing orchestrator component, deep prop threading
-
-### Carrying Cost: High
-
-The root `page.tsx` was already the largest and most complex file in the codebase. This branch adds 6 new props threaded through 4 component layers (`page.tsx` -> `InputPanel` -> `FormalizationControls` -> `ArtifactChipSelector`), plus 5 new state variables, 3 new callbacks, and expands the already massive `useMemo` dependency array for `renderPanel` to 57+ entries. Every new artifact-related feature will continue to inflate this file and deepen the prop chain. The `renderPanel` function is a growing switch statement that now has a dynamic `default` branch for custom types — a sign the static panel routing pattern is under strain. Cognitive load for any change touching panels or artifacts is high and rising.
-
-### Fix Cost
-
-- **Scope:** Cross-cutting — would touch state management, panel routing, and component boundaries
-- **Effort:** 2-4 days (extract a context provider or use a lightweight state manager like Zustand)
-- **Risk:** Medium — many components depend on props flowing from `page.tsx`
-- **Incremental?** Yes — could start with extracting artifact state into a context/store without changing everything at once
-
-### Urgency Triggers
-
-- Any additional artifact types (built-in or custom) will compound this
-- Adding per-node custom type support (currently excluded — `formalizeNode.ts` returns `null` for custom types) would require even more prop threading
-- If multiple developers work on panels simultaneously, merge conflicts in `page.tsx` will be frequent
-
-### Recommendation: Fix opportunistically
-
-The current state is workable but approaching a tipping point. The next feature that adds state to `page.tsx` should include extracting artifact state into a dedicated context or store. The custom artifact feature is a good forcing function — its CRUD operations and dynamic panel routing don't belong in the root orchestrator.
+This is a clean, well-commented feature. The debt below is minor and mostly latent — none of it blocks the PR. The triage exists to make the carry/fix tradeoff explicit so the author can decide what (if anything) to address before merge.
 
 ---
 
-## 2. Tech Debt: Misleading "added in v2" Comment on Persistence Schema
+## Triage Summary
 
-**Location:** `app/lib/types/persistence.ts:32`
+| # | Debt Item | Carrying Cost | Cost of Deferral | Failure Cost | Fix Cost | Urgency | Recommendation |
+|---|-----------|:---:|:---:|:---:|:---:|:---:|---|
+| 1 | `responseFormat` absent from `callLlm` cache key | Low | +0 (inert today) | Low × Med — silent wrong-shape cache hit if two endpoints ever share model+prompts+maxTokens | Hours | Latent | Defer and monitor |
+| 2 | Shared `errors[key]` map collides between search and scoring hooks | Medium | +0 (inert) | | Hours | None | Fix opportunistically |
+| 3 | Schema-dialect coupling: source schemas carry OpenRouter-shaped keywords, stripped per-provider | Low | +1 stripped keyword per schema feature adopted | | Hours→Days | Latent | Carry intentionally |
+| 4 | Route-level duplication vs sibling `evidence-search/route.ts` (validation, prompt+schema colocation, catch block) | Low | +~30 dup lines per new evidence route | | Days | None | Carry intentionally |
+| 5 | `MAX_PAPERS_PER_REQUEST = 10` unreachable via UI (search caps at 8) — dead headroom | Low | +0 (inert) | | Minutes | None | Carry intentionally |
+| 6 | Score-range invariant ([0,1]) split across three locations with no shared assertion | Low | +0 (inert) | | Hours | None | Carry intentionally |
 
-**Nature:** Documentation / misleading comment (confirmed by fact-check)
+### Recommended Order
+Only #2 is worth touching pre-merge if the author is already in the file. #1 should get a one-line code comment now and a real fix deferred. #3–#6 are carry-intentionally — documented here so they don't get rediscovered as surprises later.
+
+---
+
+## 1. `responseFormat` absent from the `callLlm` cache key — Defer and monitor
+
+**Location:** `app/lib/llm/callLlm.ts:151-152`, `app/lib/llm/cache.ts:16-25`
+**Nature:** Caching correctness (latent)
+**Cost of Deferral:** `+0 — inert today`
+**Failure Cost:** `Low × Med — a structured-output call could return a cached free-text result (or vice-versa) from a different endpoint that happens to collide on (model, systemPrompt, userContent, maxTokens)`
+**Legibility-target:** for-author
 
 ### Carrying Cost: Low
-
-The comment `// Custom artifact types and their generated data (added in v2)` implies a version bump occurred, but `WORKSPACE_VERSION` remains `2` (same as before this branch). The custom fields are optional (`?`) so backward compatibility is maintained, but if someone relies on version numbers to detect capabilities, this is misleading. The earlier artifact fields (lines 26-31) have an identical comment — so the pattern predates this branch, but extending it here compounds the confusion.
+`computeHash` keys on `(model, systemPrompt, userContent, maxTokens)` only — `responseFormat` is not part of the key. Today this is harmless: every endpoint ships a distinct `systemPrompt`, and the JSON-shape instructions are embedded in that prompt, so two calls that differ only in `responseFormat` but share the prompt do not occur in practice. The risk is purely latent: a future endpoint that reuses an existing prompt with a different schema (or toggles structured output on/off) would silently serve the wrong-shaped cached payload.
 
 ### Fix Cost
-
-- **Scope:** Localized — one comment change, possibly a version bump
-- **Effort:** Minutes
-- **Risk:** Low (if just fixing comment); Medium (if bumping version, since migration logic would need updating)
-- **Incremental?** Yes
+- **Scope:** localized — add the schema (or a stable hash of it) as a 5th `computeHash` argument and to `CacheKey`.
+- **Effort:** hours.
+- **Risk:** low — but it invalidates all existing cache entries on deploy (acceptable; cache is best-effort and non-durable on Vercel per CLAUDE.md).
+- **Incremental?** yes.
 
 ### Urgency Triggers
+- A second endpoint reuses an existing `systemPrompt` while changing `responseFormat`. Until then there is no collision surface.
 
-- If the project ever needs to do a real schema migration (e.g., making custom fields required)
-- If another developer reads this comment and assumes v2 means "has custom types"
-
-### Recommendation: Fix now
-
-Either bump `WORKSPACE_VERSION` to 3 with a migration path, or change the comment to say "added as optional extension to v2 schema" to avoid implying a version transition occurred. Given that all custom fields are optional with `?? []` / `?? {}` fallbacks, just fixing the comment is the lower-risk option.
+### Recommendation
+**Recommendation:** Defer and monitor. Add a one-line comment at the `computeHash` call site noting that `responseFormat` is intentionally excluded and that this is safe only while prompts are unique per endpoint. Re-evaluate the moment a prompt is shared across endpoints with differing output formats.
 
 ---
 
-## 3. Tech Debt: Reference to Unimplemented Cross-Session Library
+## 2. Shared `errors[key]` map collides between search and scoring — Fix opportunistically
 
-**Location:** `app/lib/types/customArtifact.ts:7-8`
-
-**Nature:** Documentation — forward reference to planned but unbuilt feature (confirmed by fact-check as unverifiable)
-
-### Carrying Cost: Low
-
-The module docstring says definitions are "optionally saved to a cross-session library." No such library exists — custom types are stored in the workspace persistence layer only and are lost when switching workspaces. This sets incorrect expectations for anyone reading the types to understand the system.
-
-### Fix Cost
-
-- **Scope:** Localized — one comment edit
-- **Effort:** Minutes
-- **Risk:** None
-- **Incremental?** Yes
-
-### Urgency Triggers
-
-- When someone tries to implement cross-session sharing and assumes infrastructure exists
-- User-facing confusion if custom types disappear on workspace switch
-
-### Recommendation: Fix now
-
-Change "and optionally saved to a cross-session library" to something like "stored per-workspace; cross-session sharing is planned but not yet implemented." This costs nothing and prevents confusion.
-
----
-
-## 4. Tech Debt: Custom Types Not Integrated with Node-Level Formalization
-
-**Location:** `app/lib/formalization/formalizeNode.ts:115-116`, `app/hooks/useArtifactGeneration.ts`
-
-**Nature:** Structural — feature gap / asymmetry
+**Location:** `app/hooks/useEvidenceScoring.ts:27,44,46`, `app/hooks/useEvidenceSearch.ts:28,52`, `app/lib/stores/evidenceStore.ts`
+**Nature:** Structural (state-shape) — overloaded store slice
+**Cost of Deferral:** `+0 — inert`
+**Legibility-target:** for-author
 
 ### Carrying Cost: Medium
+The store added a dedicated `scoring[key]` loading map (good — it correctly separates search-loading from score-loading) but reused the single `errors[key]` slot for both operations. Consequences visible in the current code:
+- `useEvidenceScoring.score` writes scoring failures into `errors[key]`, but the error is **only rendered by `FindEvidenceButton` via the search hook's `error`** (`EvidenceResultsSection` receives no error prop). So a scoring failure renders in the same spot as a search failure with no label distinguishing them.
+- `score()` calls `setError(key, null)` on entry, silently clearing any prior **search** error; symmetrically a later search clears a scoring error. The two operations stomp each other's error state.
 
-Custom artifact types work at the global (whole-source) level but are silently skipped during per-node formalization (`formalizeNode` returns `null` for custom types). The auto-formalization queue, which processes decomposition nodes, will therefore never generate custom artifacts for individual propositions. There is no UI indication that custom types are global-only. Users who decompose their source and then expect custom artifacts per-node will get nothing without explanation.
+This is friction rather than a bug today (the two operations are mutually exclusive in time for a given element in normal use), but it is a misleading state shape: a reader reasonably assumes search-error and score-error are independent, and they are not.
 
 ### Fix Cost
-
-- **Scope:** Cross-cutting — would need to thread custom type definitions through `formalizeNode`, the queue, and node detail UI
-- **Effort:** 1-2 days
-- **Risk:** Medium — `formalizeNode` has a different request/response flow than `useArtifactGeneration`
-- **Incremental?** Yes — could add a "global only" badge to custom type chips as a quick stopgap
+- **Scope:** localized — either add a `scoringErrors[key]` map mirroring `scoring[key]`, or namespace error values. ~Hours.
+- **Risk:** low — additive store change, persisted under `evidence-store-v1` (new optional map; old persisted state hydrates fine).
+- **Incremental?** yes.
 
 ### Urgency Triggers
+- Any UI change that surfaces score errors distinctly from search errors will force this split anyway.
 
-- When users start using decomposition alongside custom types (the two features intersect naturally)
-- If the auto-formalize queue is promoted as a primary workflow
-
-### Recommendation: Carry intentionally
-
-This is a known scope limitation, not accidental debt. The `formalizeNode` comment explicitly says custom types go through `useArtifactGeneration`. However, the lack of user-facing indication is a UX gap. Add a brief tooltip or badge ("global only") to custom type chips as a low-cost fix, and defer full node-level integration until there's user demand.
+### Recommendation
+**Recommendation:** Fix opportunistically. The store change is small and the author is already in these exact files. If not fixed now, document that `errors[key]` is shared so a future reader does not assume independence.
 
 ---
 
-## 5. Tech Debt: `useWorkspacePersistence` Hook Monolith
+## 3. Schema-dialect coupling — Carry intentionally
 
-**Location:** `app/hooks/useWorkspacePersistence.ts` (now 327 lines)
-
-**Nature:** Structural — growing god-hook
-
-### Carrying Cost: Medium
-
-This hook now manages: source text, extracted files, context text, semiformal text, lean code, verification state, 5 built-in artifact types, custom type definitions (CRUD), custom artifact data, decomposition state, workspace snapshots, and auto-save debouncing. It exposes 25+ values/setters through a single `useMemo`. The custom artifact additions added 6 new exported functions and 2 new state fields. Each new artifact type or state dimension inflates this hook further.
-
-### Fix Cost
-
-- **Scope:** Cross-cutting — consumers of the hook would need updating
-- **Effort:** 1-2 days to split into composable hooks (e.g., `useArtifactPersistence`, `useCustomTypePersistence`)
-- **Risk:** Low-medium — the hook is the single source of truth, so splitting requires careful coordination of the save/load cycle
-- **Incremental?** Yes — custom type state could be extracted first since it's relatively self-contained
-
-### Urgency Triggers
-
-- Next feature adding persisted state
-- Performance issues from the growing `useMemo` dependency array (currently mitigated by debounced saves)
-
-### Recommendation: Fix opportunistically
-
-The hook works correctly today but is becoming hard to reason about. When the next feature adds persisted state, extract custom type management into its own composable hook as part of that work.
-
----
-
-## 6. Tech Debt: `CustomTypeDesigner` as a Monolithic Modal (321 Lines)
-
-**Location:** `app/components/features/artifact-selector/CustomTypeDesigner.tsx`
-
-**Nature:** Structural — large single-file component with mixed concerns
+**Location:** `app/lib/llm/callLlm.ts:49-77,170-182`
+**Nature:** Cross-provider coupling
+**Cost of Deferral:** `+1 stripped keyword per JSON-Schema feature the source schemas adopt` (the deny-list must grow each time a source schema starts using a keyword Anthropic rejects)
+**Legibility-target:** for-author
 
 ### Carrying Cost: Low
+`adaptSchemaForAnthropic` strips a hard-coded deny-list (`minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`) so OpenRouter-shaped schemas can be reused on the Anthropic path. This is a reasonable, well-commented adaptation. The debt is the maintenance contract: the deny-list is enumerated by trial-and-error ("Extend this set if other keywords surface"), so the next unsupported keyword fails at runtime against the live Anthropic API rather than at build/test time. The fact-check confirmed the strip-set is a correct superset of what is currently needed (Claim 1, Mostly Accurate), so there is no present gap — only future-maintenance exposure.
 
-The designer component manages three wizard steps (describe, review, test), API calls, form state, and all the associated UI in a single 321-line file. It works, but the review step alone has 7 form fields rendered inline with repeated styling patterns. If the designer needs additional steps or more complex validation, this file will be difficult to extend.
+A secondary smell: stripping `minimum`/`maximum` means the [0,1] score constraint is *only* enforced server-side by `clampScore`. That is intentional and documented in the route schema comments, but it couples the schema's correctness to a runtime clamp living in a different file (see #6).
 
 ### Fix Cost
+- **Scope:** localized but open-ended — a true fix (allow-list of Anthropic-supported keywords, or a typed schema-builder that emits per-provider variants) is Days, not Hours, and is over-engineering for one consumer.
+- **Risk:** low.
+- **Incremental?** yes.
 
-- **Scope:** Localized — internal refactor only
-- **Effort:** Half a day
-- **Risk:** Low
-- **Incremental?** Yes — could extract step components one at a time
-
-### Urgency Triggers
-
-- Adding versioning or diff display for type definitions
-- Adding export/import of custom type definitions
-- Adding the cross-session library feature
-
-### Recommendation: Carry intentionally
-
-321 lines for a wizard modal is within reasonable bounds. The three steps are clear and the logic is straightforward. Refactor when the component needs to grow, not preemptively.
+### Recommendation
+**Recommendation:** Carry intentionally. The deny-list approach is the right call at one consumer. Revisit only when a third structured-output endpoint lands or when the deny-list needs a third extension — at that point the recurring "add a keyword, get a runtime failure" cost justifies a test that asserts known schemas survive adaptation, or a switch to an allow-list.
 
 ---
 
-## 7. Tech Debt: No Input Sanitization for User-Provided System Prompts
+## 4. Route-level duplication vs `evidence-search/route.ts` — Carry intentionally
 
-**Location:** `app/api/formalization/custom/route.ts`, `app/components/features/artifact-selector/CustomTypeDesigner.tsx`
-
-**Nature:** Security / robustness
-
-### Carrying Cost: Medium
-
-Users provide system prompts that are sent directly to the LLM. The only validation is a length check (`MAX_SYSTEM_PROMPT_LENGTH = 10_000`). There is no sanitization, content filtering, or rate limiting. While this is an internal/research tool (not public-facing), the system prompt is persisted to localStorage and could contain injection patterns that affect other users if workspaces are ever shared (e.g., via the planned export feature).
-
-### Fix Cost
-
-- **Scope:** Localized — API route + possibly a shared validation utility
-- **Effort:** Hours
-- **Risk:** Low
-- **Incremental?** Yes
-
-### Urgency Triggers
-
-- If workspaces become sharable/exportable
-- If the tool is deployed for multi-user access
-- If LLM provider billing becomes a concern (a malicious prompt could be designed to maximize token usage)
-
-### Recommendation: Defer and monitor
-
-For a single-user research tool, the current length check is adequate. Revisit when workspace sharing or multi-user deployment is on the roadmap. Add a brief comment noting the limitation.
-
----
-
-## 8. Tech Debt: Repeated Tailwind Class Strings / Inline Styles
-
-**Location:** `app/components/features/artifact-selector/CustomTypeDesigner.tsx`, `app/components/features/artifact-selector/ArtifactTypeModal.tsx`, `app/components/panels/CustomArtifactPanel.tsx`
-
-**Nature:** Styling duplication
+**Location:** `app/api/evidence-score/route.ts` vs `app/api/evidence-search/route.ts`
+**Nature:** Duplication
+**Cost of Deferral:** `+~30 duplicated lines per new evidence-* route`
+**Legibility-target:** for-author
 
 ### Carrying Cost: Low
+The new route faithfully mirrors the sibling's structure — same import set, same `try { validate → callLlm → JSON.parse(stripCodeFences(text)) → catch }` skeleton, same `OpenRouterError`-then-generic catch block, same colocated `SYSTEM_PROMPT` + `SCHEMA` constants. This is consistency, not copy-paste rot: a reader who knows one route knows the other, and the duplication is shallow (boilerplate, not business logic). Extracting a shared "structured-output route" helper now would be premature — there are only two routes and they differ in their post-LLM processing (OpenAlex search/dedup vs. per-paper score validation).
 
-The new components repeat long Tailwind class strings for form inputs, buttons, section headers, and card layouts. For example, the input field styling pattern `"w-full rounded border border-[#DDD9D5] bg-white px-3 py-1.5 text-sm text-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)]"` appears 6+ times across the designer. This is consistent with the existing codebase pattern (other panels have similar repetition), but the custom type feature adds more of it.
+One genuinely good move worth noting: the author extracted `scoreValidation.ts` out of the route specifically so it could be unit-tested (`scoreValidation.test.ts`, 143 lines). That is the *opposite* of debt — the sibling route's `mapOpenAlexWork`/`deduplicatePapers` follow the same pattern. The structure is consistent across the two routes.
 
 ### Fix Cost
+- **Scope:** systemic if pursued (a shared route harness touches both routes). Days.
+- **Risk:** medium — a shared abstraction over two slightly-divergent routes tends to grow conditionals.
 
-- **Scope:** Localized to new files, but a proper fix would establish shared component primitives
-- **Effort:** Half a day for shared input/button components
-- **Risk:** Low
-- **Incremental?** Yes
-
-### Urgency Triggers
-
-- Theme changes requiring updates to many files
-- Adding more custom type UI features
-
-### Recommendation: Carry intentionally
-
-This matches the existing codebase style. Extracting shared form primitives would be valuable but is a separate initiative, not specific to this branch.
+### Recommendation
+**Recommendation:** Carry intentionally. Two similar routes is below the threshold where a shared abstraction pays off. Revisit at the third evidence-* route — the rule-of-three applies cleanly here.
 
 ---
 
-## Summary Table
+## 5. `MAX_PAPERS_PER_REQUEST = 10` is unreachable via UI — Carry intentionally
 
-| # | Debt Item | Carrying Cost | Fix Cost | Urgency | Recommendation |
-|---|-----------|--------------|----------|---------|----------------|
-| 1 | `page.tsx` god component / prop drilling | High | 2-4 days, medium risk | Next panel feature | Fix opportunistically |
-| 2 | Misleading "added in v2" comment | Low | Minutes, low risk | Now | **Fix now** |
-| 3 | Reference to unimplemented cross-session library | Low | Minutes, no risk | Now | **Fix now** |
-| 4 | Custom types not integrated with node formalization | Medium | 1-2 days, medium risk | User demand | Carry intentionally |
-| 5 | `useWorkspacePersistence` monolith | Medium | 1-2 days, low-medium risk | Next persisted state addition | Fix opportunistically |
-| 6 | `CustomTypeDesigner` single-file modal | Low | Half day, low risk | Feature expansion | Carry intentionally |
-| 7 | No system prompt sanitization | Medium | Hours, low risk | Multi-user / sharing | Defer and monitor |
-| 8 | Repeated Tailwind class strings | Low | Half day, low risk | Theme changes | Carry intentionally |
+**Location:** `app/api/evidence-score/route.ts:18` (cap = 10) vs `app/api/evidence-search/route.ts` (`MAX_RESULTS = 8`)
+**Nature:** Dead headroom / minor inconsistency
+**Cost of Deferral:** `+0 — inert`
+**Legibility-target:** for-author
 
-## Recommended Fix Order
+### Carrying Cost: Low
+Search returns at most 8 papers, scoring accepts up to 10, so the top 2 slots of the cap are unreachable through the product flow. This is harmless and arguably defensible (a defense-in-depth cap on a public route should not be coupled to the current UI limit). The only cost is a reader briefly wondering why the two numbers differ. Not a security gap — the cap still bounds token usage.
 
-1. **Items 2 and 3 (now):** Fix the misleading comment and the unimplemented feature reference. These are minutes of work with zero risk and prevent ongoing confusion.
-2. **Item 1 (next feature touching panels):** Extract artifact state from `page.tsx` into a context or store. This is the highest-carrying-cost item and gets worse with every feature.
-3. **Item 5 (alongside item 1):** Split `useWorkspacePersistence` when extracting artifact state — the two cleanups naturally compose.
-4. **Item 4 (when user demand exists):** Add node-level custom type support or at minimum a "global only" indicator.
-5. **Items 6, 7, 8:** Carry or defer as described.
+### Recommendation
+**Recommendation:** Carry intentionally. Optionally drop a one-word comment (`// defense-in-depth; UI search caps at 8`) so the mismatch reads as intentional rather than as drift.
+
+---
+
+## 6. Score-range invariant split across three locations — Carry intentionally
+
+**Location:** route schema comments (`route.ts:78,98`), `clampScore` (`scoreValidation.ts:13-16`), and the LLM prompt's "0.0 to 1.0" instructions (`route.ts` system prompt)
+**Nature:** Distributed invariant
+**Cost of Deferral:** `+0 — inert`
+**Legibility-target:** for-author
+
+### Carrying Cost: Low
+The "[0,1]" contract is asserted in three places — the prompt asks for it, the schema *would* enforce it but the keyword is stripped for Anthropic, and `clampScore` is the real enforcement. This is correctly architected (clamp is the source of truth and is unit-tested), but the invariant's authority is non-obvious: a reader scanning the schema sees no `minimum`/`maximum` and has to find the clamp. The existing comments in `route.ts` already point at `clampScore`, which substantially mitigates this.
+
+### Recommendation
+**Recommendation:** Carry intentionally. Already adequately commented. No action.
+
+---
+
+## Goal-Alignment Note
+- Answered: yes — triaged all debt the diff introduces, ranked by carry-vs-fix.
+- Out of scope: correctness/security/perf of the scoring logic itself (other critics own those); whether LLM scoring is the right approach (product decision, not debt); the pre-existing Vercel cache non-durability noted in CLAUDE.md (not introduced by this PR).
+- Escalate: nothing blocking. Item #2 (shared `errors[key]` map) is the one item worth surfacing to the author as a "fix-while-you're-here" — it is a genuine state-shape smell, not just cosmetics. Item #1 (cache key) warrants a one-line code comment now even though the real fix is deferred.
+- Questions I would have asked: omitted — scope was clear.
