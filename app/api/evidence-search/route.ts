@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { CLAUDE_SONNET } from "@/app/lib/llm/models";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
-import { mapOpenAlexWork, deduplicatePapers, type OpenAlexWork } from "./openAlexUtils";
+import { OPENALEX_API_URL, mapOpenAlexWork, deduplicatePapers, type OpenAlexWork } from "./openAlexUtils";
 import { EVIDENCE_ARTIFACT_TYPES, type EvidenceSearchRequest, type EvidenceSearchResponse } from "@/app/lib/types/evidence";
-
-const OPENALEX_API_URL = "https://api.openalex.org/works";
 const OPENALEX_TIMEOUT_MS = 10_000;
 function getOpenAlexMailto(): string {
   const mailto = process.env.OPENALEX_MAILTO;

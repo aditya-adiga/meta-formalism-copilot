@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   reconstructAbstract,
   mapOpenAlexWork,
   deduplicatePapers,
+  fetchWorksByIds,
   type OpenAlexWork,
 } from "./openAlexUtils";
 import type { EvidencePaper } from "@/app/lib/types/evidence";
@@ -151,5 +152,87 @@ describe("deduplicatePapers", () => {
 
   it("returns empty array for empty input", () => {
     expect(deduplicatePapers([])).toEqual([]);
+  });
+});
+
+describe("fetchWorksByIds", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns empty array for empty input", async () => {
+    const result = await fetchWorksByIds([], "test@example.com");
+    expect(result).toEqual([]);
+  });
+
+  it("fetches works by ID with correct URL params", async () => {
+    const mockResponse = {
+      results: [
+        {
+          id: "https://openalex.org/W123",
+          referenced_works: ["https://openalex.org/W456", "https://openalex.org/W789"],
+        },
+      ],
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockResponse),
+    } as Response);
+
+    const result = await fetchWorksByIds(
+      ["https://openalex.org/W123"],
+      "test@example.com",
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].referenced_works).toEqual([
+      "https://openalex.org/W456",
+      "https://openalex.org/W789",
+    ]);
+
+    // Verify URL construction
+    const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("filter")).toBe("openalex:W123");
+    expect(calledUrl.searchParams.get("select")).toBe("id,referenced_works");
+    expect(calledUrl.searchParams.get("mailto")).toBe("test@example.com");
+  });
+
+  it("strips full URL prefix from IDs", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [] }),
+    } as Response);
+
+    await fetchWorksByIds(
+      ["https://openalex.org/W111", "https://openalex.org/W222"],
+      "test@example.com",
+    );
+
+    const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("filter")).toBe("openalex:W111|W222");
+  });
+
+  it("returns empty array on HTTP error", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 500,
+    } as Response);
+
+    const result = await fetchWorksByIds(
+      ["https://openalex.org/W123"],
+      "test@example.com",
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array on network error", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network failure"));
+
+    const result = await fetchWorksByIds(
+      ["https://openalex.org/W123"],
+      "test@example.com",
+    );
+    expect(result).toEqual([]);
   });
 });
