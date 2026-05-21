@@ -34,4 +34,11 @@ describe("EvidenceQueryEditor", () => {
     render(<EvidenceQueryEditor queries={["alpha"]} isLoading onRerun={() => {}} />);
     expect(screen.getByRole("button", { name: /searching/i })).toBeDisabled();
   });
+
+  it("does not call onRerun when all queries are blank", async () => {
+    const onRerun = vi.fn();
+    render(<EvidenceQueryEditor queries={["   "]} isLoading={false} onRerun={onRerun} />);
+    await userEvent.click(screen.getByRole("button", { name: /re-run/i }));
+    expect(onRerun).not.toHaveBeenCalled();
+  });
 });

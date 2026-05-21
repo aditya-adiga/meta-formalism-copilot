@@ -58,7 +58,6 @@ export default function EvidenceQueryEditor({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          aria-label="Add query"
           onClick={addRow}
           className="rounded text-xs text-[#6B6560] hover:text-[var(--ink-black)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30"
         >
@@ -66,7 +65,6 @@ export default function EvidenceQueryEditor({
         </button>
         <button
           type="button"
-          aria-label={isLoading ? "Searching..." : "Re-run ⟳"}
           disabled={isLoading}
           onClick={handleRerun}
           className="ml-auto rounded-md border border-[#DDD9D5] px-2 py-0.5 text-xs text-[#6B6560] hover:bg-[#F5F1ED] hover:text-[var(--ink-black)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30 active:bg-[#ECE7E2] disabled:cursor-wait disabled:opacity-50"
