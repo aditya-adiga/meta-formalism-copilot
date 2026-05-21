@@ -113,7 +113,7 @@ export function saveWorkspace(input: SaveWorkspaceInput): boolean {
   }
 }
 
-function isObject(v: unknown): v is Record<string, unknown> {
+export function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 

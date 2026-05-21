@@ -14,6 +14,14 @@ export type ArtifactEditingProps = {
   editWaitEstimate?: WaitTimeEstimate | null;
 };
 
+/** Props for staleness indicators (input provenance tracking). */
+export type StalenessProps = {
+  /** Whether the artifact was generated from different inputs than current */
+  isStale?: boolean;
+  /** Callback to regenerate the artifact from current inputs */
+  onRegenerate?: () => void;
+};
+
 type ArtifactPanelShellProps = {
   title: string;
   loading?: boolean;
@@ -21,7 +29,7 @@ type ArtifactPanelShellProps = {
   emptyMessage: string;
   loadingMessage: string;
   children: ReactNode;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 /**
  * Shared shell for artifact panels (causal graph, statistical model, etc.).
@@ -39,6 +47,8 @@ export default function ArtifactPanelShell({
   onAiEdit,
   editing,
   editWaitEstimate,
+  isStale,
+  onRegenerate,
 }: ArtifactPanelShellProps) {
   const header = (
     <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
@@ -77,6 +87,21 @@ export default function ArtifactPanelShell({
       )}
 
       {header}
+
+      {isStale && !loading && (
+        <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-800">
+          <span>Generated from different inputs.</span>
+          {onRegenerate && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="font-medium underline hover:text-amber-900"
+            >
+              Regenerate
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && !hasData ? (
         <div className="flex-1 px-8 py-10 text-sm text-[#6B6560]">
