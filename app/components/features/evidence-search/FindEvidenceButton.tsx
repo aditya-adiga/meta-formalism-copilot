@@ -1,6 +1,7 @@
 "use client";
 
 import { useEvidenceSearch } from "@/app/hooks/useEvidenceSearch";
+import { useEvidenceScoring } from "@/app/hooks/useEvidenceScoring";
 import EvidenceResultsSection from "./EvidenceResultsSection";
 import type { EvidenceArtifactType } from "@/app/lib/types/evidence";
 
@@ -18,6 +19,7 @@ export default function FindEvidenceButton({
   contextSummary,
 }: FindEvidenceButtonProps) {
   const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
+  const { isScoring, score } = useEvidenceScoring(artifactType, elementId);
 
   return (
     <div className="mt-1.5">
@@ -38,7 +40,13 @@ export default function FindEvidenceButton({
         <p className="text-xs text-red-600 mt-1">{error}</p>
       )}
 
-      {slot && <EvidenceResultsSection slot={slot} />}
+      {slot && (
+        <EvidenceResultsSection
+          slot={slot}
+          onScore={() => score(elementContent)}
+          isScoring={isScoring}
+        />
+      )}
     </div>
   );
 }
