@@ -59,6 +59,26 @@ export const STUDY_TYPE_LABELS: Record<StudyType, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Paper lifecycle status
+// ---------------------------------------------------------------------------
+
+/** Lifecycle status of a paper within a slot. Reflects a step that HAS
+ *  happened (a read-out), not a manual cause:
+ *   - retrieved:  default when search returns it
+ *   - evaluated:  set automatically when reliability/relatedness scoring lands
+ *   - integrated: reserved — no setter yet (artifact integration not built)
+ *   - pruned:     user dismissed it (soft; recoverable, survives re-runs)
+ *  Status keys off the slot (= one claim), so it already models per-(paper,
+ *  claim) status and a future shared-paper-pool view can reuse this type. */
+export const EVIDENCE_PAPER_STATUSES = [
+  "retrieved",
+  "evaluated",
+  "integrated",
+  "pruned",
+] as const;
+export type EvidencePaperStatus = (typeof EVIDENCE_PAPER_STATUSES)[number];
+
+// ---------------------------------------------------------------------------
 // Paper scoring
 // ---------------------------------------------------------------------------
 
@@ -99,6 +119,8 @@ export type EvidencePaper = {
   reliability: ReliabilityScore | null;
   /** Per-paper relatedness to the claim (null until scored) */
   relatedness: RelatednessScore | null;
+  /** Lifecycle status within this slot (see EvidencePaperStatus) */
+  status: EvidencePaperStatus;
 };
 
 /** An evidence slot attached to one artifact element.
@@ -113,10 +135,13 @@ export type EvidenceSlot = {
   scoredAt: string | null;
 };
 
-/** Whether every paper in a slot has been scored. Derived from the papers
- *  themselves rather than stored, so it cannot drift from the actual scores. */
+/** Whether every *active* (non-pruned) paper in a slot has been scored.
+ *  Pruned papers are intentionally never scored, so they must not block the
+ *  slot's "scored" state. Derived from the papers (not stored) so it cannot
+ *  drift from the actual scores. */
 export function isSlotScored(slot: EvidenceSlot): boolean {
-  return slot.papers.length > 0 && slot.papers.every((p) => p.reliability !== null);
+  const active = slot.papers.filter((p) => p.status !== "pruned");
+  return active.length > 0 && active.every((p) => p.reliability !== null);
 }
 
 /** API request shape for evidence search */
@@ -125,6 +150,9 @@ export type EvidenceSearchRequest = {
   elementId: string;
   elementContent: string;
   contextSummary?: string;
+  /** When present and non-empty, search these queries directly instead of
+   *  generating them via the LLM. Sanitized server-side. */
+  queries?: string[];
 };
 
 /** API response shape for evidence search */

@@ -79,6 +79,7 @@ export function mapOpenAlexWork(work: OpenAlexWork): EvidencePaper {
     oaUrl: work.open_access?.oa_url ?? null,
     reliability: null,
     relatedness: null,
+    status: "retrieved",
   };
 }
 
