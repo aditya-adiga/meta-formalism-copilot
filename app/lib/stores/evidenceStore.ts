@@ -11,7 +11,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { EvidenceSlot, PaperScore } from "@/app/lib/types/evidence";
+import type { EvidenceSlot, PaperScore, OverlapAnalysis } from "@/app/lib/types/evidence";
 
 // ---------------------------------------------------------------------------
 // Debounced localStorage adapter (same pattern as workspaceStore)
@@ -54,10 +54,14 @@ const debouncedStorage = createDebouncedStorage();
 interface EvidenceState {
   /** Evidence slots keyed by "artifactType::elementId" */
   slots: Record<string, EvidenceSlot>;
+  /** Per-element overlap analysis results */
+  overlap: Record<string, OverlapAnalysis>;
   /** Per-element loading state (search or scoring) */
   loading: Record<string, boolean>;
   /** Per-element scoring loading state */
   scoring: Record<string, boolean>;
+  /** Per-element overlap analysis loading state */
+  analyzing: Record<string, boolean>;
   /** Per-element error messages */
   errors: Record<string, string>;
 }
@@ -66,17 +70,22 @@ interface EvidenceActions {
   setEvidence: (key: string, slot: EvidenceSlot) => void;
   setLoading: (key: string, loading: boolean) => void;
   setScoring: (key: string, scoring: boolean) => void;
+  setAnalyzing: (key: string, analyzing: boolean) => void;
   setError: (key: string, error: string | null) => void;
   /** Apply LLM scores to papers in a slot */
   applyScores: (key: string, scores: PaperScore[]) => void;
+  /** Apply overlap analysis results */
+  applyOverlap: (key: string, analysis: OverlapAnalysis) => void;
   clearEvidence: (key: string) => void;
   clearAll: () => void;
 }
 
 const DEFAULT_STATE: EvidenceState = {
   slots: {},
+  overlap: {},
   loading: {},
   scoring: {},
+  analyzing: {},
   errors: {},
 };
 
@@ -102,6 +111,11 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
       setScoring: (key: string, scoring: boolean) =>
         set((state: EvidenceState) => ({
           scoring: { ...state.scoring, [key]: scoring },
+        })),
+
+      setAnalyzing: (key: string, analyzing: boolean) =>
+        set((state: EvidenceState) => ({
+          analyzing: { ...state.analyzing, [key]: analyzing },
         })),
 
       setError: (key: string, error: string | null) =>
@@ -143,22 +157,44 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           };
         }),
 
+      applyOverlap: (key: string, analysis: OverlapAnalysis) =>
+        set((state: EvidenceState) => ({
+          overlap: { ...state.overlap, [key]: analysis },
+        })),
+
       clearEvidence: (key: string) =>
         set((state: EvidenceState) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { [key]: _removed, ...rest } = state.slots;
-          return { slots: rest };
+          const { [key]: _s, ...restSlots } = state.slots;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _o, ...restOverlap } = state.overlap;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _l, ...restLoading } = state.loading;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _sc, ...restScoring } = state.scoring;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _a, ...restAnalyzing } = state.analyzing;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _e, ...restErrors } = state.errors;
+          return {
+            slots: restSlots,
+            overlap: restOverlap,
+            loading: restLoading,
+            scoring: restScoring,
+            analyzing: restAnalyzing,
+            errors: restErrors,
+          };
         }),
 
-      clearAll: () => set({ slots: {}, loading: {}, scoring: {}, errors: {} }),
+      clearAll: () => set({ slots: {}, overlap: {}, loading: {}, scoring: {}, analyzing: {}, errors: {} }),
     }),
     {
       name: "evidence-store-v1",
       storage: typeof window !== "undefined"
         ? createJSONStorage(() => debouncedStorage)
         : undefined,
-      // Only persist slots, not transient loading state
-      partialize: (state: EvidenceState & EvidenceActions) => ({ slots: state.slots }),
+      // Only persist slots and overlap, not transient loading state
+      partialize: (state: EvidenceState & EvidenceActions) => ({ slots: state.slots, overlap: state.overlap }),
       skipHydration: true,
     },
   ),

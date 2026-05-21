@@ -2,6 +2,7 @@
 
 import { useEvidenceSearch } from "@/app/hooks/useEvidenceSearch";
 import { useEvidenceScoring } from "@/app/hooks/useEvidenceScoring";
+import { useEvidenceOverlap } from "@/app/hooks/useEvidenceOverlap";
 import EvidenceResultsSection from "./EvidenceResultsSection";
 import type { EvidenceArtifactType } from "@/app/lib/types/evidence";
 
@@ -20,6 +21,7 @@ export default function FindEvidenceButton({
 }: FindEvidenceButtonProps) {
   const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
   const { isScoring, score } = useEvidenceScoring(artifactType, elementId);
+  const { overlap, isAnalyzing, analyze, hasReviews } = useEvidenceOverlap(artifactType, elementId);
 
   return (
     <div className="mt-1.5">
@@ -45,6 +47,10 @@ export default function FindEvidenceButton({
           slot={slot}
           onScore={() => score(elementContent)}
           isScoring={isScoring}
+          onAnalyzeOverlap={analyze}
+          isAnalyzing={isAnalyzing}
+          overlap={overlap}
+          hasReviews={hasReviews}
         />
       )}
     </div>
