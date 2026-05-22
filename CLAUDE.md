@@ -44,7 +44,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
   - `artifact-selector/` — Artifact type selection UI
   - `causal-graph/` — Graph visualization components
   - `lean-display/` — Lean code display with syntax highlighting
-  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidencePaperCard` for grounding artifacts in published research
+  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidenceQueryEditor`, `EvidencePaperCard` for grounding artifacts in published research
 - `components/ui/` — Shared UI components and icons
 - `hooks/` — Custom hooks: `useWorkspacePersistence`, `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useAnalytics`, etc.
 - `lib/types/` — TypeScript type definitions for panels, sessions, artifacts, decomposition
@@ -62,6 +62,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map — each with a dedicated panel and API route. Users can also create **custom artifact types** with user-authored system prompts, generated via a generic `/api/formalization/custom` route.
 - **Decomposition workflow**: extract propositions from sources into a dependency graph, then formalize per-node
 - **Session management**: workspace sessions (global) and formalization sessions (per-scope) for tracking artifact history
+- **Evidence lifecycle**: evidence papers carry a lifecycle `status` (retrieved → evaluated → integrated, plus pruned). Search queries are user-editable; re-runs and "Refresh evidence" merge results (existing papers win, deduped by OpenAlex id), and soft-pruned papers survive re-runs. `/api/evidence-search` accepts an optional sanitized `queries[]` override that skips LLM query generation. The `evidenceStore` persists at `version: 1` with a status-backfill migration.
 
 ### Design System
 

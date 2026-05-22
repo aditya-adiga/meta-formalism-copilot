@@ -30,22 +30,28 @@ export function useEvidenceSearch(
   );
 
   const search = useCallback(
-    async (elementContent: string, contextSummary?: string) => {
-      const { setLoading, setEvidence, setError } = useEvidenceStore.getState();
+    async (elementContent: string, contextSummary?: string, queries?: string[]) => {
+      const { setLoading, setEvidence, mergeEvidence, setError } = useEvidenceStore.getState();
       setLoading(key, true);
       setError(key, null);
       try {
         const result = await fetchApi<EvidenceSearchResponse>(
           "/api/evidence-search",
-          { artifactType, elementId, elementContent, contextSummary },
+          { artifactType, elementId, elementContent, contextSummary, queries },
         );
-        setEvidence(key, {
-          targetKey: { artifactType, elementId },
-          searchQueries: result.queries,
-          papers: result.papers,
-          searchedAt: new Date().toISOString(),
-          scoredAt: null,
-        });
+        const existing = useEvidenceStore.getState().slots[key];
+        if (existing) {
+          // Re-run: merge new results, preserving prune/score status.
+          mergeEvidence(key, result.queries, result.papers);
+        } else {
+          setEvidence(key, {
+            targetKey: { artifactType, elementId },
+            searchQueries: result.queries,
+            papers: result.papers,
+            searchedAt: new Date().toISOString(),
+            scoredAt: null,
+          });
+        }
       } catch (err) {
         console.error("[useEvidenceSearch]", err);
         const message = err instanceof Error ? err.message : "Evidence search failed";
@@ -57,5 +63,14 @@ export function useEvidenceSearch(
     [artifactType, elementId, key],
   );
 
-  return { slot, isLoading, error, search };
+  const prune = useCallback(
+    (openAlexId: string) => useEvidenceStore.getState().prunePaper(key, openAlexId),
+    [key],
+  );
+  const restore = useCallback(
+    (openAlexId: string) => useEvidenceStore.getState().restorePaper(key, openAlexId),
+    [key],
+  );
+
+  return { slot, isLoading, error, search, prune, restore };
 }

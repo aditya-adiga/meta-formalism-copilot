@@ -18,7 +18,7 @@ export default function FindEvidenceButton({
   elementContent,
   contextSummary,
 }: FindEvidenceButtonProps) {
-  const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
+  const { slot, isLoading, error, search, prune, restore } = useEvidenceSearch(artifactType, elementId);
   const { isScoring, score, error: scoringError } = useEvidenceScoring(artifactType, elementId);
 
   return (
@@ -43,8 +43,12 @@ export default function FindEvidenceButton({
       {slot && (
         <EvidenceResultsSection
           slot={slot}
+          onRerun={(queries) => search(elementContent, contextSummary, queries)}
+          onPrune={prune}
+          onRestore={restore}
           onScore={() => score(elementContent)}
           isScoring={isScoring}
+          isLoading={isLoading}
         />
       )}
 

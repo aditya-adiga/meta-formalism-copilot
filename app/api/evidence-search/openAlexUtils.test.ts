@@ -125,6 +125,7 @@ describe("deduplicatePapers", () => {
     oaUrl: null,
     reliability: null,
     relatedness: null,
+    status: "retrieved",
   });
 
   it("removes duplicates by openAlexId", () => {
