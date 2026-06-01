@@ -1,7 +1,7 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
-import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
+import OutputTypesSection from "@/app/components/features/artifact-selector/OutputTypesSection";
 import CostTooltip from "@/app/components/ui/CostTooltip";
 
 type FormalizationControlsProps = {
@@ -83,24 +83,18 @@ export default function FormalizationControls({
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
         />
 
-        {/* Artifact type chips */}
-        <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B6560]">
-            Output Types
-          </h3>
-          <ArtifactChipSelector
-            selected={selectedArtifactTypes}
-            onChange={onArtifactTypesChange}
-            loading={chipLoading}
-            disabled={loading}
-            customTypes={customArtifactTypes}
-            onCreateCustomType={onCreateCustomType}
-            onEditCustomType={onEditCustomType}
-            onDeleteCustomType={onDeleteCustomType}
-            sourceText={sourceText}
-            contextText={contextText}
-          />
-        </div>
+        <OutputTypesSection
+          selected={selectedArtifactTypes}
+          onChange={onArtifactTypesChange}
+          loading={chipLoading}
+          disabled={loading}
+          customArtifactTypes={customArtifactTypes}
+          onCreateCustomType={onCreateCustomType}
+          onEditCustomType={onEditCustomType}
+          onDeleteCustomType={onDeleteCustomType}
+          sourceText={sourceText}
+          contextText={contextText}
+        />
       </div>
 
       {/* Docked Formalise button */}

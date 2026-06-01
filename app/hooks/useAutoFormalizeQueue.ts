@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import { topologicalSort } from "@/app/lib/utils/topologicalSort";
 import { formalizeNode, type CancelSignal } from "@/app/lib/formalization/formalizeNode";
 
@@ -30,6 +31,7 @@ export function useAutoFormalizeQueue(
   nodes: PropositionNode[],
   updateNode: (id: string, updates: Partial<PropositionNode>) => void,
   contextText?: string,
+  customTypeDefs?: CustomArtifactTypeDefinition[],
 ) {
   const [progress, setProgress] = useState<QueueProgress>(INITIAL_PROGRESS);
 
@@ -43,6 +45,10 @@ export function useAutoFormalizeQueue(
   // next node, not the one currently being formalized.
   const contextTextRef = useRef(contextText);
   useEffect(() => { contextTextRef.current = contextText; }, [contextText]);
+  // Same ref pattern for custom-type definitions so updates mid-run apply
+  // to the next node rather than recreating start() on every workspace edit.
+  const customTypeDefsRef = useRef(customTypeDefs);
+  useEffect(() => { customTypeDefsRef.current = customTypeDefs; }, [customTypeDefs]);
 
   const start = useCallback(async (artifactTypes?: ArtifactType[]) => {
     if (runningRef.current) return;
@@ -125,7 +131,15 @@ export function useAutoFormalizeQueue(
 
       setProgress((p) => ({ ...p, currentNodeId: nodeId }));
 
-      const result = await formalizeNode(node, nodes, updateNode, cancelSignalRef.current, artifactTypes, contextTextRef.current);
+      const result = await formalizeNode(
+        node,
+        nodes,
+        updateNode,
+        cancelSignalRef.current,
+        artifactTypes,
+        contextTextRef.current,
+        customTypeDefsRef.current,
+      );
 
       if (cancelSignalRef.current.cancelled) break;
 
