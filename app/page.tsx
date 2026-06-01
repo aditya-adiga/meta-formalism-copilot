@@ -934,6 +934,10 @@ export default function Home() {
             onNodeContextChange={(text) => updateNode(selectedNode.id, { context: text })}
             onNodeArtifactTypesChange={(types) => updateNode(selectedNode.id, { selectedArtifactTypes: types })}
             loadingState={artifactLoadingState}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={addCustomArtifactType}
+            onEditCustomType={(def) => updateCustomArtifactType(def.id, def)}
+            onDeleteCustomType={handleDeleteCustomType}
           />
         ) : undefined;
       case "causal-graph":

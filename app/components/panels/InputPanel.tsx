@@ -100,6 +100,7 @@ export default function InputPanel({
           onDeleteCustomType={onDeleteCustomType}
           sourceText={sourceText}
           sourceCharLength={sourceText.length}
+          fillHeight
         />
       </div>
     </div>

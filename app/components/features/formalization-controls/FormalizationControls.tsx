@@ -23,6 +23,13 @@ type FormalizationControlsProps = {
   sourceText?: string;
   /** Source text character count, used for cost estimation tooltip. */
   sourceCharLength?: number;
+  /**
+   * When true, the component fills its parent's height and scrolls the
+   * context+chips area, keeping the Generate button docked at the bottom.
+   * When false (default), the component sizes to its content — appropriate
+   * for use as a docked bottom block (see NodeDetailPanel).
+   */
+  fillHeight?: boolean;
 };
 
 export default function FormalizationControls({
@@ -40,6 +47,7 @@ export default function FormalizationControls({
   onDeleteCustomType,
   sourceText,
   sourceCharLength,
+  fillHeight = false,
 }: FormalizationControlsProps) {
   // Derive per-chip loading booleans from loadingState
   const chipLoading: Partial<Record<ArtifactType, boolean>> = {};
@@ -53,9 +61,19 @@ export default function FormalizationControls({
       ? `Generate \u2192 ${selectedArtifactTypes.length} outputs`
       : "Generate";
 
+  // In fillHeight mode the wrapper claims remaining space and the inner
+  // section scrolls so the Generate button stays visible at the bottom.
+  // Default mode keeps the original docked behavior used by NodeDetailPanel.
+  const wrapperClass = fillHeight
+    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+    : "flex shrink-0 flex-col";
+  const scrollClass = fillHeight
+    ? "flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4"
+    : "flex flex-col gap-3 p-4";
+
   return (
-    <div className="flex shrink-0 flex-col">
-      <div className="flex flex-col gap-3 p-4">
+    <div className={wrapperClass}>
+      <div className={scrollClass}>
         <textarea
           value={contextText}
           onChange={(e) => onContextChange(e.target.value)}
