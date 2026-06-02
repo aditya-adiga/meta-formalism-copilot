@@ -1,176 +1,110 @@
-# Security Code Review: `feat/custom-artifact-types`
+# Security Review — feat/corpus-architecture (DD-009 S0+S1)
 
-**Reviewer:** Claude (automated security review)
-**Branch:** `feat/custom-artifact-types` relative to `main`
-**Date:** 2026-04-07
+**Scope:** `git diff main...HEAD -- app/` (corpus FS abstraction + OPFS adapter behind a default-off dev flag). Docs excluded.
+**Date:** 2026-06-01
+**Based on:** Stage-1 code-fact-check (11 Verified, 1 Mostly Accurate, 0 Incorrect — error model, quota reification, and SSR guard all confirmed honored).
+**Deployment context:** Client-side, self-hosted single-tenant (one trust boundary per deployment, per repo CLAUDE.md §Deployment). OPFS is per-origin sandboxed.
+
+No escalation patterns matched. No HALT block.
 
 ---
 
 ## Trust Boundary Map
 
-This feature introduces a new data path where **user-authored system prompts** flow from the browser client through API routes into LLM provider calls (Anthropic / OpenRouter). The trust boundaries are:
+```
+B1: [workspace title / source id / custom-type id]  → [paths.ts workspaceSlug / safeSegment allowlist] → [POSIX corpus path under workspaces/]
+B2: [arbitrary path string]                          → [opfsAdapter splitPath + walkDir]                → [OPFS directory/file handles]
+B3: [persist blob value from zustand]                → [storeAdapter enc.encode → CorpusFS.writeFile]  → [OPFS file state/<name>.json]
+B4: [bytes read back from OPFS / localStorage]       → [parseManifest / zustand merge]                 → [in-memory workspace state]
+B5: [flag inputs: env NEXT_PUBLIC_CORPUS_FS, localStorage corpus-fs-enabled] → [isCorpusEnabled()]     → [substrate selection]
+```
 
-1. **Browser -> Next.js API routes**: User-supplied `customSystemPrompt` and `customOutputFormat` fields arrive via POST to `/api/formalization/custom` and `/api/custom-type/design`. The API runs server-side with access to API keys.
-2. **Next.js API -> LLM Provider**: The user-supplied `customSystemPrompt` is passed directly as the `system` parameter to `callLlm()`, which forwards it verbatim to the Anthropic SDK or OpenRouter API.
-3. **LLM response -> Browser**: LLM output is parsed (JSON or text) and returned to the client, where it is rendered in `CustomArtifactPanel`.
-4. **Browser <-> localStorage**: Custom type definitions (including system prompts) are persisted to and restored from localStorage.
+B1 is the designed choke point: untrusted user-authored titles and ids are sanitized into single, separator-free path segments before they can become directory names. B2 is the *raw* path entry into OPFS — it performs no traversal validation of its own and trusts that its callers (today only B3, eventually B1's builders) hand it clean paths. B3 is the only live writer in S1 and uses a hardcoded constant path. B4 is the deserialization boundary (manifest parse is fail-loud; zustand merge is pre-existing). B5 selects which substrate is active and is where the "dev-only" claim is enforced — or, as it turns out, not enforced. The whole module is client-side and OPFS is origin-sandboxed, so the blast radius of any path issue is bounded to the user's own per-origin storage, not other users or the host filesystem.
 
 ---
 
 ## Findings
 
-#### 1. User-controlled system prompt enables indirect prompt injection
-**Severity:** Medium
-**Location:** `app/api/formalization/custom/route.ts:33-35`, `app/lib/llm/callLlm.ts:110-112`
-**Move:** Trace the trust boundaries; Find the implicit sanitization assumption
-**Confidence:** High
-
-The `customSystemPrompt` field is supplied by the user (or by a prior LLM call via the design API), validated only for type and length (max 10,000 chars), and then passed directly as the system prompt to `callLlm()`. This is architecturally intentional -- the whole feature is "user designs their own prompt" -- but it means the system prompt slot, which is normally trusted application code, now contains untrusted user content. An attacker who can influence the prompt (e.g., via a shared workspace export or crafted localStorage payload) could instruct the LLM to exfiltrate source text, generate misleading content, or attempt to extract other information from the LLM context.
-
-In this application's threat model (single-user local tool), the risk is limited. However, if workspace sharing is ever added, this becomes a prompt injection vector.
-
-**Recommendation:** Document in the codebase that `customSystemPrompt` is user-controlled and must never be concatenated with trusted system instructions without clear separation. Consider adding a fixed preamble to the system prompt in `handleArtifactRoute` that the user cannot override (e.g., "You are generating an analytical artifact. Never output API keys, credentials, or system information.").
-
----
-
-#### 2. LLM-generated type definitions flow through without structural validation
-**Severity:** Medium
-**Location:** `app/api/custom-type/design/route.ts:76-89`
-**Move:** Test the serialization boundary
-**Confidence:** High
-
-The `/api/custom-type/design` route asks an LLM to generate a `CustomArtifactTypeDefinition` (including a `systemPrompt`). The response is validated for `name` and `systemPrompt` presence but the content of `systemPrompt` is not constrained. The LLM-generated definition then flows to the client, where it can be saved and later sent back as the system prompt for `/api/formalization/custom`. This creates a two-hop injection chain: a malicious `userDescription` to the design endpoint could instruct the meta-LLM to embed adversarial instructions inside the `systemPrompt` field of the generated definition, which is then used verbatim in the second LLM call.
-
-This is a known limitation of "LLM generates prompts for another LLM" architectures and is difficult to fully mitigate. The user does get a review step (the designer shows the generated prompt), which is a meaningful control.
-
-**Recommendation:** The review step is good. Consider adding a visible warning in the `CustomTypeDesigner` UI when the system prompt contains patterns that look like injection attempts (e.g., "ignore previous instructions", "you are now", references to API keys or environment variables).
-
----
-
-#### 3. No rate limiting on LLM-calling API routes
-**Severity:** Medium
-**Location:** `app/api/custom-type/design/route.ts`, `app/api/formalization/custom/route.ts`
-**Move:** Ask "what if there are a million of these?"
-**Confidence:** High
-
-Neither the new `/api/custom-type/design` nor `/api/formalization/custom` routes have rate limiting. This is consistent with the existing built-in artifact routes (none of them have rate limiting either), but the custom type designer introduces an iterative refinement loop that makes rapid repeated calls more natural. Each call consumes API credits. An automated script hitting these endpoints could exhaust the API key budget.
-
-**Recommendation:** This is a pre-existing gap, not introduced by this PR. However, as the number of LLM-calling routes grows, consider adding middleware-level rate limiting (e.g., per-IP or per-session token bucket). At minimum, document in the deployment guide that these routes should sit behind authentication or a reverse proxy with rate limiting in production.
-
----
-
-#### 4. Error responses leak LLM output fragments
+#### OPFS adapter performs no path-traversal validation of its own; safety depends entirely on callers using paths.ts
 **Severity:** Low
-**Location:** `app/api/custom-type/design/route.ts:80,83,92`
-**Move:** Check the error path
+**Location:** `app/lib/corpus/opfsAdapter.ts:57-77` (`splitPath`, `walkDir`)
+**Boundary:** B2
+**Move:** #2 (implicit sanitization assumption), #1 (trust boundaries)
 **Confidence:** High
+**Legibility-target:** PR author / S4 implementer
 
-When the LLM returns unparseable JSON, the error response includes `responseText.slice(0, 500)` in the `details` field. This is returned to the client. The leaked content is the LLM's own output (not server internals), so the information disclosure risk is limited. However, if the LLM hallucinates or echoes back parts of the system prompt, this could leak the meta-system prompt to the client.
+`splitPath` strips only leading/trailing slashes and empty segments; it does not reject `.` or `..` segments. A path like `workspaces/../../escape/x` survives `splitPath` as `dirs=["workspaces","..","..","escape"]`, and `walkDir` would call `getDirectoryHandle("..")`. The adapter's safety against directory escape rests *entirely* on the documented contract that "the only source of corpus paths is paths.ts" (paths.ts:17-19) — but the adapter does not enforce that contract itself. Today this is not exploitable: the single live caller (`storeAdapter.ts`, B3) passes the hardcoded constant `state/workspace-zustand-v1.json`, and paths.ts (B1) is not yet wired to any caller (confirmed: no callers of the builders or the adapter exist outside the corpus module and tests). The exposure is latent — in S4, when the folder-layout builders start feeding the adapter, or if any future caller hand-builds a path, the only defense is reviewer discipline. The practical ceiling is low even if bypassed: OPFS is origin-sandboxed, so `..` cannot escape the origin's private storage to the real filesystem; the worst case is reading/clobbering another file *within the same origin's corpus*.
 
-**Recommendation:** This is low risk since the meta-system prompt is not secret (it's in the source code). No action required, but be aware of this pattern if secret system prompts are ever introduced.
+**Recommendation:** Add a defense-in-depth guard in `splitPath` (and the `readdir` path-split at line 128) that throws `CorpusError({kind:"io"})` if any segment is `.` or `..` (or contains a backslash). This makes the adapter safe regardless of caller discipline and turns the paths.ts "single choke point" comment into an enforced invariant rather than an honor system. Cost is ~2 lines and cannot break any legitimate path, since paths.ts never emits dot-segments.
 
----
+#### Flag is documented "DEV-ONLY" but has no NODE_ENV guard — it can activate in production
+**Severity:** Low
+**Location:** `app/lib/corpus/flag.ts:15-25`
+**Boundary:** B5
+**Move:** #5 (invert the access-control model), #3 (error path)
+**Confidence:** High
+**Legibility-target:** PR author / deployer
 
-#### 5. Misleading comment: "added in v2" on fields that extend existing v2 schema
+`isCorpusEnabled()` returns `true` whenever `NEXT_PUBLIC_CORPUS_FS === "1"` or `localStorage["corpus-fs-enabled"] === "1"`, in *any* environment. The docstring (flag.ts:4) and CLAUDE.md both state the flag is "DEFAULT OFF and DEV-ONLY" and "must not be turned on for end users until S4 ships migration," because enabling it starts from an empty corpus with no localStorage migration. The code does not enforce the "dev-only" half: a production build with the env var set, or an end user who runs `localStorage.setItem("corpus-fs-enabled","1")`, silently swaps the persistence substrate and presents an empty workspace — their existing localStorage work appears to vanish (it is not deleted, just no longer read). This is a data-availability / user-trust hazard, not a confidentiality breach. Default-off is correctly implemented; the gap is that "dev-only" is a comment, not a constraint.
+
+**Recommendation:** Gate the env-var branch behind `process.env.NODE_ENV !== "production"`, or document explicitly that the env var is intentionally honored in prod for self-hosters and is their responsibility. Given the single-tenant self-host model, a `NODE_ENV` guard on the env branch plus keeping the localStorage runtime toggle dev-gated is the lowest-surprise option. At minimum, make the empty-corpus state visible (a "corpus mode active, N items not migrated" banner) so the substrate swap is not silent.
+
+#### CorpusError messages embed the full corpus path; low-sensitivity here but worth noting before S4
 **Severity:** Informational
-**Location:** `app/lib/types/persistence.ts:32`
-**Move:** Test the serialization boundary (fact-check cross-reference)
+**Location:** `app/lib/corpus/types.ts:80-87`, `app/lib/corpus/opfsAdapter.ts:82`, `app/lib/corpus/manifest.ts:66`
+**Boundary:** B2, B4
+**Move:** #3 (error path / message leakage)
 **Confidence:** High
+**Legibility-target:** S3/S4 implementer
 
-Per the fact-check report: the comment "added in v2" on `customArtifactTypes` and `customArtifactData` is misleading. `WORKSPACE_VERSION` was already 2 and was not bumped. The new fields are optional (`?`), so existing v2 data loads fine without them. However, the comment implies a version boundary that doesn't exist, which could mislead a future developer into thinking a migration path exists when it doesn't.
+Error messages interpolate the offending path (`corpus path not found: ${d.path}`, `corpus i/o error at ${d.path}`) and `manifest.ts` interpolates the raw JSON-parse exception message. In S1 the only paths are sandboxed, non-secret corpus-relative paths (`state/...`, `workspaces/<slug>/...`) and the substrate is the user's own origin-private storage, so this leaks nothing the user doesn't already own. Flagging for forward-awareness: once S4 puts user-authored titles into slugs and S3 surfaces these errors across a worker boundary / into logs, a workspace title could end up echoed in an error string.
 
-**Security implication:** If a future developer adds a v3 migration that depends on the v2->v3 boundary being where custom types were introduced, they might incorrectly assume all v2 data lacks these fields. The optional typing (`?`) makes this safe today, but the misleading comment is a maintenance hazard.
+**Recommendation:** No action required for S1. When S3/S4 land, confirm these messages are not forwarded to any shared sink (server logs, analytics) without review; consider keeping the human-readable path in `detail` (structured) and a generic string in `message`.
 
-**Recommendation:** Change the comment to "optional extension to the v2 schema" or similar.
-
----
-
-#### 6. localStorage persistence of system prompts has no integrity check
-**Severity:** Low
-**Location:** `app/lib/utils/workspacePersistence.ts:121-129`, `app/hooks/useWorkspacePersistence.ts:83-84`
-**Move:** Test the serialization boundary
+#### Manifest parse is fail-loud and type-checked, but does not validate id/ext content (forward note)
+**Severity:** Informational
+**Location:** `app/lib/corpus/manifest.ts:86-104`
+**Boundary:** B4
+**Move:** #7 (serialization boundary), #2 (validated for format, not content)
 **Confidence:** Medium
+**Legibility-target:** S4 implementer
 
-Custom type definitions, including their system prompts, are persisted to localStorage and restored on page load. The `isValidCustomTypeDef` validator checks structural shape but does not constrain the `systemPrompt` content. A malicious browser extension or XSS in a co-hosted page on the same origin could modify localStorage to inject a crafted system prompt that would be sent to the LLM on next formalization.
+`parseManifest` correctly fails loud on malformed input (no silent default-empty manifest — confirmed by fact-check) and type-checks every field. However, `source.id`, `source.ext`, `artifact.type`, and `customTypeIds` entries are accepted as any string without re-running them through `safeSegment`/`safeExt`. The manifest is consumed by the path builders later (S4): `sourcePath(slug, source.id, source.ext)`. Because those builders re-sanitize their inputs at use-time (B1), a malicious `id` in a hand-edited or corrupted `workspace.json` would be neutralized when the path is built — *provided* every consumer routes through paths.ts. This is the same honor-system dependency as finding #1. Today there is no live consumer, so this is purely a note for S4.
 
-In a single-user local dev tool, this is low risk. The `isValidCustomTypeDef` function does properly validate the shape, which is good defensive coding.
-
-**Recommendation:** No immediate action needed. If the app is ever deployed as a multi-user service, add HMAC signing to persisted data or move persistence server-side.
-
----
-
-#### 7. Fact-check: ARTIFACT_RESPONSE_KEY comment is misleading about mapping
-**Severity:** Informational
-**Location:** `app/lib/types/artifacts.ts:200`
-**Move:** Fact-check cross-reference
-**Confidence:** High
-
-The comment says "kebab-case -> camelCase" but `semiformal -> proof` and `lean -> leanCode` are not simple case conversions -- they are semantic renames. This is not a security issue but could lead to incorrect assumptions when extending the mapping for custom types.
-
-**Recommendation:** Update the comment to note the exceptions: "Maps built-in artifact types to their JSON response key. Most follow kebab-case -> camelCase; exceptions: semiformal -> proof, lean -> leanCode."
-
----
-
-#### 8. Fact-check: formatLabel docstring incomplete
-**Severity:** Informational
-**Location:** `app/components/panels/CustomArtifactPanel.tsx:80`
-**Move:** Fact-check cross-reference
-**Confidence:** High
-
-The docstring says "camelCase or snake_case" but the function's `.replace(/[_-]/g, " ")` also handles kebab-case. Not a security issue.
-
-**Recommendation:** Update docstring to "Convert camelCase, snake_case, or kebab-case keys to a readable label."
-
----
-
-#### 9. Fact-check: "cross-session library" reference to nonexistent feature
-**Severity:** Informational
-**Location:** `app/lib/types/customArtifact.ts:7`
-**Move:** Fact-check cross-reference
-**Confidence:** High
-
-The module docstring mentions "optionally saved to a cross-session library" but no such feature exists in the codebase. This is not a security issue but could confuse developers.
-
-**Recommendation:** Remove or mark as future work (e.g., "future: cross-session library").
+**Recommendation:** No action for S1. In S4, ensure every manifest-derived id/ext flows through `safeSegment`/`safeExt` before becoming a path (it already does in `sourcePath`/`customTypePath`), and add a test asserting a manifest with a traversal-laden source id cannot produce an escaping path.
 
 ---
 
 ## What Looks Good
 
-- **System prompt length limit** (`MAX_SYSTEM_PROMPT_LENGTH = 10_000`): The custom formalization route enforces a maximum system prompt length, preventing abuse via extremely large prompts that would consume excessive tokens.
-
-- **Input validation on the custom route**: `customSystemPrompt` is checked for presence and type before use. The `sourceText` required check in `handleArtifactRoute` catches empty requests.
-
-- **Defensive localStorage deserialization**: `loadWorkspace` uses thorough type checking (`isObject`, `isValidCustomTypeDef`, field-by-field coercion) rather than blindly trusting parsed JSON. This is good defense against corrupted or tampered localStorage.
-
-- **No `dangerouslySetInnerHTML`**: The `CustomArtifactPanel` renders LLM output via React's JSX interpolation (`{String(value)}`), which auto-escapes HTML. There is no XSS vector in the rendering path.
-
-- **`isCustomType` type guard**: Using the `custom-` prefix convention with a type guard prevents confusion between built-in and custom types, which could otherwise lead to routing errors or privilege confusion.
-
-- **Request cloning in custom route**: The `request.clone()` pattern in `/api/formalization/custom` correctly handles the need to read the body twice without consuming the stream.
-
-- **`transformBody` strips custom fields**: The custom-specific fields (`customSystemPrompt`, `customOutputFormat`) are removed before `buildUserMessage` processes the body, preventing them from leaking into the LLM user message.
+- **Allowlist, not denylist, sanitization (B1).** `SAFE_SEGMENT = /[^a-zA-Z0-9_-]+/g` replaces everything outside a tiny allowlist with a hyphen. No `.`, `/`, or `\` can survive, so dot-segment and separator-injection attacks are structurally impossible — verified empirically: `../etc/passwd` → `etc-passwd`, `..` → throw, `%2e%2e/` → `2e-2e`. This is the correct shape for a traversal guard.
+- **NFKD normalization before sanitizing (B1).** Unicode homoglyph/compatibility tricks are folded first: fullwidth `ＡＢ`→`ab`, ligature `ﬀ`→`ff`, compatibility dots (`U+2024`, `U+FF0E`) normalize to `.` and are then stripped. Ideographic period `U+3002` does not decompose but is non-allowlisted and stripped anyway. All-unsafe titles throw rather than collapsing to `""` (which would silently escape `workspaces/`) — with an explicit test for this.
+- **Empty-after-sanitize throws (B1).** Both `workspaceSlug` and `safeSegment` reject an empty result, closing the "all-unsafe title becomes empty segment" hole.
+- **Quota errors reified, not swallowed (B2).** `wrap()` maps `QuotaExceededError` to a typed `{kind:"quota-exceeded", substrate:"opfs"}` instead of the legacy `console.warn`-and-drop. Confirmed by fact-check and the G7 test.
+- **SSR/unavailable guard rejects with a typed error before touching `navigator` (B2).** `getRoot()` checks `navigator.storage.getDirectory` and throws `{kind:"unavailable"}` rather than a raw `TypeError`. Covered for every method by the G8 test.
+- **Default-off, single hardcoded live path (B3, B5).** The only path reaching OPFS in S1 is the constant `state/workspace-zustand-v1.json`; the OFF path is a verbatim move of the prior localStorage adapter (characterization test). Minimal new attack surface.
+- **Writable lifecycle is correct (B2).** `writeFile` closes the writable in a `finally`, so a mid-write failure does not leak an open handle.
+- **No dependency-manifest changes.** No `package.json`/lockfile churn in the diff — supply-chain move (#10) is not implicated.
 
 ---
 
 ## Summary Table
 
-| # | Finding | Severity | Location | Confidence |
-|---|---------|----------|----------|------------|
-| 1 | User-controlled system prompt enables indirect prompt injection | Medium | `api/formalization/custom/route.ts:33-35` | High |
-| 2 | LLM-generated definitions flow through without content validation | Medium | `api/custom-type/design/route.ts:76-89` | High |
-| 3 | No rate limiting on LLM-calling API routes | Medium | Both new API routes | High |
-| 4 | Error responses leak LLM output fragments | Low | `api/custom-type/design/route.ts:80,83,92` | High |
-| 5 | Misleading "added in v2" comment | Informational | `lib/types/persistence.ts:32` | High |
-| 6 | localStorage persistence has no integrity check | Low | `lib/utils/workspacePersistence.ts:121-129` | Medium |
-| 7 | ARTIFACT_RESPONSE_KEY comment misleading | Informational | `lib/types/artifacts.ts:200` | High |
-| 8 | formatLabel docstring incomplete | Informational | `panels/CustomArtifactPanel.tsx:80` | High |
-| 9 | "cross-session library" reference to nonexistent feature | Informational | `lib/types/customArtifact.ts:7` | High |
+| # | Finding | Severity | Boundary | Location | Confidence |
+|---|---------|----------|----------|----------|------------|
+| 1 | OPFS adapter does no traversal validation; relies on callers using paths.ts | Low | B2 | `opfsAdapter.ts:57-77` | High |
+| 2 | "DEV-ONLY" flag has no NODE_ENV guard; can activate in prod (silent substrate swap) | Low | B5 | `flag.ts:15-25` | High |
+| 3 | Error messages embed corpus path (sandboxed now; note for S3/S4) | Informational | B2,B4 | `types.ts:80-87`, `opfsAdapter.ts:82` | High |
+| 4 | Manifest parse doesn't re-sanitize id/ext content (note for S4) | Informational | B4 | `manifest.ts:86-104` | Medium |
 
 ---
 
 ## Overall Assessment
 
-The security posture of this feature is **reasonable for a single-user local development tool**. The core design decision -- allowing users to author their own system prompts -- is inherently a trust delegation, but it is appropriate for the use case. The code demonstrates good defensive practices: thorough input validation on the localStorage deserialization path, proper React escaping in rendering, type guards for the custom/builtin boundary, and a length limit on user-supplied prompts.
+The security posture of this change is sound for what it ships. The path-traversal choke point (`paths.ts`) — the reviewer's top priority — is correctly built as an allowlist over an NFKD-normalized string, and I could not construct any input (separator, dot-segment, URL-encoded, unicode homoglyph, compatibility dot, or empty-after-sanitize) that escapes `workspaces/`. The error model, quota reification, and SSR guard are all implemented as documented and confirmed by fact-check. Because the whole module is client-side and OPFS is origin-sandboxed, the realistic blast radius of any defect is the user's own per-origin storage — no cross-tenant or host-filesystem exposure exists in this single-tenant deployment model. None of the findings rise above Low, and none are exploitable on the one live code path (the hardcoded `state/` blob via storeAdapter). The two Low findings are both *latent* — they bite in S4/S3 when more callers appear or the flag is mis-enabled. The single most important thing to address is **finding #1**: add a 2-line `.`/`..`/backslash reject inside `splitPath` so the OPFS adapter enforces the no-traversal invariant itself rather than trusting every present and future caller to route through paths.ts. That turns the load-bearing comment into a guarantee at near-zero cost and de-risks S4 before it is written.
 
-The main concerns are architectural rather than implementation-level: (1) the user-controlled system prompt pattern would become a significant risk if workspace sharing or multi-tenancy is ever added, and (2) the lack of rate limiting is a pre-existing gap that this PR does not worsen but also does not address. None of the findings are blocking for merge. The informational items from the fact-check report should be addressed as documentation cleanup, ideally in this PR.
+---
+
+## Goal-Alignment Note
+
+The user's goal is a comprehensive security review of feat/corpus-architecture before opening a PR, with priority on (1) path-traversal safety in paths.ts, (2) opfsAdapter path handling, (3) the storeAdapter blob, and (4) error-message leakage. This review addresses all four: priority (1) is the largest "What Looks Good" entry plus the empirical traversal testing and is assessed as correctly implemented; priority (2) is finding #1 (the adapter's lack of self-enforcement); priority (3) is covered by confirming the live path is a hardcoded constant with no injection vector (B3); priority (4) is finding #3. The findings are calibrated to the stated client-side, single-tenant, origin-sandboxed context — no finding is inflated by assuming a multi-tenant or server-filesystem threat model the deployment does not have. Nothing in the diff blocks opening the PR; finding #1 is a recommended pre-merge hardening, not a blocker.

@@ -81,3 +81,24 @@ describe("OPFS adapter — quota reification (G7)", () => {
     if (detail.kind === "quota-exceeded") expect(detail.substrate).toBe("opfs");
   });
 });
+
+describe("OPFS adapter — defense-in-depth traversal rejection (C1)", () => {
+  it("rejects a path containing a .. segment rather than resolving it", async () => {
+    const fakeRoot = {
+      async getFileHandle() { return { async getFile() { return { size: 0, async arrayBuffer() { return new ArrayBuffer(0); } }; }, async createWritable() { return { async write() {}, async close() {} }; } }; },
+      async getDirectoryHandle() { return fakeRoot; },
+      async removeEntry() {},
+      async *keys() {},
+    };
+    setStorage({ getDirectory: async () => fakeRoot });
+    const fs = createOpfsCorpusFs();
+    let caught: unknown;
+    try {
+      await fs.writeFile("workspaces/s/../../escape.txt", new TextEncoder().encode("x"));
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(CorpusError);
+    expect((caught as CorpusError).detail.kind).toBe("io");
+  });
+});

@@ -11,7 +11,8 @@
  *    ({kind:"unavailable"}), never a raw `TypeError`.
  *  - Failure reification: a quota failure rejects with {kind:"quota-exceeded",
  *    substrate:"opfs"} — it is NOT swallowed with console.warn the way the
- *    legacy localStorage adapter does (workspaceStore.ts:44-46).
+ *    legacy localStorage adapter does (createDebouncedLocalStorage in
+ *    storeAdapter.ts).
  *
  * OPFS handle types are declared locally rather than relying on lib.dom, whose
  * OPFS surface (notably async `keys()`) varies by TypeScript version — keeping
@@ -56,6 +57,14 @@ async function getRoot(): Promise<OpfsDirHandle> {
 
 function splitPath(path: string): { dirs: string[]; name: string } {
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+  // Defense-in-depth: paths.ts is the sanitizing choke point, but the adapter
+  // must not trust callers to have used it. Reject traversal/backslash segments
+  // rather than resolving them (an adapter is the wrong layer to interpret "..").
+  for (const seg of parts) {
+    if (seg === "." || seg === ".." || seg.includes("\\")) {
+      throw new CorpusError({ kind: "io", path, reason: `unsafe path segment: ${seg}` });
+    }
+  }
   const name = parts.pop();
   if (!name) throw new CorpusError({ kind: "io", path, reason: "path has no file component" });
   return { dirs: parts, name };

@@ -67,6 +67,23 @@ function safeExt(ext: string): string {
 
 export const SETTINGS_PATH = "settings.json";
 
+/**
+ * S1 BLOB-MODE STORE — reconcile in S4.
+ *
+ * In S1 the whole Zustand persist blob is written as a single file under
+ * `state/` (see storeAdapter.createCorpusBackedStorage). This is a SEPARATE
+ * namespace from the per-workspace folder layout below; it exists only so the
+ * OPFS substrate can be exercised behind the flag before the files-per-artifact
+ * layout is wired up. S4's migration must reconcile this blob into the workspace
+ * folders and then retire `state/`. Routed through this builder (rather than a
+ * hand-built string in storeAdapter) so the namespace fork is greppable and the
+ * name goes through the same `safeSegment` sanitization as every other path.
+ */
+export const STATE_DIR = "state";
+export function stateBlobPath(name: string): string {
+  return `${STATE_DIR}/${safeSegment(name)}.json`;
+}
+
 export function workspaceDir(slug: string): string {
   return `workspaces/${workspaceSlug(slug)}`;
 }

@@ -13,6 +13,13 @@
 export const CORPUS_FLAG_KEY = "corpus-fs-enabled";
 
 export function isCorpusEnabled(): boolean {
+  // Hard production guard: because S1 has no migration, enabling the corpus path
+  // swaps persistence to an empty corpus and existing localStorage work appears
+  // to vanish. Refuse to activate in a production build so the dev flag can never
+  // become an end-user data-loss footgun (security review C2). Remove this guard
+  // only when S4 ships migration and the flag becomes a real, safe rollout knob.
+  if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") return false;
+
   if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_CORPUS_FS === "1") return true;
   if (typeof window !== "undefined") {
     try {

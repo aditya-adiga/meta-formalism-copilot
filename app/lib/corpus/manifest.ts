@@ -7,10 +7,13 @@
  * here — the manifest only points at the current version so a consumer can open
  * a workspace without scanning every file.
  *
- * Codec contract (arch-review / test-strategy G11): parsing is FAIL-LOUD. A
- * malformed or absent manifest must surface as a typed `CorpusError` of kind
- * "io" or "browser-storage-cleared", never a silent default-empty manifest that
- * would masquerade as "this workspace has no work in it" and mask data loss.
+ * Codec contract (arch-review / test-strategy G11): parsing is FAIL-LOUD for
+ * content. A malformed or absent manifest surfaces as a typed `CorpusError` of
+ * kind "io", never a silent default-empty manifest that would masquerade as
+ * "this workspace has no work in it" and mask data loss. The only fields that
+ * default rather than fail are the `createdAt`/`updatedAt` timestamps (metadata,
+ * not content) — every content field (title, sources, artifacts, customArtifactTypeIds)
+ * fails loud if missing or malformed.
  */
 
 import { CorpusError } from "./types";
@@ -38,7 +41,7 @@ export interface WorkspaceManifest {
   updatedAt: string;
   sources: SourceRef[];
   artifacts: ArtifactPointer[];
-  customTypeIds: string[];
+  customArtifactTypeIds: string[];
 }
 
 export function createManifest(title: string, now = new Date().toISOString()): WorkspaceManifest {
@@ -49,7 +52,7 @@ export function createManifest(title: string, now = new Date().toISOString()): W
     updatedAt: now,
     sources: [],
     artifacts: [],
-    customTypeIds: [],
+    customArtifactTypeIds: [],
   };
 }
 
@@ -99,9 +102,9 @@ export function parseManifest(bytes: Uint8Array | null): WorkspaceManifest {
       })
     : fail("missing or invalid field: artifacts");
 
-  const customTypeIds: string[] = Array.isArray(raw.customTypeIds)
-    ? raw.customTypeIds.filter((x): x is string => typeof x === "string")
-    : fail("missing or invalid field: customTypeIds");
+  const customArtifactTypeIds: string[] = Array.isArray(raw.customArtifactTypeIds)
+    ? raw.customArtifactTypeIds.filter((x): x is string => typeof x === "string")
+    : fail("missing or invalid field: customArtifactTypeIds");
 
   return {
     manifestVersion: raw.manifestVersion,
@@ -110,6 +113,6 @@ export function parseManifest(bytes: Uint8Array | null): WorkspaceManifest {
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
     sources,
     artifacts,
-    customTypeIds,
+    customArtifactTypeIds,
   };
 }

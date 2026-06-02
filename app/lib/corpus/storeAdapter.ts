@@ -8,14 +8,17 @@
  * store ever knowing which adapter it talks to.
  *
  * In S1 the persist blob is stored as a SINGLE file via CorpusFS (blob mode) —
- * the files-per-artifact folder layout (layout.ts/manifest.ts) is built but not
- * used by the store until S4. This keeps S1 a pure substrate swap.
+ * the files-per-artifact folder layout (paths.ts/manifest.ts) is built but not
+ * used by the store until S4. This keeps S1 a pure substrate swap. The blob path
+ * goes through `stateBlobPath` in paths.ts so the `state/` namespace fork is
+ * greppable and S4 migration can find/reconcile it.
  */
 
 import type { StateStorage } from "zustand/middleware";
 import type { CorpusFS } from "./types";
 import { createOpfsCorpusFs } from "./opfsAdapter";
 import { isCorpusEnabled } from "./flag";
+import { stateBlobPath } from "./paths";
 
 // ---------------------------------------------------------------------------
 // Default: debounced localStorage (moved verbatim from workspaceStore.ts so the
@@ -52,7 +55,7 @@ export function createDebouncedLocalStorage(): StateStorage {
 export function createCorpusBackedStorage(fs: CorpusFS): StateStorage {
   const enc = new TextEncoder();
   const dec = new TextDecoder();
-  const pathFor = (name: string) => `state/${name}.json`;
+  const pathFor = (name: string) => stateBlobPath(name);
   return {
     getItem: async (name) => {
       const bytes = await fs.readFile(pathFor(name));

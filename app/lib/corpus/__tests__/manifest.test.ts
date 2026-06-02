@@ -12,7 +12,7 @@ describe("manifest round-trip (G12)", () => {
       { type: "semiformal", currentVersion: 3 },
       { type: "causal-graph", currentVersion: 1 },
     ];
-    m.customTypeIds = ["custom-abc", "custom-def"];
+    m.customArtifactTypeIds = ["custom-abc", "custom-def"];
 
     const parsed = parseManifest(serializeManifest(m));
     expect(parsed).toEqual(m);
@@ -45,7 +45,7 @@ describe("manifest fail-loud parse (G11)", () => {
 
   it("throws when sources entries are malformed", () => {
     const bytes = new TextEncoder().encode(
-      JSON.stringify({ manifestVersion: 1, title: "t", sources: [{ id: "x" }], artifacts: [], customTypeIds: [] }),
+      JSON.stringify({ manifestVersion: 1, title: "t", sources: [{ id: "x" }], artifacts: [], customArtifactTypeIds: [] }),
     );
     expect(() => parseManifest(bytes)).toThrow(/source entry missing/);
   });
