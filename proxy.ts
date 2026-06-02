@@ -17,11 +17,22 @@ import type { NextRequest } from "next/server";
  *
  * `connect-src 'self'` is sufficient because Anthropic / OpenAlex / OpenRouter
  * calls are server-to-server (Next API routes), not browser-to-third-party.
+ *
+ * Why `allowUnsafeEval` in development only: Next.js's dev server (HMR + eval
+ * source maps) injects `eval()`-based code that a strict CSP blocks, flooding
+ * the browser console with EvalErrors. Production output is genuinely
+ * eval-free, so `'unsafe-eval'` is added only when NODE_ENV !== "production".
  */
-export function buildCsp(nonce: string): string {
+export function buildCsp(
+  nonce: string,
+  allowUnsafeEval: boolean = process.env.NODE_ENV !== "production",
+): string {
+  const scriptSrc = `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${
+    allowUnsafeEval ? " 'unsafe-eval'" : ""
+  }`;
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
