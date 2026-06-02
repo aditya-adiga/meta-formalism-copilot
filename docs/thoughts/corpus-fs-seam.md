@@ -1,9 +1,9 @@
-# The corpus FS seam (DD-009 S1) — notes for S2–S4
+# The corpus FS seam (DD-009 S1+S2) — notes for S3–S5
 
 Last verified: 2026-06-01
 Relevant paths: app/lib/corpus/, app/lib/stores/storeAdapter (corpus/storeAdapter.ts), docs/decisions/009-artifact-corpus-architecture.md, docs/working/decomposition-corpus-architecture.md
 
-What S1 built and the contracts later sub-tasks must hold to.
+What S1+S2 built and the contracts later sub-tasks must hold to.
 
 ## The module (`app/lib/corpus/`)
 
@@ -11,18 +11,23 @@ What S1 built and the contracts later sub-tasks must hold to.
 - `paths.ts` — the only source of corpus paths (DD-009 folder layout). `workspaceSlug`/`safeSegment` are the single traversal choke point. **Do not hand-concatenate corpus paths elsewhere** — route every path through these builders so the sanitization can't be bypassed.
 - `manifest.ts` — `workspace.json` schema + fail-loud codec. `parseManifest` throws a typed `CorpusError` on malformed/absent input; it never returns a default-empty manifest (that would masquerade as data loss).
 - `opfsAdapter.ts` — `CorpusFS` over OPFS. SSR/unavailable → typed error; quota → `{kind:"quota-exceeded", substrate:"opfs"}` (not swallowed).
-- `flag.ts` — `isCorpusEnabled()`, default-off, dev-only.
-- `storeAdapter.ts` — `resolveWorkspaceStorage()` chooses debounced-localStorage (default) or `createCorpusBackedStorage(fs)`. **The seam is typed as `CorpusFS`** so S3's worker-proxy is a drop-in here without touching the store.
+- `fsaAdapter.ts` *(S2)* — `createFsaCorpusFs(handle)`: a `CorpusFS` over a user-picked `FileSystemDirectoryHandle`. Near-twin of `opfsAdapter`; SSR/no-handle → `{kind:"unavailable"}`; `NotAllowedError`/`SecurityError` → `{kind:"fsa-permission-revoked"}`; quota → `{quota-exceeded, substrate:"fsa"}`.
+- `mirrorFs.ts` *(S2)* — `createMirrorCorpusFs({primary, mirror?})`: a **decorator** `CorpusFS` (IS-a CorpusFS, passes the shared contract). Writes primary-sync + mirror-async-with-bounded-backoff; reads primary-then-fallthrough (browser-storage-clear recovery); `readdir` = sorted union. Exposes `getMirrorStatus()` (`idle|pending|ok|failed`, carries the typed `CorpusError` on `failed`) + `onMirror(cb)` — the **truthful sync-ack** the S5 "saved" indicator derives from. A mirror failure is SURFACED, never swallowed; the primary write still succeeds.
+- `fsaPicker.ts` *(S2)* — `pickFolder()` (user-gesture `showDirectoryPicker`; cancel→null; absent→`{unavailable}`), `ensurePermission()` (denied→`fsa-permission-revoked`), `saveHandle`/`loadHandle` (IDB get/set injected for tests). Pure function module — holds no global connected-handle singleton.
+- `flag.ts` — `isCorpusEnabled()`, default-off, dev-only, production-guarded.
+- `storeAdapter.ts` — `resolveWorkspaceStorage(connectedMirror?)` chooses debounced-localStorage (default) or `createCorpusBackedStorage(resolveCorpusFs(connectedMirror))`. **The seam is typed as `CorpusFS`** so S3's worker-proxy is a drop-in here without touching the store. `resolveCorpusFs(connectedMirror?, primary?)` *(S2)* is the focused selection helper: connected folder → mirror composite; else bare OPFS. Add future arms (S3 worker-proxy, S4 folder-layout) here, not in the wrapping.
 
 ## Load-bearing facts for S2–S4
 
 - **S1 is blob-mode.** The store writes the whole Zustand persist blob to one OPFS file (`state/workspace-zustand-v1.json`) via `CorpusFS`. The files-per-artifact folder layout (`paths.ts`/`manifest.ts`) is built and unit-tested but **not yet used by the store** — S4 is where the store starts reading/writing per-artifact files and the page.tsx session bridge is replaced. Don't assume enabling the flag today populates the folder layout; it doesn't.
 - **S1 does no migration.** Flag-ON starts from an empty corpus. S4 owns the localStorage→corpus one-shot migration (back up the five old keys before deleting).
-- **The contract suite is shared.** `app/lib/corpus/__tests__/corpusFsContract.ts` (`defineCorpusFsContract`) is run against the in-memory fake in CI and is intended to be run against the real OPFS adapter via Playwright out-of-CI (see `docs/spikes/corpus-opfs-smoke.md`). New `CorpusFS` implementations (FSA in S2, worker-proxy in S3) should be held to the same suite.
-- **The "saved" indicator is NOT S1's.** OPFS-write-ack ≠ "saved" (durability is on the browser's flush schedule). The truthful save state derives from the FSA-mirror ack (S2) and remote-push ack (S3); S1 ships no save UI.
+- **The contract suite is shared.** `app/lib/corpus/__tests__/corpusFsContract.ts` (`defineCorpusFsContract`) is run against the in-memory fake, the FSA adapter (over a fake handle, S2), and the mirror composite (over two in-memory fakes, S2) in CI, and is intended to be run against the real OPFS/FSA adapters via Playwright out-of-CI (`docs/spikes/corpus-opfs-smoke.md`, `docs/spikes/corpus-fsa-smoke.md`). New `CorpusFS` implementations (worker-proxy in S3) should be held to the same suite.
+- **The "saved" indicator is NOT S1/S2's UI — but the SIGNAL now exists (S2).** OPFS-write-ack ≠ "saved" (durability is on the browser's flush schedule). The truthful save state derives from the FSA-mirror ack (`mirrorFs.getMirrorStatus()`/`onMirror`, S2) and the remote-push ack (S3). S2 makes the FSA-mirror ack exist and be truthful (a mirror failure → `failed` status, never a green "saved"); the *UI* that consumes it — plus wiring zustand to actually `await`/debounce the seam (the other half of S1 review C4) — is **S5**. Until S5, under the flag a failed mirror is surfaced via status/ack but there is no UI showing it.
 
 ## Gotchas discovered in S1
 
 - **`layout.ts` is a RESERVED filename under `app/`.** Next.js App Router treats any `app/**/layout.{ts,tsx}` as a route layout and the build fails with "Property 'default' is missing in type ... LayoutConfig". That's why the path builders live in `paths.ts`, not `layout.ts`. Avoid `page`, `route`, `template`, `default`, `loading`, `error`, `not-found` as module names anywhere under `app/` too.
 - **`Uint8Array<ArrayBufferLike>` vs `BufferSource`.** Recent TS makes `Uint8Array` generic; typing an OPFS `write(data: BufferSource)` fails to accept it (SharedArrayBuffer mismatch). The local OPFS handle typings narrow `write` to `Uint8Array`.
 - **jsdom has no OPFS.** `navigator.storage.getDirectory` is absent under Vitest. The adapter's success path is unverifiable in CI — that's the whole reason for the in-memory fake + the out-of-CI Playwright smoke. Don't add a `.test.ts` that needs real OPFS; it will silently no-op or fail.
+- **jsdom has no FSA either** *(S2)*. No `showDirectoryPicker`, no `FileSystemDirectoryHandle`, and no way to persist a handle in IndexedDB. The FSA adapter is tested over a **fake `FileSystemDirectoryHandle`** (`__tests__/fakeFsaHandle.ts`, same technique as the OPFS test's `fakeRoot`); the picker over a stubbed `window.showDirectoryPicker`; persistence over an injected in-memory `HandleStore`. The real folder/permission/persistence flow is `docs/spikes/corpus-fsa-smoke.md` (Chromium/Edge only — Firefox/Safari lack `showDirectoryPicker`, so `pickFolder()` rejects `{unavailable}` and the app stays OPFS-only).
+- **Don't make the store reach into `fsaPicker` for the connected handle** *(S2, arch-review F3)*. The connected FSA `CorpusFS` is INJECTED into `resolveCorpusFs(connectedMirror)`; `fsaPicker` returns handles, it does not hold a global "currently connected" singleton. Keep the composition root (`storeAdapter`) as the only place that decides which `CorpusFS` the store uses.

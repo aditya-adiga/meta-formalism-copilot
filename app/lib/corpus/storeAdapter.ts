@@ -12,11 +12,20 @@
  * used by the store until S4. This keeps S1 a pure substrate swap. The blob path
  * goes through `stateBlobPath` in paths.ts so the `state/` namespace fork is
  * greppable and S4 migration can find/reconcile it.
+ *
+ * S2 adds a THIRD selection arm: when the user has connected an FSA folder, the
+ * store's CorpusFS becomes a mirror composite (OPFS primary + the connected FSA
+ * mirror) instead of bare OPFS. The connected FSA CorpusFS is INJECTED into
+ * `resolveCorpusFs` (not reached out of fsaPicker's internals) so the selection
+ * stays unit-testable with an in-memory fake and the composition root owns the
+ * wiring (arch-review F2/F3). flag-OFF and flag-ON/no-folder arms are unchanged
+ * from S1 (byte-for-byte the prior behavior).
  */
 
 import type { StateStorage } from "zustand/middleware";
 import type { CorpusFS } from "./types";
 import { createOpfsCorpusFs } from "./opfsAdapter";
+import { createMirrorCorpusFs } from "./mirrorFs";
 import { isCorpusEnabled } from "./flag";
 import { stateBlobPath } from "./paths";
 
@@ -70,10 +79,37 @@ export function createCorpusBackedStorage(fs: CorpusFS): StateStorage {
   };
 }
 
-/** Selected once when the store's persist middleware initializes. */
-export function resolveWorkspaceStorage(): StateStorage {
+/**
+ * Build the CorpusFS the store should use when the corpus flag is on. With a
+ * connected FSA mirror, returns the OPFS+FSA mirror composite; otherwise bare
+ * OPFS (S1 behavior). Factored out of `resolveWorkspaceStorage` so future arms
+ * (S3 worker-proxy, S4 folder-layout) add to one focused function and the
+ * StateStorage wrapping stays untouched (arch-review F2). `connectedMirror` is
+ * injected so the selection is testable with an in-memory fake (arch-review F3).
+ * `primary` defaults to the OPFS adapter and is injectable only for tests (jsdom
+ * has no OPFS) — production always uses the default.
+ */
+export function resolveCorpusFs(
+  connectedMirror?: CorpusFS | null,
+  primary: CorpusFS = createOpfsCorpusFs(),
+): CorpusFS {
+  if (connectedMirror) {
+    return createMirrorCorpusFs({ primary, mirror: connectedMirror });
+  }
+  return primary;
+}
+
+/**
+ * Selected once when the store's persist middleware initializes.
+ *
+ * `connectedMirror` is the FSA-backed CorpusFS for a user-connected folder, or
+ * null/undefined when none is connected (the common case at init — the folder is
+ * connected later via a user gesture, after which the store would be re-pointed).
+ * Default-off + production-guarded via `isCorpusEnabled()` (S1).
+ */
+export function resolveWorkspaceStorage(connectedMirror?: CorpusFS | null): StateStorage {
   if (isCorpusEnabled()) {
-    return createCorpusBackedStorage(createOpfsCorpusFs());
+    return createCorpusBackedStorage(resolveCorpusFs(connectedMirror));
   }
   return createDebouncedLocalStorage();
 }
