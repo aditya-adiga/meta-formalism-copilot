@@ -28,8 +28,8 @@ declare const self: {
 };
 
 import { Buffer } from "buffer";
-import * as git from "isomorphic-git";
-// iso-git's browser http client. Imported only in worker scope.
+// iso-git's browser http client. Imported only in worker scope (iso-git itself is
+// pulled in transitively via gitCore — it must not load on the main thread).
 import http from "isomorphic-git/http/web";
 import { createGitCore } from "./gitCore";
 import { createGitFs } from "./gitFs";
