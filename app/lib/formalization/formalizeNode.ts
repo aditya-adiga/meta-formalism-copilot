@@ -1,6 +1,6 @@
 import type { PropositionNode, NodeArtifact } from "@/app/lib/types/decomposition";
 import type { ArtifactType, BuiltinArtifactType } from "@/app/lib/types/session";
-import { isCustomType } from "@/app/lib/types/customArtifact";
+import { isCustomType, type CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import type { ArtifactGenerationRequest } from "@/app/lib/types/artifacts";
 import { gatherDependencyContext } from "@/app/lib/utils/leanContext";
 import { generateSemiformal, fetchApi } from "@/app/lib/formalization/api";
@@ -24,6 +24,13 @@ export async function formalizeNode(
   signal?: CancelSignal,
   artifactTypes?: ArtifactType[],
   contextText?: string,
+  /**
+   * Definitions for custom artifact types selected via "Generate All". The
+   * queue needs these to dispatch custom types to /api/formalization/custom
+   * (the per-node path in useArtifactGeneration uses the same route).
+   * Omit or pass [] to skip custom types — matches the legacy behavior.
+   */
+  customTypeDefs?: CustomArtifactTypeDefinition[],
 ): Promise<"verified" | "failed"> {
   // If no artifact types specified, default to legacy deductive pipeline
   const types = artifactTypes && artifactTypes.length > 0 ? artifactTypes : ["semiformal" as ArtifactType];
@@ -65,7 +72,7 @@ export async function formalizeNode(
     // Run non-deductive artifact generation in parallel
     if (nonDeductiveTypes.length > 0) {
       const request: ArtifactGenerationRequest = { sourceText: nodeText, context, nodeId: node.id, nodeLabel: node.label };
-      const artifactResults = await generateNonDeductiveArtifacts(nonDeductiveTypes, request, signal);
+      const artifactResults = await generateNonDeductiveArtifacts(nonDeductiveTypes, request, signal, customTypeDefs);
 
       if (signal?.cancelled) {
         updateNode(node.id, { verificationStatus: "unverified", verificationErrors: "" });
@@ -109,11 +116,37 @@ async function generateNonDeductiveArtifacts(
   types: ArtifactType[],
   request: ArtifactGenerationRequest,
   signal?: CancelSignal,
+  customTypeDefs?: CustomArtifactTypeDefinition[],
 ): Promise<Array<{ type: ArtifactType; content: unknown }>> {
+  // Index custom defs by id for O(1) lookup inside the per-type promise.
+  // Mirrors useArtifactGeneration so single-node and batch paths agree.
+  const customDefsById = new Map((customTypeDefs ?? []).map((d) => [d.id, d]));
+
   const promises = types.map(async (type): Promise<{ type: ArtifactType; content: unknown } | null> => {
     if (signal?.cancelled) return null;
-    // formalizeNode only handles built-in types (custom types go through useArtifactGeneration)
-    if (isCustomType(type)) return null;
+
+    // Custom artifact types: dispatch to /api/formalization/custom with the
+    // user's system prompt. Without a matching definition we skip silently —
+    // the type was selected but its definition isn't in the workspace.
+    if (isCustomType(type)) {
+      const def = customDefsById.get(type);
+      if (!def) return null;
+      try {
+        const data = await fetchApi<Record<string, unknown>>(
+          "/api/formalization/custom",
+          {
+            ...request,
+            customSystemPrompt: def.systemPrompt,
+            customOutputFormat: def.outputFormat,
+          },
+        );
+        return { type, content: data.result ?? null };
+      } catch (err) {
+        console.error(`[formalizeNode:${type}]`, err);
+        return null;
+      }
+    }
+
     const builtinType = type as BuiltinArtifactType;
     const route = ARTIFACT_ROUTE[builtinType];
     if (!route) return null;

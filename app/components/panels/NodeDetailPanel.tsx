@@ -3,6 +3,7 @@
 import type { PropositionNode, NodeVerificationStatus } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import FormalizationControls from "@/app/components/features/formalization-controls/FormalizationControls";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 
@@ -18,6 +19,11 @@ type NodeDetailPanelProps = {
   onNodeContextChange: (text: string) => void;
   onNodeArtifactTypesChange: (types: ArtifactType[]) => void;
   loadingState?: ArtifactLoadingState;
+  /** Custom artifact type support — threaded through to the chip selector */
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  onCreateCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onEditCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onDeleteCustomType?: (id: string) => void;
 };
 
 const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: string }> = {
@@ -30,6 +36,7 @@ const STATUS_LABELS: Record<NodeVerificationStatus, { text: string; color: strin
 export default function NodeDetailPanel({
   node, dependencies, onFormalise, onGenerateLean, loading,
   globalContextText, onNodeContextChange, onNodeArtifactTypesChange, loadingState = {},
+  customArtifactTypes, onCreateCustomType, onEditCustomType, onDeleteCustomType,
 }: NodeDetailPanelProps) {
   const status = STATUS_LABELS[node.verificationStatus];
 
@@ -155,6 +162,14 @@ export default function NodeDetailPanel({
             loading={loading}
             loadingState={loadingState}
             contextPlaceholder={globalContextText || "e.g., Analyze this from a decision-making perspective, considering strategic interactions between actors..."}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={onCreateCustomType}
+            onEditCustomType={onEditCustomType}
+            onDeleteCustomType={onDeleteCustomType}
+            // The node's statement is what the formalization actually runs on, so
+            // it doubles as the designer test preview source and the cost input.
+            sourceText={node.statement}
+            sourceCharLength={node.statement.length + (node.proofText?.length ?? 0)}
           />
         </div>
       </div>

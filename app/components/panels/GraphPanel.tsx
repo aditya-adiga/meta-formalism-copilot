@@ -4,9 +4,10 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { PropositionNode, SourceDocument, GraphLayout } from "@/app/lib/types/decomposition";
 import type { ArtifactType } from "@/app/lib/types/session";
+import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
 import type { QueueProgress } from "@/app/hooks/useAutoFormalizeQueue";
 import { useStreamingMerge } from "@/app/hooks/useStreamingMerge";
-import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
+import OutputTypesSection from "@/app/components/features/artifact-selector/OutputTypesSection";
 import DownloadButton from "@/app/components/ui/DownloadButton";
 import CostTooltip from "@/app/components/ui/CostTooltip";
 
@@ -47,6 +48,11 @@ type GraphPanelProps = {
   onRenameNode?: (nodeId: string, label: string) => void;
   onConnectNodes?: (fromId: string, toId: string) => boolean;
   onDeleteEdges?: (edges: Array<{ source: string; target: string }>) => void;
+  /** Custom artifact type support for the "Generate All" picker. */
+  customArtifactTypes?: CustomArtifactTypeDefinition[];
+  onCreateCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onEditCustomType?: (def: CustomArtifactTypeDefinition) => void;
+  onDeleteCustomType?: (id: string) => void;
 };
 
 export default function GraphPanel({
@@ -71,6 +77,10 @@ export default function GraphPanel({
   onRenameNode,
   onConnectNodes,
   onDeleteEdges,
+  customArtifactTypes,
+  onCreateCustomType,
+  onEditCustomType,
+  onDeleteCustomType,
 }: GraphPanelProps) {
   const { displayData: displayPropositions, hasDisplayData: hasNodes } = useStreamingMerge(
     propositions.length > 0 ? propositions : null,
@@ -100,6 +110,14 @@ export default function GraphPanel({
 
   const totalInputCharLength = useMemo(
     () => sourceDocuments.reduce((sum, doc) => sum + doc.text.length, 0),
+    [sourceDocuments],
+  );
+
+  // Concatenated source text for the custom-type designer's test preview.
+  // The designer is reachable from the "Generate All" picker, so it needs
+  // representative source content; we join all sources with blank lines.
+  const combinedSourceText = useMemo(
+    () => sourceDocuments.map((d) => d.text).join("\n\n"),
     [sourceDocuments],
   );
 
@@ -261,15 +279,17 @@ export default function GraphPanel({
         </div>
       )}
 
-      {/* Artifact type picker — shown when user clicks Formalize All */}
+      {/* Artifact type picker — shown when user clicks Generate All */}
       {showArtifactPicker && (
         <div className="border-b border-[#DDD9D5] bg-[#FDFCFB] px-6 py-3">
-          <p className="mb-2 text-xs font-medium text-[#6B6560]">
-            Select output types to generate for all parts:
-          </p>
-          <ArtifactChipSelector
+          <OutputTypesSection
             selected={queueArtifactTypes}
             onChange={setQueueArtifactTypes}
+            customArtifactTypes={customArtifactTypes}
+            onCreateCustomType={onCreateCustomType}
+            onEditCustomType={onEditCustomType}
+            onDeleteCustomType={onDeleteCustomType}
+            sourceText={combinedSourceText}
           />
           <div className="mt-3 flex items-center gap-2">
             <button
