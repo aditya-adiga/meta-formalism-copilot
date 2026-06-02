@@ -123,3 +123,76 @@ export interface CorpusFS {
   /** Returns `{ size }` for an existing file, or `null` if it does not exist. */
   stat(path: string): Promise<CorpusStat | null>;
 }
+
+// ---------------------------------------------------------------------------
+// The git interface (DD-009 sub-task S3) — DELIBERATELY SEPARATE from CorpusFS.
+//
+// Git is NOT part of CorpusFS (arch-review finding 2, ISP): `CorpusGit` operates
+// *over* a `CorpusFS` (via the iso-git-fs shim in gitFs.ts), it is not a kind of
+// `CorpusFS`. Keeping it a distinct interface means the in-memory fake and every
+// non-git consumer (e.g. the store's storage seam) never have to stub git methods
+// they don't use. The concrete impl is a worker proxy (gitWorkerClient.ts) so
+// iso-git's SHA1/zlib CPU bursts run off the main thread (DD-009 §Decision).
+// ---------------------------------------------------------------------------
+
+/** One entry of git history (a commit). Mirrors the subset of iso-git's
+ *  `ReadCommitResult` the version-history UI needs. */
+export interface GitLogEntry {
+  /** Full 40-char commit oid (the `sha` half of the (repo-url, sha, path) triple). */
+  oid: string;
+  message: string;
+  /** Author name + epoch-seconds timestamp (UTC). */
+  author: { name: string; email: string; timestamp: number };
+}
+
+/** A bounded page of git log entries. `nextCursor` is the oid to resume from on
+ *  the next page, or `null` when the history is exhausted. Pagination is the
+ *  3000-commit-cliff mitigation (perf-characteristics.md): callers MUST page,
+ *  never request an unbounded log. */
+export interface GitLogPage {
+  entries: GitLogEntry[];
+  nextCursor: string | null;
+}
+
+/** Options for a paginated log read. `filepath` scopes to one artifact's history
+ *  (the F6 provenance path); `depth` bounds the page; `cursor` resumes a prior page. */
+export interface GitLogOptions {
+  filepath?: string;
+  depth?: number;
+  cursor?: string;
+}
+
+/** Result of a commit. `noChange:true` means the working tree matched HEAD and no
+ *  new commit was created (the returned oid is the existing HEAD). */
+export interface GitCommitResult {
+  oid: string;
+  noChange: boolean;
+}
+
+/** One working-tree status entry vs HEAD. */
+export interface GitStatusEntry {
+  path: string;
+  status: "added" | "modified" | "deleted" | "unmodified";
+}
+
+/**
+ * The git pipeline over the corpus. Async (the impl crosses a worker boundary);
+ * every method rejects with a typed `CorpusError` (reconstructed from a
+ * `CorpusWorkerError` on the main thread) — never an untyped throw.
+ */
+export interface CorpusGit {
+  /** Initialize a git working tree at the corpus root (idempotent). */
+  init(): Promise<void>;
+  /** Stage all changes and commit; resolves with the new (or unchanged) HEAD oid. */
+  commit(message: string): Promise<GitCommitResult>;
+  /** Lazy, paginated history. Never an eager unbounded log (cliff mitigation). */
+  log(options?: GitLogOptions): Promise<GitLogPage>;
+  /** Working-tree status vs HEAD. */
+  status(): Promise<GitStatusEntry[]>;
+  /** Push to the configured remote. Rejects `{kind:"remote-auth-expired"}` on auth
+   *  failure (never a generic io error). */
+  push(): Promise<void>;
+  /** Pull from the configured remote. A both-sides edit rejects
+   *  `{kind:"git-conflict", path}` (v1 last-write-wins detection; warning UI is S5). */
+  pull(): Promise<void>;
+}
