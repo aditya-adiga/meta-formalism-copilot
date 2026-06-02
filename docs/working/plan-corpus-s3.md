@@ -2,7 +2,7 @@
 
 - **Goal**: Implement DD-009's cross-device-sync + provenance half — a `CorpusGit` interface (commit / lazy-paginated log / push / pull / status) backed by `isomorphic-git` running in a dedicated Web Worker so its SHA1/zlib CPU bursts stay off the main thread, with every error reified into the existing typed `CorpusWorkerError` across the boundary, conflict detection mapping to the existing `git-conflict` kind — all behind the existing default-off, dev-only corpus flag, without disturbing the localStorage default or S1's committed behavior.
 - **Project state**: branch `feat/corpus-git-pipeline` off `feat/corpus-architecture` (S1, not yet merged to main); third of the S0–S5 sub-tasks; depends on S0 layout + S1, **parallel-independent of S2** (branched off S1, not S2) · not blocked (S1 contracts settled + committed; both iso-git spikes complete with validated versions).
-- **Task status**: in-progress.
+- **Task status**: complete (S3 implemented 2026-06-01 on `feat/corpus-git-pipeline`; lint clean, `npm run build` (Turbopack) green, 358 tests pass incl. 33 new S3 corpus tests; S1 characterization + flag-routing unaffected; real worker + real OPFS + real remote documented in `docs/spikes/corpus-git-smoke.md` but not run). FS route chosen: iso-git-fs shim over `CorpusFS` (validated against real iso-git@1.38.3 — see the spike-found `bindFs`/`statusMatrix-root` gotchas folded into gitFs.ts). commit-on-write deferred to S4 as planned.)
 
 Research: docs/working/research-corpus-s3.md
 Decomposition: docs/working/decomposition-corpus-architecture.md
