@@ -52,6 +52,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - `lib/formalization/` — Shared artifact generation logic
 - `lib/utils/` — Utilities (PDF parsing, LaTeX parsing, export, text selection)
 - `lib/stores/` — Zustand stores: `evidenceStore` (evidence search results, persisted to localStorage)
+- `lib/corpus/` — DD-009 corpus filesystem layer (sub-task S1): `CorpusFS` interface + error kinds (`types.ts`), folder-layout path builders (`paths.ts` — **not** `layout.ts`, which is a reserved Next.js filename), `workspace.json` codec (`manifest.ts`), OPFS adapter (`opfsAdapter.ts`), default-off dev flag (`flag.ts`), and the store storage-seam selector (`storeAdapter.ts`). Behind a flag; localStorage is still the default persistence path.
 - `api/` — Next.js API routes for formalization, editing, verification, decomposition, analytics, evidence search
 
 ### Key Patterns
@@ -62,6 +63,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - **Multiple artifact types**: semiformal, lean, causal-graph, statistical-model, property-tests, dialectical-map — each with a dedicated panel and API route. Users can also create **custom artifact types** with user-authored system prompts, generated via a generic `/api/formalization/custom` route.
 - **Decomposition workflow**: extract propositions from sources into a dependency graph, then formalize per-node
 - **Session management**: workspace sessions (global) and formalization sessions (per-scope) for tracking artifact history
+- **Corpus persistence (DD-009, in progress)**: a `CorpusFS` abstraction in `lib/corpus/` will eventually replace localStorage with an OPFS-cached, FSA-folder + git-remote corpus. Sub-task S1 (the `CorpusFS` interface + OPFS adapter) is wired behind `lib/corpus/flag.ts` (`isCorpusEnabled()`), **default-off and dev-only** — enabling it starts from an empty corpus (no migration until S4), so it must not be turned on for end users yet. Note for tests: **jsdom has no OPFS**, so the OPFS adapter's success path is verified via an in-memory fake + an out-of-CI Playwright smoke (`docs/spikes/corpus-opfs-smoke.md`), not the Vitest suite.
 
 ### Design System
 

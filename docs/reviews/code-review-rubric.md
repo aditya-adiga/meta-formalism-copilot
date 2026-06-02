@@ -1,86 +1,67 @@
 # Code Review Rubric
 
-**Scope:** `feat/custom-artifact-types` vs `main` — 23 files, +1434/-193 | **Reviewed:** 2026-04-07 | **Status: ✅ PASSES REVIEW**
+**Scope:** feat/corpus-architecture vs main (`app/` code only; ~1166 lines, 15 files) | **Reviewed:** 2026-06-01 | **Commit:** 2dc403e | **Status: 🟡 CONDITIONAL PASS** — 4 amber item(s), all fixed in follow-up commit
+
+Pipeline: code-fact-check + security + performance + api-consistency + architecture-review (code-stage) + tech-debt-triage (advisory). test-strategy skipped (tests ship with the change); dependency-upgrade skipped (no manifest change).
 
 ---
 
 ## 🔴 Must Fix
 
-Issues that must be resolved before merge. Draft cannot pass review with any red items unresolved.
-
-| # | Finding | Domain | Location | Status |
-|---|---|---|---|---|
-| — | No red items | — | — | — |
+None.
 
 ---
 
 ## 🟡 Must Address
 
-Issues that must be fixed or acknowledged by the author with justification for why they stand. Each must carry a resolution or author note.
-
-| # | Finding | Domain | Source | Status | Author note |
-|---|---|---|---|---|---|
-| A1 | `usePanelDefinitions` invalidated on every loading state change — passing unstable `artifactLoadingState` object breaks granular memo deps | Performance | Performance reviewer | ✅ Fixed | Derived stable `customLoadingKey` string instead of passing whole object |
-| A2 | `renderPanel` useCallback has excessive dependency array — `customArtifactData` and `customArtifactTypes` are unstable refs that cause re-render cascade | Performance | Performance reviewer | ✅ Fixed | Moved to refs (`customArtifactTypesRef`, `customArtifactDataRef`) |
-| A3 | CustomTypeDesigner action buttons trapped inside scroll container — buttons scroll out of view at 1366x768 on review step | UI Layout | UI visual reviewer | ✅ Fixed | Split modal into pinned header + scrollable body + pinned footer |
-| A4 | `persistence.ts:32` comment says "added in v2" but `WORKSPACE_VERSION` was already 2 and wasn't bumped — misleading version history | Fact-check + API Consistency | Fact-check (Incorrect, high confidence) + API consistency | ✅ Fixed | Changed to "optional, backward-compatible addition to v2" |
-| A5 | `customArtifact.ts:7` references "cross-session library" that doesn't exist — sets incorrect expectations | Fact-check + API Consistency | Fact-check (Unverifiable) + API consistency | ✅ Fixed | Removed cross-session library reference |
-| A6 | Design route (`/api/custom-type/design`) duplicates `handleArtifactRoute` patterns instead of reusing shared infrastructure | API Consistency | API consistency reviewer | ✅ Fixed | Added comment documenting why it diverges (different semantics) |
+| # | Finding | Domain | Source | Legibility-target | Considered overrides | Status | Author note |
+|---|---|---|---|---|---|---|---|
+| A1 | `WorkspaceManifest.customTypeIds` should be `customArtifactTypeIds` to match the app-wide `customArtifactType*` vocabulary; cheap now (no consumers), on the S4 reconciliation path | API Consistency (Inconsistent) | api-consistency | for-author | — | ✅ Fixed | Renamed in manifest.ts + test |
+| A2 | `createCorpusBackedStorage` writes the blob under `state/<name>.json`, a namespace parallel to the `paths.ts` folder layout that bypasses the traversal choke point and that S4 migration must reconcile | Architecture (Coupling, escalated) | api-consistency + architecture (converged) | for-author | — | ✅ Fixed | Added STATE_DIR/stateBlobPath in paths.ts + breadcrumb |
+| A3 | Stale comments: `layout.ts` ref in storeAdapter.ts (file is `paths.ts`) and `workspaceStore.ts:44-46` ref in opfsAdapter.ts (swallow code now in storeAdapter.ts) | Fact-check (Mostly Accurate) | fact-check + tech-debt | for-author | — | ✅ Fixed | Comments corrected |
+| A4 | manifest.ts docstring drift: implies a `browser-storage-cleared` throw the codec never emits (only `io`); claims "never silent default" but defaults `createdAt`/`updatedAt` | Fact-check / Architecture (Minor, converged) | fact-check + architecture (F3) | for-author | — | ✅ Fixed | Docstring corrected to match behavior |
 
 ---
 
 ## 🟢 Consider
 
-Advisory findings from contextual critics, single-critic suggestions, and improvement opportunities. Not required to pass review.
+| # | Finding | Source | Legibility-target | Considered overrides |
+|---|---|---|---|---|
+| C1 | opfsAdapter `splitPath` doesn't reject `.`/`..`/backslash — defense-in-depth, latent once S4 has many callers | security (Low) | for-author | — |
+| C2 | flag.ts has no `NODE_ENV` guard; enabling it swaps to an empty corpus and existing localStorage work appears to vanish (data-availability footgun) | security (Low) | for-author | — |
+| C3 | `walkDir` re-resolves the full directory chain per op; add handle caching/batching before S4's files-per-artifact layout makes it O(files×depth) round-trips | performance (Low→Med for S4) | for-author | — |
+| C4 | Corpus storage seam is async + un-debounced and zustand doesn't await it → a quota/io failure under the flag is a silently-dropped floating promise (the silent-fallback DD-009 forbids). Needs debounce + sync-ack in S2/S3/S5 | tech-debt #2 (+ performance) | for-author | — |
+| C5 | `readdir` casing vs codebase camelCase | api-consistency (Minor) | for-author | — |
+| C6 | Playwright OPFS smoke documented but not yet run/automated — run once before the flag is enabled anywhere shared | tech-debt #4 | for-author | — |
+| C7 | Error messages embed corpus paths; manifest doesn't re-sanitize id/ext — forward note for S3/S4 | security (Info) | for-author | — |
+| C8 | paths.ts/manifest.ts built but unused until S4 (dead-until-later) — intentional staging, tracked in decomposition | tech-debt #1 | for-orchestrator-synthesis | — |
+| C9 | Dev flag + no migration = data loss on toggle — intentional, documented | tech-debt #5 | for-orchestrator-synthesis | — |
 
-| # | Finding | Source |
-|---|---|---|
-| C1 | User-controlled system prompt becomes a prompt injection vector if workspace sharing is ever added — document the trust assumption | Security |
-| C2 | LLM-generated type definitions pass through a two-hop chain without content validation — user review step mitigates | Security |
-| C3 | No rate limiting on LLM-calling API routes (pre-existing gap, not introduced by this PR) | Security |
-| C4 | Double JSON parse in custom route via `request.clone()` — unnecessary serialization cost (cold path) | Performance |
-| C5 | Orphaned `customArtifactData` keys accumulate in localStorage when types are deleted then snapshots restored | Performance |
-| C6 | Custom route uses generic `"result"` response key, breaking naming symmetry with built-in routes | API Consistency |
-| C7 | `isCustomType("custom-")` matches empty suffix — minor robustness gap | API Consistency |
-| C8 | `customArtifactData` split across `artifacts` and top-level in persistence — asymmetric structure | API Consistency |
-| C9 | `ARTIFACT_RESPONSE_KEY` comment says "kebab-case -> camelCase" but `semiformal->proof` and `lean->leanCode` aren't case conversions | Fact-check (Mostly Accurate) |
-| C10 | `formatLabel` docstring says "camelCase or snake_case" but also handles kebab-case | Fact-check (Mostly Accurate) |
-| C11 | ArtifactTypeModal header scrolls away with many custom types (pre-existing, worsened) | UI Visual |
-| C12 | `CustomArtifactIcon` SVG paths exceed 20x20 viewBox — may clip | UI Visual |
-| C13 | Recursive `JsonSection` has no depth guard for deeply nested LLM output | UI Visual |
-| C14 | `page.tsx` god component (780 lines, 57+ memo deps) — highest carrying-cost tech debt item, approaching tipping point | Tech Debt Triage |
-| C15 | `useWorkspacePersistence` monolith (327 lines, 25+ exports) — related to C14, should be split alongside | Tech Debt Triage |
-| C16 | Custom types silently skip node-level formalization with no UI indication | Tech Debt Triage |
-| C17 | No system prompt sanitization beyond length check — acceptable for single-user tool, flag when sharing is added | Tech Debt Triage |
-| C18 | High-priority test gaps: `useWorkspacePersistence` CRUD, `useArtifactGeneration` custom routing, custom API route validation | Test Strategy |
-| C19 | Medium-priority test gaps: design API route, `usePanelDefinitions` with custom types, `CustomArtifactPanel` rendering | Test Strategy |
-| C20 | Systemic gap: no API route tests exist anywhere in the project | Test Strategy |
+---
+
+## ↩️ Considered Overrides
+
+No prior overrides matched this diff. (override-log.md created this run; no rows yet.)
 
 ---
 
 ## ✅ Confirmed Good
 
-Patterns, implementations, or claims confirmed correct by fact-check and/or critics.
-
-| Item | Verdict | Source |
-|---|---|---|
-| Type system extension (`BuiltinArtifactType \| CustomArtifactTypeId`) is clean and well-designed | ✅ Confirmed | API Consistency, Performance |
-| `custom-` prefix convention with `isCustomType` guard prevents type confusion | ✅ Confirmed | Fact-check, Security |
-| Custom formalization route correctly reuses `handleArtifactRoute` | ✅ Confirmed | API Consistency |
-| Persistence is backward-compatible — optional fields with `?? []`/`?? {}` defaults | ✅ Confirmed | Fact-check, API Consistency |
-| `isValidCustomTypeDef` defensive validation on localStorage load | ✅ Confirmed | Security, Performance |
-| No XSS vectors — React auto-escaping, no `dangerouslySetInnerHTML` | ✅ Confirmed | Security |
-| `MAX_SYSTEM_PROMPT_LENGTH` guard (10,000 chars) on custom route | ✅ Confirmed | Security, Performance |
-| `transformBody` strips custom fields before `buildUserMessage` | ✅ Confirmed | Security |
-| Parallel generation via `Promise.allSettled` — no sequential bottleneck | ✅ Confirmed | Performance |
-| Stale selection cleanup via `useEffect` on `customArtifactTypes` | ✅ Confirmed | API Consistency, Performance |
-| `updateCustomArtifactType` clears stale data when system prompt changes | ✅ Confirmed | Performance |
-| `ARTIFACT_META` keyed by `BuiltinArtifactType` with entry for every member | ✅ Confirmed | Fact-check |
-| `SELECTABLE_ARTIFACT_TYPES` correctly excludes `lean` (deductive pipeline only) | ✅ Confirmed | Fact-check |
-| `ARTIFACT_ROUTE` is `Partial<Record>` — semiformal and lean correctly absent | ✅ Confirmed | Fact-check |
-| Request cloning in custom route handles body stream correctly | ✅ Confirmed | Security, Fact-check |
-| Custom types return `null` from `formalizeNode` (intentional scope boundary) | ✅ Confirmed | Fact-check |
+| Item | Verdict | Source | Legibility-target |
+|---|---|---|---|
+| Path sanitization is allowlist (`[^a-zA-Z0-9_-]+`) + NFKD + empty-result throw; `../etc/passwd`→`etc-passwd`, `..`→throws | ✅ Confirmed | security | for-orchestrator-synthesis |
+| OPFS quota reified to `{kind:"quota-exceeded",substrate:"opfs"}` not swallowed; SSR guard rejects typed before touching navigator.storage | ✅ Confirmed | security + fact-check | for-orchestrator-synthesis |
+| CorpusFS has exactly 5 methods, no git; CorpusGit reserved for S3 | ✅ Confirmed | fact-check + api-consistency + architecture | for-orchestrator-synthesis |
+| Single substrate-neutral CorpusErrorKind feeds both CorpusError and CorpusWorkerError | ✅ Confirmed | api-consistency + architecture | for-orchestrator-synthesis |
+| Store binds to the CorpusFS abstraction; OPFS isolated to one composition root — S2/S3/S4 are drop-in swaps | ✅ Confirmed | architecture | for-orchestrator-synthesis |
+| Debounced-localStorage OFF path moved verbatim (behavior parity) | ✅ Confirmed | performance + fact-check | for-orchestrator-synthesis |
 
 ---
 
-To pass review: all 🔴 items must be resolved. All 🟡 items must be either fixed or carry an author note. 🟢 items are optional.
+## ⏭️ Skipped Core Critics
+
+All core critics ran; no skips applied. (test-strategy and dependency-upgrade are contextual and were not triggered.)
+
+---
+
+To pass review: all 🔴 resolved (none). All 🟡 fixed or carrying an author note (all 4 fixed). 🟢 optional.
