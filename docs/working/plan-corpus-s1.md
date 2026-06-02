@@ -2,7 +2,7 @@
 
 - **Goal**: Implement the foundational corpus filesystem layer — a `CorpusFS` interface, folder/manifest contracts, and an OPFS-backed adapter that the workspace store can read/write through behind a feature flag — without disturbing the localStorage default, as the first sub-task of DD-009.
 - **Project state**: `feat/corpus-architecture` carries the DD-009 decision + both iso-git spikes (merged from doc branches); this is the first of the S0–S5 sub-tasks from the decomposition · standalone otherwise · not blocked.
-- **Task status**: in-progress (plan drafted, awaiting approval — implementation gated)
+- **Task status**: complete (S1 implemented 2026-06-01; lint clean, build passes, 324 tests green incl. 25 new corpus tests + 4 characterization. Renamed `layout.ts`→`paths.ts` to dodge Next.js reserved filename; out-of-CI OPFS Playwright smoke documented but not yet run.)
 
 Research: docs/working/research-corpus-architecture.md
 Decomposition: docs/working/decomposition-corpus-architecture.md
@@ -45,7 +45,7 @@ Research ~30k (complete), Implementation ~55k, Review ~20k.
 
 ## Actual context cost (post-implementation)
 
-__ (to fill in during step 6/7)
+Research ~30k, Implementation ~45k, Review/verify ~15k. Roughly on estimate; implementation a touch under (S1 is ~70% tests + small files, and the largest existing-file edit shrank `workspaceStore.ts` rather than growing it).
 
 ## Test specification
 

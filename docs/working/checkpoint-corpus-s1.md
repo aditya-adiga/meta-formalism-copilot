@@ -22,7 +22,7 @@ Architecture review: docs/reviews/architecture-review.md
 
 ## Plan (summary — full steps in plan-corpus-s1.md)
 1. `corpus/types.ts` — `CorpusFS` interface; single substrate-neutral `CorpusErrorKind` source feeding `CorpusError`+`CorpusWorkerError`; document `CorpusGit` as a separate interface over `CorpusFS`.
-2. `corpus/layout.ts` — DD-009 folder-layout path builders + slug-traversal sanitization.
+2. `corpus/paths.ts` — DD-009 folder-layout path builders + slug-traversal sanitization (named `paths.ts`, not `layout.ts`, which Next.js reserves under `app/`).
 3. `corpus/manifest.ts` — `workspace.json` schema + fail-loud serialize/parse.
 4. **(test-first)** `__tests__/workspaceStore-characterization.test.ts` — lock current localStorage round-trip as equivalence target.
 5. **(test-first)** `corpus/__tests__/` — in-memory fake + shared contract test (incl. S4 many-small-files access pattern) + layout/manifest unit tests.
@@ -43,7 +43,7 @@ Implementation order: `[1,2,3,4] → 5 → 6 → 7 → 8 → 10`; 9 any time aft
 
 ## File map
 - `app/lib/corpus/types.ts` — CorpusFS interface + error kinds (step 1, new)
-- `app/lib/corpus/layout.ts` — path builders + slug sanitization (step 2, new)
+- `app/lib/corpus/paths.ts` — path builders + slug sanitization (step 2, new; renamed from layout.ts — Next.js reserved name)
 - `app/lib/corpus/manifest.ts` — workspace.json schema + codec (step 3, new)
 - `app/lib/corpus/opfsAdapter.ts` — OPFS implementation of CorpusFS (step 6, new)
 - `app/lib/corpus/flag.ts` — dev-only default-off flag (step 7, new)

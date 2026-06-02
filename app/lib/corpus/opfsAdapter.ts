@@ -23,7 +23,9 @@ import { CorpusError } from "./types";
 
 // --- Minimal local OPFS typings ---
 interface OpfsWritable {
-  write(data: BufferSource): Promise<void>;
+  // We only ever write Uint8Array; typing it narrowly avoids the lib.dom
+  // BufferSource/ArrayBufferLike strictness mismatch across TS versions.
+  write(data: Uint8Array): Promise<void>;
   close(): Promise<void>;
 }
 interface OpfsFileHandle {

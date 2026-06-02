@@ -1,0 +1,143 @@
+{
+  "properties": [
+    {
+      "id": "discoverability-on-creation",
+      "name": "discoverabilityOnCreation",
+      "description": "When the meta-interface creates a new interface for a task domain, that interface must immediately communicate what actions are possible without requiring prior knowledge or instruction. Signifiers, affordances, and conceptual models must be self-evident from the generated interface itself.",
+      "preconditions": "A new task domain is detected or requested; the LLM has generated a new interface configuration; the user has not previously encountered this interface.",
+      "postcondition": "The generated interface provides sufficient signifiers and affordances such that a naive user can determine at least one valid action sequence without external help. Discoverability score (proportion of users finding a primary action within 60 seconds) >= 0.80.",
+      "pseudocode": "function checkDiscoverabilityOnCreation(generatedInterface, targetTaskDomain):\n  naiveUserPanel = sampleUsers(count=5, familiarity=NONE)\n  for user in naiveUserPanel:\n    observedActions = recordFirstActions(user, generatedInterface, timeLimit=60s)\n    primaryGoal = inferPrimaryGoalFor(targetTaskDomain)\n    assert observedActions containsPathToward primaryGoal\n  discoveryRate = countSuccessful(naiveUserPanel) / count(naiveUserPanel)\n  assert discoveryRate >= 0.80\n  assert generatedInterface.signifiers.count > 0\n  assert generatedInterface.hasConceptualModel == true"
+    },
+    {
+      "id": "feedback-continuity-across-transitions",
+      "name": "feedbackContinuityAcrossTransitions",
+      "description": "When the meta-interface transitions from one task-specific interface to another, it must provide immediate and informative feedback acknowledging the transition, the new context, and the state carried forward. The user must never be left uncertain about which interface is active or what happened to prior work.",
+      "preconditions": "User moves between tasks; a transition event is detected; the previous interface state exists.",
+      "postcondition": "Within 100ms of transition, a feedback signal is visible. The new interface displays the current task context explicitly. Any preserved state from the prior interface is visibly indicated. The user can determine the new interface's purpose without performing any action.",
+      "pseudocode": "function checkFeedbackOnTransition(prevInterface, newInterface, transitionEvent):\n  transitionTimestamp = transitionEvent.timestamp\n  firstFeedbackTimestamp = newInterface.firstVisibleFeedback.timestamp\n  assert (firstFeedbackTimestamp - transitionTimestamp) <= 100ms\n  assert newInterface.displayedContext != null\n  assert newInterface.displayedContext describes currentTaskDomain\n  if prevInterface.hasPreservableState:\n    assert newInterface.showsCarriedState == true\n  assert userCanIdentifyPurpose(newInterface) withoutPerformingAction == true"
+    },
+    {
+      "id": "conceptual-model-coherence",
+      "name": "conceptualModelCoherence",
+      "description": "Each generated interface must project a coherent conceptual model of the current task domain. The system image presented must be sufficient for users to form an accurate mental model of what the interface does, predict outcomes of actions, and recover from errors. The model must not contradict itself across interface elements.",
+      "preconditions": "A task-specific interface has been generated; the interface contains at least two interactive elements.",
+      "postcondition": "For every pair of interactive elements (A, B) in the interface, the implied conceptual model from A is consistent with the implied conceptual model from B. A user who correctly models element A can correctly predict the behavior of element B at a rate >= 0.70.",
+      "pseudocode": "function checkConceptualModelCoherence(generatedInterface):\n  elements = generatedInterface.interactiveElements\n  for each pair (A, B) in combinations(elements, 2):\n    modelFromA = inferConceptualModel(A)\n    modelFromB = inferConceptualModel(B)\n    assert isConsistent(modelFromA, modelFromB)\n  userPanel = sampleUsers(count=5)\n  for user in userPanel:\n    learnFrom(user, elements[0])\n    predictionsForRest = user.predictBehaviorOf(elements[1:])\n    assert accuracy(predictionsForRest) >= 0.70\n  assert generatedInterface.containsNoContradictoryAffordances == true"
+    },
+    {
+      "id": "gulf-of-envisioning-reduction",
+      "name": "gulfOfEnvisioningReduction",
+      "description": "The meta-interface must actively reduce the gulf of envisioning by scaffolding the user's intention formulation. When generating a new interface on the fly, the system must address the capability gap (what can be done), the instruction gap (how to express it), and the intentionality gap (how to evaluate output). This must occur proactively without requiring the user to ask.",
+      "preconditions": "The LLM is generating or has generated a new interface; the user's goal has been detected or inferred; the user has not previously used an interface for this task domain.",
+      "postcondition": "The generated interface contains at least one affordance addressing each of: (1) capability gap — examples or scope indicators showing what the interface can do, (2) instruction gap — structured prompts or guided input mechanisms, (3) intentionality gap — expected output previews or evaluation criteria. Users can articulate what the interface is for without interacting.",
+      "pseudocode": "function checkGulfOfEnvisioningReduction(generatedInterface, userGoal):\n  assert generatedInterface.hasCapabilityIndicators == true\n  assert generatedInterface.capabilityIndicators.coversGoalDomain(userGoal) == true\n  assert generatedInterface.hasStructuredInputScaffolding == true\n  assert generatedInterface.hasOutputPreviewOrEvaluationCriteria == true\n  userPanel = sampleUsers(count=5, domainFamiliarity=NOVICE)\n  for user in userPanel:\n    description = user.describeInterfacePurpose(generatedInterface)\n    assert description alignsWith userGoal withAccuracy >= 0.75"
+    },
+    {
+      "id": "mapping-naturalness",
+      "name": "mappingNaturalness",
+      "description": "Controls and displays in each generated interface must employ natural mappings appropriate to the task domain. Spatial, temporal, and semantic relationships between controls and their effects must follow principles of natural correspondence so that users can infer correct action sequences from interface layout alone.",
+      "preconditions": "The generated interface contains controls that affect outputs or system state; the task domain has an identifiable conceptual structure.",
+      "postcondition": "For each control C affecting output O: the spatial or semantic relationship between C and O in the interface corresponds to the natural relationship in the task domain. Users without instruction correctly select the right control for a desired outcome >= 0.75 of the time on first attempt.",
+      "pseudocode": "function checkMappingNaturalness(generatedInterface):\n  controlOutputPairs = generatedInterface.getControlOutputMappings()\n  for (control, output) in controlOutputPairs:\n    naturalRelation = getNaturalDomainRelation(control.semanticMeaning, output.semanticMeaning)\n    interfaceRelation = getSpatioSemanticRelation(control, output, generatedInterface.layout)\n    assert corresponds(interfaceRelation, naturalRelation)\n  userPanel = sampleUsers(count=10, instruction=NONE)\n  for scenario in generateScenarios(generatedInterface, count=5):\n    firstAttemptCorrect = countCorrectFirstAttempts(userPanel, scenario)\n    assert (firstAttemptCorrect / count(userPanel)) >= 0.75"
+    },
+    {
+      "id": "semantic-distance-minimization",
+      "name": "semanticDistanceMinimization",
+      "description": "Each generated interface must minimize the semantic distance between the user's task-level intentions and the vocabulary of available interface actions. The interface language must encode concepts at the same level of abstraction at which the user thinks about the task. Users must not need to translate their goals into system-level operations.",
+      "preconditions": "A task domain has been identified; the user has a goal expressible in domain language; the interface has been generated.",
+      "postcondition": "The number of translation steps a user must perform to map a domain-level intention to an interface action is <= 2. The interface provides at least one action whose label or affordance directly matches the user's natural phrasing of their goal.",
+      "pseudocode": "function checkSemanticDistanceMinimization(generatedInterface, userIntention):\n  intentionTerms = extractDomainTerms(userIntention)\n  interfaceVocabulary = generatedInterface.getAllActionLabelsAndAffordances()\n  directMatches = countTermOverlap(intentionTerms, interfaceVocabulary)\n  assert directMatches >= 1\n  translationSteps = computeMinTranslationPath(userIntention, generatedInterface)\n  assert translationSteps <= 2\n  userPanel = sampleUsers(count=5)\n  for user in userPanel:\n    expressGoalNaturally(user, currentTaskDomain)\n    matchedAction = findClosestInterfaceAction(user.expression, generatedInterface)\n    assert semanticSimilarity(user.expression, matchedAction.label) >= 0.70"
+    },
+    {
+      "id": "error-recoverability",
+      "name": "errorRecoverability",
+      "description": "Every generated interface must support reversibility of actions and provide clear paths to recovery when users take incorrect actions. Given that interfaces are generated on the fly and users lack prior familiarity, error rates will be higher; the design must compensate by making errors cheap and correctable.",
+      "preconditions": "An action has been performed on the generated interface; the action has produced an outcome; the outcome may or may not match the user's goal.",
+      "postcondition": "Every action taken through the generated interface is either reversible or, if irreversible, requires an additional confirmation step before execution. After any incorrect action, the user can identify what went wrong and reach the correct state within 3 subsequent actions. No single action can produce catastrophic or unrecoverable state change.",
+      "pseudocode": "function checkErrorRecoverability(generatedInterface):\n  allActions = generatedInterface.getAllPossibleActions()\n  for action in allActions:\n    if isIrreversible(action):\n      assert requiresConfirmation(action) == true\n    else:\n      assert hasUndoMechanism(action) == true\n  errorScenarios = generateErrorScenarios(generatedInterface, count=10)\n  for scenario in errorScenarios:\n    userPanel = sampleUsers(count=5)\n    for user in userPanel:\n      triggerError(user, scenario)\n      stepsToRecovery = countActionsToCorrectState(user, generatedInterface)\n      assert stepsToRecovery <= 3\n  catastrophicActions = filterCatastrophicActions(allActions)\n  assert count(catastrophicActions) == 0"
+    },
+    {
+      "id": "context-sensitivity-accuracy",
+      "name": "contextSensitivityAccuracy",
+      "description": "The meta-interface must accurately infer the user's current task context from environmental signals, interaction history, and explicit input, and generate an interface appropriate to that context. The inferred context must match the user's actual intent at an acceptable rate.",
+      "preconditions": "The user has interacted with the system for at least one prior session or has provided explicit goal signals; environmental context signals are available; the meta-interface has generated a new interface.",
+      "postcondition": "The generated interface matches the user's actual current task domain >= 0.85 of the time when evaluated by the user. When the interface does not match, the user can correct the context with <= 2 interactions.",
+      "pseudocode": "function checkContextSensitivityAccuracy(metaInterface, sessionHistory, environmentSignals):\n  for trial in generateTrials(count=20):\n    userActualGoal = trial.trueUserGoal\n    inferredContext = metaInterface.inferContext(sessionHistory, environmentSignals, trial.userInput)\n    generatedInterface = metaInterface.generateInterfaceFor(inferredContext)\n    userConfirmation = askUser(generatedInterface, 'Does this match your current task?')\n    matchRate += (userConfirmation == YES ? 1 : 0)\n  assert (matchRate / 20) >= 0.85\n  mismatchedTrials = filter(trials, where userConfirmation == NO)\n  for trial in mismatchedTrials:\n    correctionActions = countActionsToCorrectContext(user, metaInterface)\n    assert correctionActions <= 2"
+    },
+    {
+      "id": "state-preservation-across-transitions",
+      "name": "statePreservationAcrossTransitions",
+      "description": "When the user moves between tasks and the meta-interface generates a new interface, relevant state from the prior task context must be preserved and accessible. Users must not lose work or context when the interface changes. The new interface must have access to prior outputs that are semantically relevant.",
+      "preconditions": "The user has completed at least one action in a prior interface; a task transition has occurred; a new interface has been generated.",
+      "postcondition": "All outputs produced in prior interfaces that are semantically relevant to the new task domain are accessible within the new interface. The user does not need to re-enter information already provided in prior interfaces. State loss rate across transitions = 0 for explicitly saved or in-progress work.",
+      "pseudocode": "function checkStatePreservationAcrossTransitions(priorInterface, newInterface, transitionEvent):\n  priorOutputs = priorInterface.getAllProducedOutputs()\n  relevantPriorOutputs = filterSemanticRelevance(priorOutputs, newInterface.taskDomain)\n  for output in relevantPriorOutputs:\n    assert isAccessible(output, newInterface) == true\n  reEnteredItems = countItemsUserMustReEnter(user, newInterface, priorInterface)\n  assert reEnteredItems == 0\n  for workItem in priorInterface.getInProgressWork():\n    if workItem.isExplicitlySaved or workItem.isInProgress:\n      assert isPreserved(workItem, afterTransition=true) == true"
+    },
+    {
+      "id": "interface-generation-latency",
+      "name": "interfaceGenerationLatency",
+      "description": "The meta-interface must generate a usable new interface quickly enough that the transition does not interrupt the user's cognitive flow. Excessive delay breaks the feedback loop and forces the user out of their task mindset.",
+      "preconditions": "A task transition event has been detected; the LLM is generating a new interface; the user is waiting.",
+      "postcondition": "A partially usable interface scaffold is displayed within 500ms of the transition event. A fully usable interface is available within 3000ms. During generation, a progress indicator is displayed. The user's most recent context is shown throughout the generation period.",
+      "pseudocode": "function checkInterfaceGenerationLatency(metaInterface, transitionEvent):\n  t0 = transitionEvent.timestamp\n  partialInterface = metaInterface.getFirstPartialRender()\n  t1 = partialInterface.timestamp\n  assert (t1 - t0) <= 500ms\n  assert partialInterface.isPartiallyUsable == true\n  fullInterface = metaInterface.getFullRender()\n  t2 = fullInterface.timestamp\n  assert (t2 - t0) <= 3000ms\n  generationPeriod = timeRange(t0, t2)\n  assert metaInterface.displayedProgressIndicator(during=generationPeriod) == true\n  assert metaInterface.displayedCurrentContext(during=generationPeriod) == true"
+    },
+    {
+      "id": "visceral-behavioral-reflective-alignment",
+      "name": "visceralBehavioralReflectiveAlignment",
+      "description": "Each generated interface must satisfy design requirements at all three levels of human processing: visceral (immediate aesthetic appeal and non-threatening appearance), behavioral (correct and efficient action support), and reflective (pride, satisfaction, and appropriate self-image when using). A generated interface that fails at any level will be rejected or misused.",
+      "preconditions": "An interface has been generated for a task domain; users have interacted with it for at least one session.",
+      "postcondition": "Visceral: >= 0.80 of users rate the interface appearance as non-threatening and task-appropriate on first encounter. Behavioral: >= 0.80 of intended actions complete successfully on first attempt. Reflective: >= 0.70 of users express satisfaction or pride after task completion and would choose to use the interface again.",
+      "pseudocode": "function checkVisceralBehavioralReflectiveAlignment(generatedInterface, taskDomain):\n  userPanel = sampleUsers(count=10)\n  // Visceral check\n  firstImpressions = collectFirstImpressions(userPanel, generatedInterface, timeLimit=3s)\n  visceralApprovalRate = countPositive(firstImpressions) / count(userPanel)\n  assert visceralApprovalRate >= 0.80\n  // Behavioral check\n  taskAttempts = recordTaskAttempts(userPanel, generatedInterface)\n  behavioralSuccessRate = countFirstAttemptSuccess(taskAttempts) / count(taskAttempts)\n  assert behavioralSuccessRate >= 0.80\n  // Reflective check\n  postTaskSurvey = conductSurvey(userPanel, after=taskCompletion)\n  satisfactionRate = countPositiveSatisfaction(postTaskSurvey) / count(userPanel)\n  assert satisfactionRate >= 0.70\n  reusageIntentRate = countWouldUseAgain(postTaskSurvey) / count(userPanel)\n  assert reusageIntentRate >= 0.70"
+    },
+    {
+      "id": "constraint-guided-error-prevention",
+      "name": "constraintGuidedErrorPrevention",
+      "description": "Each generated interface must embed physical, logical, semantic, and cultural constraints appropriate to the task domain to prevent common errors before they occur. The system must not allow actions that are impossible or meaningless within the current task context.",
+      "preconditions": "The task domain is known; the interface has been generated; the set of valid and invalid actions for the domain is derivable.",
+      "postcondition": "Actions that are invalid in the current task context are either hidden, disabled, or require confirmation. The ratio of possible-but-invalid actions presented to total actions presented <= 0.10. Users encounter zero unrecoverable errors due to interface design failures.",
+      "pseudocode": "function checkConstraintGuidedErrorPrevention(generatedInterface, taskDomain):\n  allPresentedActions = generatedInterface.getAllVisibleActions()\n  validActions = computeValidActions(taskDomain, currentState)\n  invalidPresentedActions = allPresentedActions - validActions\n  assert count(invalidPresentedActions) / count(allPresentedActions) <= 0.10\n  for action in invalidPresentedActions:\n    assert (action.isHidden OR action.isDisabled OR action.requiresConfirmation)\n  errorTrials = simulateCommonErrors(generatedInterface, taskDomain, count=20)\n  for trial in errorTrials:\n    assert trial.resultedInUnrecoverableState == false\n  assert count(filteredCatastrophicPaths(generatedInterface)) == 0"
+    }
+  ],
+  "dataGenerators": [
+    {
+      "name": "taskDomainSampler",
+      "description": "Generates diverse task domains spanning the full range of user activities: information lookup, content creation, data analysis, communication drafting, scheduling, e-commerce, navigation, creative tasks, and professional workflows.",
+      "constraints": "Must include at least: 3 information tasks, 3 creation tasks, 2 communication tasks, 2 data tasks. Domains must vary in conceptual complexity (simple to expert-level). Must include domains the user has never encountered before (novelty condition) and familiar domains (familiarity condition)."
+    },
+    {
+      "name": "userProfileGenerator",
+      "description": "Generates synthetic user profiles varying in: domain expertise (novice/intermediate/expert), LLM familiarity (none/some/experienced), cognitive load at time of interaction (low/medium/high), and prior session history length (0 to 50 prior interactions).",
+      "constraints": "Age range 18-75. Expertise must be independent of LLM familiarity. At least 20% of profiles must be novice in both domain and LLM use. At least one profile must have no prior session history. Cognitive load should be varied by controlling interruption conditions."
+    },
+    {
+      "name": "taskTransitionSequenceGenerator",
+      "description": "Generates sequences of task transitions to test interface switching behavior. Sequences vary in: number of transitions (1 to 10), relatedness of consecutive tasks (related/unrelated), transition speed (abrupt/gradual), and whether the user explicitly requests a new task or the system infers it.",
+      "constraints": "Sequence length 1 to 10. Must include at least one abrupt unrelated transition. Must include sequences where the user never explicitly states a new goal. Must include sequences with repeated returns to the same domain. Minimum gap between transitions: 0 seconds (immediate). Maximum gap: 24 hours (delayed return)."
+    },
+    {
+      "name": "errorScenarioGenerator",
+      "description": "Generates realistic error scenarios including: wrong action selection due to poor mapping, mode errors from interface ambiguity, memory lapses during multi-step tasks, description-similarity errors when multiple controls look alike, and capture slips when prior task patterns intrude on new task.",
+      "constraints": "Must cover all five error categories from Norman's taxonomy. Each scenario must be reproducible. Must include both slips (subconscious) and mistakes (wrong goal). Scenarios must be calibrated to realistic error rates: slips ~15% of sessions, mistakes ~5% of sessions."
+    },
+    {
+      "name": "contextSignalGenerator",
+      "description": "Generates sets of environmental and historical context signals available to the meta-interface: open documents, recent emails, calendar events, location (simulated), time of day, recent search queries, and clipboard contents.",
+      "constraints": "Signals must be combinable. Must include cases where signals are contradictory. Must include cases with zero signals available. Must include cases where signals are ambiguous (could indicate multiple task domains). Minimum 5 signals per test case, maximum 20."
+    },
+    {
+      "name": "intentSpecificityVariants",
+      "description": "Generates user goal statements at varying levels of specificity: completely vague ('help me write something'), partially specified ('write an email to my boss'), fully specified ('write a 3-paragraph professional email declining a meeting request, maintaining positive tone').",
+      "constraints": "Must span the full range from 1-word goals to 100-word detailed specifications. Must include ambiguous phrasings that could map to multiple domains. Must include goals with internal contradictions. Must include goals that exceed LLM capabilities."
+    },
+    {
+      "name": "generatedInterfaceVariants",
+      "description": "Generates plausible interface configurations the LLM might produce for a given task domain, varying in: layout approach, control vocabulary, feedback mechanisms, level of scaffolding, and degree of task-domain alignment.",
+      "constraints": "Must include at least one near-optimal design and one poor design for each domain. Poor designs must be realistic (not obviously broken). Must include interfaces with good visceral but poor behavioral properties, and vice versa. Interfaces must vary in number of controls (2 to 20)."
+    },
+    {
+      "name": "edgeCaseUserGoalGenerator",
+      "description": "Generates boundary and edge case goals: goals at the boundary between two task domains, goals that evolve mid-session, goals that are private or sensitive (requiring confidentiality), goals in non-English languages, and goals that reference prior session context implicitly.",
+      "constraints": "Must include at least 5 boundary-domain goals. Must include goals that change after first interface is generated. Must include at least one non-English goal. Must include goals whose full intent cannot be expressed without reference to prior session history."
+    }
+  ],
+  "summary": "This property test suite evaluates a meta-interface that dynamically generates task-specific interfaces as users move between domains, grounded in Norman's Design of Everyday Things principles, Hutchins et al.'s direct manipulation framework, Victor's information software theory, and Subramonyam et al.'s gulf of envisioning model. The suite tests twelve independent properties spanning discoverability and conceptual model coherence of generated interfaces, feedback continuity and state preservation across task transitions, semantic distance minimization and natural mapping in dynamically created controls, the three-dimensional gulf of envisioning (capability, instruction, and intentionality gaps), error prevention through constraints and recoverability, context inference accuracy from environmental and historical signals, and alignment across visceral, behavioral, and reflective levels of user processing. Eight data generators provide coverage across diverse task domains, user profiles, transition sequences, error scenarios, context signal sets, intent specificity levels, interface quality variants, and edge cases to ensure the property tests are exercised under realistic and adversarial conditions."
+}

@@ -10,7 +10,7 @@ import {
   artifactMetaPath,
   customTypePath,
   decompositionGraphLayoutPath,
-} from "../layout";
+} from "../paths";
 
 describe("workspaceSlug sanitization (G10 — no traversal)", () => {
   it("strips path separators and dot-segments so a title can't escape workspaces/", () => {
