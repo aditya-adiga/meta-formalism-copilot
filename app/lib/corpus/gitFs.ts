@@ -85,7 +85,15 @@ function rel(root: string, p: string): string {
   s = s.replace(/^\/+/, "").replace(/\/+$/, "");
   // iso-git stats the working-tree root as "." (or the bare `dir`); normalize it
   // to "" so the root is recognized as the corpus directory itself.
-  return s === "." ? "" : s;
+  if (s === ".") return "";
+  // Defense-in-depth (security review S3 #4): reject `..` traversal segments.
+  // Today OPFS's origin sandbox contains any escape, but this becomes load-bearing
+  // once the FSA real-folder mirror (S2) is the substrate — fail loud rather than
+  // resolve a `..` into a parent the user didn't intend to expose.
+  if (s.split("/").some((seg) => seg === "..")) {
+    throw new FsError("EINVAL", `EINVAL: unsafe path traversal '${p}'`);
+  }
+  return s;
 }
 
 /** iso-git's PromiseFsClient shape. NOTE: iso-git's `bindFs` unconditionally

@@ -68,7 +68,12 @@ function buildCore(init?: GitWorkerInit) {
 }
 
 self.onmessage = async (ev: { data: unknown }) => {
-  const msg = ev.data as GitRequest | GitWorkerInit;
+  // Validate the message shape before dereferencing it (security review S3 #2):
+  // a null/primitive postMessage must not throw an unhandled rejection (the
+  // silent failure DD-009 forbids). Ignore anything that isn't an object.
+  const data = ev.data;
+  if (typeof data !== "object" || data === null) return;
+  const msg = data as GitRequest | GitWorkerInit;
   // Re-init (set remote/author) is a control message, not a git op.
   if ((msg as GitWorkerInit).type === "__init__") {
     core = buildCore(msg as GitWorkerInit);

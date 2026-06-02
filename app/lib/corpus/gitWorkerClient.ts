@@ -13,7 +13,7 @@
  * builds the real `Worker` and passes it in via `workerTransport()`.
  */
 
-import { CorpusError } from "./types";
+import { CorpusError, isCorpusWorkerError } from "./types";
 import type { CorpusGit, CorpusWorkerError, GitCommitResult, GitLogOptions, GitLogPage, GitStatusEntry } from "./types";
 import type { GitRequest, GitResponse } from "./gitProtocol";
 
@@ -47,6 +47,12 @@ export function createGitWorkerProxy(transport: GitTransport): CorpusGit {
   });
 
   function reconstruct(e: CorpusWorkerError): CorpusError {
+    // Validate the payload before trusting its shape (security review S3 #1).
+    // The only legitimate sender is our worker, but a malformed `error` must
+    // degrade to a typed io error rather than constructing from arbitrary data.
+    if (!isCorpusWorkerError(e)) {
+      return new CorpusError({ kind: "io", path: "(git-worker)", reason: "malformed worker error payload" });
+    }
     // Rebuild the thrown form from the serializable twin (types.ts contract).
     return new CorpusError(e.detail, e.message);
   }
