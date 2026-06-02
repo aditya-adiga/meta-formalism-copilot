@@ -55,15 +55,22 @@ function isPermissionLost(e: unknown): boolean {
   return e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
 }
 
-function splitPath(path: string): { dirs: string[]; name: string } {
+/** Split a path into segments and reject traversal/backslash. Defense-in-depth:
+ *  paths.ts is the sanitizing choke point, but the adapter must not trust callers
+ *  to have used it (parity with opfsAdapter C1). Shared by splitPath AND readdir
+ *  so every method gets the same guard (security review S2 #1). */
+function safeSegments(path: string): string[] {
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
-  // Defense-in-depth: paths.ts is the sanitizing choke point, but the adapter
-  // must not trust callers to have used it (parity with opfsAdapter C1).
   for (const seg of parts) {
     if (seg === "." || seg === ".." || seg.includes("\\")) {
       throw new CorpusError({ kind: "io", path, reason: `unsafe path segment: ${seg}` });
     }
   }
+  return parts;
+}
+
+function splitPath(path: string): { dirs: string[]; name: string } {
+  const parts = safeSegments(path);
   const name = parts.pop();
   if (!name) throw new CorpusError({ kind: "io", path, reason: "path has no file component" });
   return { dirs: parts, name };
@@ -147,7 +154,7 @@ export function createFsaCorpusFs(handle: FsaDirHandle | null | undefined): Corp
     async readdir(path) {
       try {
         const root = requireRoot(handle);
-        const dirs = path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+        const dirs = safeSegments(path);
         const dir = await walkDir(root, dirs, false);
         if (!dir) return [];
         const names: string[] = [];
