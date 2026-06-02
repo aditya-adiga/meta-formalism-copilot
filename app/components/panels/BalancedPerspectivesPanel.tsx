@@ -110,11 +110,13 @@ export default function BalancedPerspectivesPanel({
                 {displayMap.tensions?.map((t, i) => (
                   <EditableSection key={i} value={t} onChange={(newT) => updateArrayItem("tensions", i, newT)}>
                     <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                      <div className="flex items-center gap-1 text-xs font-mono text-red-700">
-                        <span>{t.between[0]}</span>
-                        <span className="text-red-400">&harr;</span>
-                        <span>{t.between[1]}</span>
-                      </div>
+                      {t.between && (
+                        <div className="flex items-center gap-1 text-xs font-mono text-red-700">
+                          <span>{t.between[0]}</span>
+                          <span className="text-red-400">&harr;</span>
+                          <span>{t.between[1]}</span>
+                        </div>
+                      )}
                       <p className="mt-1 text-xs text-red-800">{t.description}</p>
                     </div>
                   </EditableSection>
