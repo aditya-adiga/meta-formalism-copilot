@@ -7,6 +7,7 @@ import { fetchApi } from "@/app/lib/formalization/api";
 import {
   serializeTargetKey,
   isReviewType,
+  isSlotScored,
   type EvidenceArtifactType,
   type EvidenceOverlapResponse,
 } from "@/app/lib/types/evidence";
@@ -35,13 +36,14 @@ export function useEvidenceOverlap(
 
   // Check whether the slot has any review-type papers (only meaningful when scored)
   const hasReviews =
-    slot?.scored === true &&
+    slot !== undefined &&
+    isSlotScored(slot) &&
     slot.papers.some((p) => isReviewType(p.reliability?.studyType));
 
   const analyze = useCallback(async () => {
     const { setAnalyzing, applyOverlap, setError } = useEvidenceStore.getState();
     const currentSlot = useEvidenceStore.getState().slots[key];
-    if (!currentSlot || !currentSlot.scored || currentSlot.papers.length === 0) return;
+    if (!currentSlot || !isSlotScored(currentSlot) || currentSlot.papers.length === 0) return;
     // Guard against concurrent calls
     if (useEvidenceStore.getState().analyzing[key]) return;
 

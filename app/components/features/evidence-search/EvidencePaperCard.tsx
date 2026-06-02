@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import type { EvidencePaper, PaperOverlapStatus } from "@/app/lib/types/evidence";
+import type { EvidencePaper, PaperOverlapStatus, EvidencePaperStatus } from "@/app/lib/types/evidence";
 import { STUDY_TYPE_LABELS } from "@/app/lib/types/evidence";
 import EvidenceScoreBadge from "./EvidenceScoreBadge";
 
 const ABSTRACT_TRUNCATE = 200;
+
+const STATUS_LABELS: Record<EvidencePaperStatus, string> = {
+  retrieved: "Retrieved",
+  evaluated: "Evaluated",
+  integrated: "Integrated",
+  pruned: "Pruned",
+};
 
 function formatAuthors(authors: string[]): string {
   if (authors.length === 0) return "Unknown authors";
@@ -29,17 +36,26 @@ export default function EvidencePaperCard({
   paper,
   overlapStatus,
   subsumingReviewTitle,
+  onPrune,
+  onRestore,
 }: {
   paper: EvidencePaper;
   overlapStatus?: PaperOverlapStatus;
   subsumingReviewTitle?: string;
+  onPrune: () => void;
+  onRestore: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const url = paperUrl(paper);
   const needsTruncation = paper.abstract && paper.abstract.length > ABSTRACT_TRUNCATE;
+  const isPruned = paper.status === "pruned";
 
   return (
-    <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-1">
+    <div
+      className={`rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-1 ${
+        isPruned ? "opacity-50" : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-sm font-medium text-[var(--ink-black)]">
           {url ? (
@@ -51,7 +67,11 @@ export default function EvidencePaperCard({
           )}
         </div>
 
+        {/* Status chip + score badges + overlap badge + prune/restore */}
         <div className="flex items-center gap-1 shrink-0">
+          <span className="rounded bg-[#F0ECE8] px-1.5 py-0.5 text-[10px] font-mono text-[#6B6560]">
+            {STATUS_LABELS[paper.status]}
+          </span>
           {paper.reliability && (
             <EvidenceScoreBadge
               label="Rel"
@@ -78,6 +98,13 @@ export default function EvidencePaperCard({
               {OVERLAP_BADGE_STYLES[overlapStatus].label}
             </span>
           )}
+          <button
+            type="button"
+            onClick={isPruned ? onRestore : onPrune}
+            className="rounded px-1.5 py-0.5 text-[10px] text-[#9A9590] hover:text-[var(--ink-black)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-black)]/30"
+          >
+            {isPruned ? "Restore" : "Prune"}
+          </button>
         </div>
       </div>
 

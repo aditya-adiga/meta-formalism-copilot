@@ -100,7 +100,9 @@ const SCORING_SCHEMA = {
                 required: ["score", "studyType", "rationale", "redFlags"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number", minimum: 0, maximum: 1 },
+                  // Range enforced server-side by clampScore (Anthropic's
+                  // structured-output schema rejects minimum/maximum).
+                  score: { type: "number" },
                   studyType: {
                     type: "string",
                     enum: [...STUDY_TYPES],
@@ -117,7 +119,9 @@ const SCORING_SCHEMA = {
                 required: ["score", "rationale"],
                 additionalProperties: false,
                 properties: {
-                  score: { type: "number", minimum: 0, maximum: 1 },
+                  // Range enforced server-side by clampScore (Anthropic's
+                  // structured-output schema rejects minimum/maximum).
+                  score: { type: "number" },
                   rationale: { type: "string" },
                 },
               },
@@ -207,11 +211,18 @@ ${paperSummaries.join("\n\n")}`;
           rationale: "Scoring unavailable (no API key configured).",
         },
       }));
-      return NextResponse.json({ scores, mock: true } satisfies EvidenceScoreResponse & { mock: boolean });
+      return NextResponse.json({ scores, mock: true } satisfies EvidenceScoreResponse);
     }
 
-    // Parse and validate LLM response
-    const parsed = JSON.parse(stripCodeFences(text));
+    // Parse and validate LLM response. A parse failure is the same failure
+    // class as a non-array `scores` (the model returned unusable output), so
+    // both return 502 rather than letting the throw fall through to a 500.
+    let parsed: { scores?: unknown };
+    try {
+      parsed = JSON.parse(stripCodeFences(text));
+    } catch {
+      return NextResponse.json({ error: "Invalid LLM response format" }, { status: 502 });
+    }
     if (!Array.isArray(parsed.scores)) {
       return NextResponse.json({ error: "Invalid LLM response format" }, { status: 502 });
     }

@@ -6,6 +6,7 @@ import { fetchApi } from "@/app/lib/formalization/api";
 import {
   MAX_INTEGRATION_PAPERS,
   serializeTargetKey,
+  isSlotScored,
   type EvidenceArtifactType,
   type EvidenceIntegrateResponse,
   type IntegrationProposal,
@@ -38,7 +39,7 @@ export function useEvidenceIntegration(
     async (artifactContent: string) => {
       const { setIntegrating, setProposals, setError } = useEvidenceStore.getState();
       const currentSlot = useEvidenceStore.getState().slots[key];
-      if (!currentSlot || !currentSlot.scored || currentSlot.papers.length === 0) return;
+      if (!currentSlot || !isSlotScored(currentSlot) || currentSlot.papers.length === 0) return;
       // Guard against concurrent calls
       if (useEvidenceStore.getState().integrating[key]) return;
 
@@ -118,6 +119,6 @@ export function useEvidenceIntegration(
     setDecision,
     clearProposals,
     hasProposals: proposals.length > 0,
-    canIntegrate: (slot?.scored ?? false) && !isIntegrating,
+    canIntegrate: (slot ? isSlotScored(slot) : false) && !isIntegrating,
   };
 }

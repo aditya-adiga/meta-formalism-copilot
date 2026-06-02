@@ -44,7 +44,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
   - `artifact-selector/` — Artifact type selection UI
   - `causal-graph/` — Graph visualization components
   - `lean-display/` — Lean code display with syntax highlighting
-  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidencePaperCard` for grounding artifacts in published research
+  - `evidence-search/` — `FindEvidenceButton`, `EvidenceResultsSection`, `EvidenceQueryEditor`, `EvidencePaperCard` for grounding artifacts in published research
 - `components/ui/` — Shared UI components and icons
 - `hooks/` — Custom hooks: `useWorkspacePersistence`, `useWorkspaceSessions`, `useFormalizationPipeline`, `useDecomposition`, `useAutoFormalizeQueue`, `useAnalytics`, etc.
 - `lib/types/` — TypeScript type definitions for panels, sessions, artifacts, decomposition
@@ -64,6 +64,7 @@ The app is a **multi-panel workspace** with a collapsible Icon Rail sidebar for 
 - **Decomposition workflow**: extract propositions from sources into a dependency graph, then formalize per-node
 - **Session management**: workspace sessions (global) and formalization sessions (per-scope) for tracking artifact history
 - **Corpus persistence (DD-009, in progress)**: a `CorpusFS` abstraction in `lib/corpus/` will eventually replace localStorage with an OPFS-cached, FSA-folder + git-remote corpus. Sub-task S1 (the `CorpusFS` interface + OPFS adapter) is wired behind `lib/corpus/flag.ts` (`isCorpusEnabled()`), **default-off and dev-only** — enabling it starts from an empty corpus (no migration until S4), so it must not be turned on for end users yet. Note for tests: **jsdom has no OPFS**, so the OPFS adapter's success path is verified via an in-memory fake + an out-of-CI Playwright smoke (`docs/spikes/corpus-opfs-smoke.md`), not the Vitest suite.
+- **Evidence lifecycle**: evidence papers carry a lifecycle `status` (retrieved → evaluated → integrated, plus pruned). Search queries are user-editable; re-runs and "Refresh evidence" merge results (existing papers win, deduped by OpenAlex id), and soft-pruned papers survive re-runs. `/api/evidence-search` accepts an optional sanitized `queries[]` override that skips LLM query generation. The `evidenceStore` persists at `version: 1` with a status-backfill migration.
 
 ### Design System
 

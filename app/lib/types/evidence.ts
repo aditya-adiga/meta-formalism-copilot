@@ -62,6 +62,26 @@ export const STUDY_TYPE_LABELS: Record<StudyType, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Paper lifecycle status
+// ---------------------------------------------------------------------------
+
+/** Lifecycle status of a paper within a slot. Reflects a step that HAS
+ *  happened (a read-out), not a manual cause:
+ *   - retrieved:  default when search returns it
+ *   - evaluated:  set automatically when reliability/relatedness scoring lands
+ *   - integrated: reserved — no setter yet (artifact integration not built)
+ *   - pruned:     user dismissed it (soft; recoverable, survives re-runs)
+ *  Status keys off the slot (= one claim), so it already models per-(paper,
+ *  claim) status and a future shared-paper-pool view can reuse this type. */
+export const EVIDENCE_PAPER_STATUSES = [
+  "retrieved",
+  "evaluated",
+  "integrated",
+  "pruned",
+] as const;
+export type EvidencePaperStatus = (typeof EVIDENCE_PAPER_STATUSES)[number];
+
+// ---------------------------------------------------------------------------
 // Paper scoring
 // ---------------------------------------------------------------------------
 
@@ -73,7 +93,9 @@ export type ReliabilityScore = {
   studyType: StudyType;
   /** Brief explanation of the reliability assessment */
   rationale: string;
-  /** Methodology red flags detected (e.g. p-hacking indicators, small sample) */
+  /** Methodology red flags detected (e.g. small sample, conflicts of interest,
+   *  retraction notices) — see the scoring prompt in app/api/evidence-score/route.ts
+   *  for the exact set the LLM is instructed to surface. */
   redFlags: string[];
 };
 
@@ -100,19 +122,30 @@ export type EvidencePaper = {
   reliability: ReliabilityScore | null;
   /** Per-paper relatedness to the claim (null until scored) */
   relatedness: RelatednessScore | null;
+  /** Lifecycle status within this slot (see EvidencePaperStatus) */
+  status: EvidencePaperStatus;
 };
 
-/** An evidence slot attached to one artifact element */
+/** An evidence slot attached to one artifact element.
+ *  Whether the slot is "scored" is derived from the papers (see isSlotScored),
+ *  not stored, so the two cannot drift apart in persisted state. */
 export type EvidenceSlot = {
   targetKey: EvidenceTargetKey;
   searchQueries: string[];
   papers: EvidencePaper[];
   searchedAt: string;
-  /** Whether papers in this slot have been scored */
-  scored: boolean;
   /** When scoring was last performed (null if never) */
   scoredAt: string | null;
 };
+
+/** Whether every *active* (non-pruned) paper in a slot has been scored.
+ *  Pruned papers are intentionally never scored, so they must not block the
+ *  slot's "scored" state. Derived from the papers (not stored) so it cannot
+ *  drift from the actual scores. */
+export function isSlotScored(slot: EvidenceSlot): boolean {
+  const active = slot.papers.filter((p) => p.status !== "pruned");
+  return active.length > 0 && active.every((p) => p.reliability !== null);
+}
 
 /** API request shape for evidence search */
 export type EvidenceSearchRequest = {
@@ -120,6 +153,9 @@ export type EvidenceSearchRequest = {
   elementId: string;
   elementContent: string;
   contextSummary?: string;
+  /** When present and non-empty, search these queries directly instead of
+   *  generating them via the LLM. Sanitized server-side. */
+  queries?: string[];
 };
 
 /** API response shape for evidence search */
@@ -146,6 +182,10 @@ export type PaperScore = {
 /** API response shape for evidence scoring */
 export type EvidenceScoreResponse = {
   scores: PaperScore[];
+  /** True when `scores` are neutral placeholders returned because no LLM
+   *  provider key is configured. Consumers must not treat these as a real
+   *  assessment. */
+  mock?: boolean;
 };
 
 // ---------------------------------------------------------------------------

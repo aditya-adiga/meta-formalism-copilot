@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useEvidenceStore } from "@/app/lib/stores/evidenceStore";
 import { fetchApi } from "@/app/lib/formalization/api";
 import {
+  isSlotScored,
   serializeTargetKey,
   type EvidenceArtifactType,
   type EvidenceScoreResponse,
@@ -26,26 +27,27 @@ export function useEvidenceScoring(
     useShallow((s) => ({
       slot: s.slots[key],
       isScoring: s.scoring[key] ?? false,
-      error: s.errors[key] ?? null,
+      error: s.scoringErrors[key] ?? null,
     })),
   );
 
   const score = useCallback(
     async (claimContent: string) => {
-      const { setScoring, applyScores, setError } = useEvidenceStore.getState();
+      const { setScoring, applyScores, setScoringError } = useEvidenceStore.getState();
       const currentSlot = useEvidenceStore.getState().slots[key];
-      if (!currentSlot || currentSlot.papers.length === 0) return;
+      const activePapers = currentSlot?.papers.filter((p) => p.status !== "pruned") ?? [];
+      if (activePapers.length === 0) return;
       // Guard against concurrent scoring calls (e.g. double-click)
       if (useEvidenceStore.getState().scoring[key]) return;
 
       setScoring(key, true);
-      setError(key, null);
+      setScoringError(key, null);
       try {
         const result = await fetchApi<EvidenceScoreResponse>(
           "/api/evidence-score",
           {
             claimContent,
-            papers: currentSlot.papers.map((p) => ({
+            papers: activePapers.map((p) => ({
               openAlexId: p.openAlexId,
               title: p.title,
               authors: p.authors,
@@ -55,11 +57,17 @@ export function useEvidenceScoring(
             })),
           },
         );
+        // Don't persist mock placeholders as real scores — surface the reason
+        // instead, leaving the papers unscored rather than silently passing.
+        if (result.mock) {
+          setScoringError(key, "Scoring unavailable — no LLM provider key configured.");
+          return;
+        }
         applyScores(key, result.scores);
       } catch (err) {
         console.error("[useEvidenceScoring]", err);
         const message = err instanceof Error ? err.message : "Scoring failed";
-        setError(key, message);
+        setScoringError(key, message);
       } finally {
         useEvidenceStore.getState().setScoring(key, false);
       }
@@ -67,7 +75,7 @@ export function useEvidenceScoring(
     [key],
   );
 
-  const hasScores = slot?.scored ?? false;
+  const hasScores = slot ? isSlotScored(slot) : false;
 
   return { slot, isScoring, error, score, hasScores };
 }

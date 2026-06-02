@@ -3,6 +3,7 @@ import { callLlm, OpenRouterError } from "@/app/lib/llm/callLlm";
 import { CLAUDE_SONNET } from "@/app/lib/llm/models";
 import { stripCodeFences } from "@/app/lib/utils/stripCodeFences";
 import { OPENALEX_API_URL, mapOpenAlexWork, deduplicatePapers, type OpenAlexWork } from "./openAlexUtils";
+import { sanitizeQueries } from "./querySanitize";
 import { EVIDENCE_ARTIFACT_TYPES, type EvidenceSearchRequest, type EvidenceSearchResponse } from "@/app/lib/types/evidence";
 const OPENALEX_TIMEOUT_MS = 10_000;
 function getOpenAlexMailto(): string {
@@ -155,8 +156,12 @@ export async function POST(request: NextRequest) {
     // Cap element content length to avoid runaway LLM token usage
     const elementContent = body.elementContent.slice(0, MAX_ELEMENT_CONTENT_LENGTH);
 
-    // Step 1: Generate search queries via LLM
-    const queries = await generateSearchQueries(elementContent, body.contextSummary);
+    // Step 1: Use the caller's edited queries when provided, else generate.
+    const override = sanitizeQueries(body.queries);
+    const queries =
+      override.length > 0
+        ? override
+        : await generateSearchQueries(elementContent, body.contextSummary);
 
     // Step 2: Search OpenAlex for all queries in parallel
     const queryResults = await Promise.allSettled(queries.map(searchOpenAlex));
@@ -170,7 +175,8 @@ export async function POST(request: NextRequest) {
     // Step 3: Filter by relevance score, map, deduplicate, cap results
     // OpenAlex returns relevance_score with title_and_abstract.search filter;
     // drop results with very low scores (< 40% of the top result's score)
-    // Safe to spread: max 15 items (PER_QUERY_RESULTS × 3 queries), well under stack limit
+    // Safe to spread: max PER_QUERY_RESULTS × MAX_OVERRIDE_QUERIES (5) results,
+    // well under the argument-count stack limit.
     const topScore = Math.max(...allWorks.map((w) => w.relevance_score ?? 0), 1);
     const relevanceThreshold = topScore * 0.4;
     const relevantWorks = allWorks.filter(

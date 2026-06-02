@@ -46,6 +46,40 @@ export type ResponseFormat = {
   };
 };
 
+/** JSON-Schema validation keywords stripped before sending a schema to
+ *  Anthropic's `output_config` path — its structured-output validator supports
+ *  only a subset of JSON Schema, while OpenRouter's response_format accepts the
+ *  full draft, so source schemas keep these and we strip them only here.
+ *
+ *  Observed-rejected: `minimum` and `maximum` — Anthropic returns an error of
+ *  the form "For 'number' type, properties maximum, minimum are not supported"
+ *  (paraphrased; the exact text comes from Anthropic's server). The remaining
+ *  numeric-range keywords are stripped pre-emptively as the same class, not
+ *  because each has been individually observed to be rejected. Extend this set
+ *  if other keywords surface. */
+const ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+]);
+
+/** Recursively strip keywords Anthropic's structured-output validator does not
+ *  support, returning a new schema (the input is not mutated). */
+export function adaptSchemaForAnthropic(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(adaptSchemaForAnthropic);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS.has(k)) continue;
+      out[k] = adaptSchemaForAnthropic(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 type CallLlmOptions = {
   endpoint: string;
   systemPrompt: string;
@@ -53,8 +87,9 @@ type CallLlmOptions = {
   maxTokens: number;
   anthropicModel?: string;
   openRouterModel?: string;
-  /** When provided, enforces structured JSON output via OpenRouter's response_format.
-   *  Only used with the OpenRouter provider (Anthropic direct API does not support this). */
+  /** When provided, enforces structured JSON output. Sent to OpenRouter as
+   *  `response_format`, and to Anthropic as `output_config.format` after
+   *  stripping keywords Anthropic doesn't support (see adaptSchemaForAnthropic). */
   responseFormat?: ResponseFormat;
 };
 
@@ -140,7 +175,12 @@ export async function callLlm({
         output_config: {
           format: {
             type: "json_schema" as const,
-            schema: responseFormat.json_schema.schema,
+            // Anthropic's structured-output validator supports only a subset of
+            // JSON Schema; strip unsupported keywords the OpenRouter-shaped
+            // schema may carry (e.g. minimum/maximum) before sending.
+            schema: adaptSchemaForAnthropic(
+              responseFormat.json_schema.schema,
+            ) as Record<string, unknown>,
           },
         },
       }),

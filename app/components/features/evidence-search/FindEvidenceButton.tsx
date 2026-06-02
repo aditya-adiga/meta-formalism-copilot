@@ -29,8 +29,8 @@ export default function FindEvidenceButton({
   artifactJson,
   onContentChange,
 }: FindEvidenceButtonProps) {
-  const { slot, isLoading, error, search } = useEvidenceSearch(artifactType, elementId);
-  const { isScoring, score } = useEvidenceScoring(artifactType, elementId);
+  const { slot, isLoading, error, search, prune, restore } = useEvidenceSearch(artifactType, elementId);
+  const { isScoring, score, error: scoringError } = useEvidenceScoring(artifactType, elementId);
   const { overlap, isAnalyzing, analyze, hasReviews } = useEvidenceOverlap(artifactType, elementId);
   const {
     proposals, isIntegrating, error: integrationError, integrate, setDecision,
@@ -68,12 +68,16 @@ export default function FindEvidenceButton({
       {slot && (
         <EvidenceResultsSection
           slot={slot}
+          onRerun={(queries) => search(elementContent, contextSummary, queries)}
+          onPrune={prune}
+          onRestore={restore}
           onScore={() => score(elementContent)}
           isScoring={isScoring}
           onAnalyzeOverlap={analyze}
           isAnalyzing={isAnalyzing}
           overlap={overlap}
           hasReviews={hasReviews}
+          isLoading={isLoading}
         />
       )}
 
@@ -103,6 +107,10 @@ export default function FindEvidenceButton({
           onSetDecision={setDecision}
           onApplyApproved={handleApplyApproved}
         />
+      )}
+
+      {scoringError && (
+        <p className="text-xs text-red-600 mt-1">{scoringError}</p>
       )}
     </div>
   );

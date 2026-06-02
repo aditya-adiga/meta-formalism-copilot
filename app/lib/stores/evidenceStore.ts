@@ -11,7 +11,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { EvidenceSlot, PaperScore, OverlapAnalysis, IntegrationProposal } from "@/app/lib/types/evidence";
+import type { EvidencePaper, EvidenceSlot, PaperScore, OverlapAnalysis, IntegrationProposal } from "@/app/lib/types/evidence";
 
 // ---------------------------------------------------------------------------
 // Debounced localStorage adapter (same pattern as workspaceStore)
@@ -66,8 +66,11 @@ interface EvidenceState {
   analyzing: Record<string, boolean>;
   /** Per-element integration loading state */
   integrating: Record<string, boolean>;
-  /** Per-element error messages */
+  /** Per-element search error messages */
   errors: Record<string, string>;
+  /** Per-element scoring error messages (separate channel from search so the
+   *  two operations don't clear or mask each other's errors) */
+  scoringErrors: Record<string, string>;
 }
 
 interface EvidenceActions {
@@ -77,6 +80,7 @@ interface EvidenceActions {
   setAnalyzing: (key: string, analyzing: boolean) => void;
   setIntegrating: (key: string, integrating: boolean) => void;
   setError: (key: string, error: string | null) => void;
+  setScoringError: (key: string, error: string | null) => void;
   /** Apply LLM scores to papers in a slot */
   applyScores: (key: string, scores: PaperScore[]) => void;
   /** Apply overlap analysis results */
@@ -87,6 +91,13 @@ interface EvidenceActions {
   setProposalDecision: (key: string, proposalId: string, decision: boolean) => void;
   /** Clear all proposals for a slot */
   clearProposals: (key: string) => void;
+  /** Merge freshly-searched papers into an existing slot (dedup by id,
+   *  existing papers win) and replace the slot's query list. */
+  mergeEvidence: (key: string, queries: string[], newPapers: EvidencePaper[]) => void;
+  /** Soft-prune a paper (status -> pruned). */
+  prunePaper: (key: string, openAlexId: string) => void;
+  /** Restore a pruned paper (status -> evaluated if scored, else retrieved). */
+  restorePaper: (key: string, openAlexId: string) => void;
   clearEvidence: (key: string) => void;
   clearAll: () => void;
 }
@@ -100,7 +111,32 @@ const DEFAULT_STATE: EvidenceState = {
   analyzing: {},
   integrating: {},
   errors: {},
+  scoringErrors: {},
 };
+
+/** Migrate persisted evidence state across store versions.
+ *  v0 -> v1: backfill `status` on papers (evaluated if already scored, else
+ *  retrieved). Exported for direct unit testing. */
+export function migrateEvidenceState(persistedState: unknown, version: number): unknown {
+  const state = persistedState as { slots?: Record<string, EvidenceSlot> } | null;
+  if (!state || typeof state !== "object" || !state.slots) return persistedState;
+  if (version >= 1) return persistedState;
+
+  const slots: Record<string, EvidenceSlot> = {};
+  for (const [key, slot] of Object.entries(state.slots)) {
+    slots[key] = {
+      ...slot,
+      papers: (Array.isArray(slot.papers) ? slot.papers : []).map((p) => {
+        const existing = (p as Partial<EvidencePaper>).status;
+        return {
+          ...p,
+          status: existing ?? (p.reliability ? "evaluated" : "retrieved"),
+        } as EvidencePaper;
+      }),
+    };
+  }
+  return { ...state, slots };
+}
 
 // ---------------------------------------------------------------------------
 // Store
@@ -146,6 +182,16 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           return { errors: { ...state.errors, [key]: error } };
         }),
 
+      setScoringError: (key: string, error: string | null) =>
+        set((state: EvidenceState) => {
+          if (error === null) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { [key]: _removed, ...rest } = state.scoringErrors;
+            return { scoringErrors: rest };
+          }
+          return { scoringErrors: { ...state.scoringErrors, [key]: error } };
+        }),
+
       applyScores: (key: string, scores: PaperScore[]) =>
         set((state: EvidenceState) => {
           const slot = state.slots[key];
@@ -158,17 +204,20 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
               ...paper,
               reliability: score.reliability,
               relatedness: score.relatedness,
+              // Status reflects the scoring step having completed. Only an
+              // active 'retrieved' paper advances; pruned/integrated are left
+              // as-is even if a stray score arrives.
+              status: paper.status === "retrieved" ? ("evaluated" as const) : paper.status,
             };
           });
-          // Only mark as fully scored if every paper received a score
-          const allScored = updatedPapers.every((p) => p.reliability !== null);
+          // "Scored" is derived from the papers (see isSlotScored), so there is
+          // no separate flag to keep in sync here — just record when scoring ran.
           return {
             slots: {
               ...state.slots,
               [key]: {
                 ...slot,
                 papers: updatedPapers,
-                scored: allScored,
                 scoredAt: new Date().toISOString(),
               },
             },
@@ -206,6 +255,61 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           return { proposals: rest };
         }),
 
+      mergeEvidence: (key: string, queries: string[], newPapers: EvidencePaper[]) =>
+        set((state: EvidenceState) => {
+          const slot = state.slots[key];
+          if (!slot) return {};
+          const existingIds = new Set(slot.papers.map((p) => p.openAlexId));
+          const additions = newPapers.filter((p) => !existingIds.has(p.openAlexId));
+          return {
+            slots: {
+              ...state.slots,
+              [key]: {
+                ...slot,
+                papers: [...slot.papers, ...additions],
+                searchQueries: queries,
+                searchedAt: new Date().toISOString(),
+              },
+            },
+          };
+        }),
+
+      prunePaper: (key: string, openAlexId: string) =>
+        set((state: EvidenceState) => {
+          const slot = state.slots[key];
+          if (!slot) return {};
+          return {
+            slots: {
+              ...state.slots,
+              [key]: {
+                ...slot,
+                papers: slot.papers.map((p) =>
+                  p.openAlexId === openAlexId ? { ...p, status: "pruned" as const } : p,
+                ),
+              },
+            },
+          };
+        }),
+
+      restorePaper: (key: string, openAlexId: string) =>
+        set((state: EvidenceState) => {
+          const slot = state.slots[key];
+          if (!slot) return {};
+          return {
+            slots: {
+              ...state.slots,
+              [key]: {
+                ...slot,
+                papers: slot.papers.map((p) =>
+                  p.openAlexId === openAlexId
+                    ? { ...p, status: p.reliability ? ("evaluated" as const) : ("retrieved" as const) }
+                    : p,
+                ),
+              },
+            },
+          };
+        }),
+
       clearEvidence: (key: string) =>
         set((state: EvidenceState) => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -224,6 +328,8 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
           const { [key]: _i, ...restIntegrating } = state.integrating;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [key]: _e, ...restErrors } = state.errors;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [key]: _se, ...restScoringErrors } = state.scoringErrors;
           return {
             slots: restSlots,
             overlap: restOverlap,
@@ -233,16 +339,19 @@ export const useEvidenceStore = create<EvidenceState & EvidenceActions>()(
             analyzing: restAnalyzing,
             integrating: restIntegrating,
             errors: restErrors,
+            scoringErrors: restScoringErrors,
           };
         }),
 
       clearAll: () => set({
         slots: {}, overlap: {}, proposals: {},
-        loading: {}, scoring: {}, analyzing: {}, integrating: {}, errors: {},
+        loading: {}, scoring: {}, analyzing: {}, integrating: {}, errors: {}, scoringErrors: {},
       }),
     }),
     {
       name: "evidence-store-v1",
+      version: 1,
+      migrate: migrateEvidenceState,
       storage: typeof window !== "undefined"
         ? createJSONStorage(() => debouncedStorage)
         : undefined,
