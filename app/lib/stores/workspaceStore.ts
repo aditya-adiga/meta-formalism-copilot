@@ -22,38 +22,7 @@ import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/l
 import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition } from "@/app/lib/utils/workspacePersistence";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
-
-// ---------------------------------------------------------------------------
-// Debounced localStorage adapter — avoids JSON.stringify on every keystroke.
-// Reads are synchronous (instant); writes are debounced by 300ms.
-// ---------------------------------------------------------------------------
-
-function createDebouncedStorage(): {
-  getItem: (name: string) => string | null;
-  setItem: (name: string, value: string) => void;
-  removeItem: (name: string) => void;
-} {
-  let pending: ReturnType<typeof setTimeout> | null = null;
-  return {
-    getItem: (name) => localStorage.getItem(name),
-    setItem: (name, value) => {
-      if (pending) clearTimeout(pending);
-      pending = setTimeout(() => {
-        try {
-          localStorage.setItem(name, value);
-        } catch (e) {
-          console.warn("Failed to persist workspace (localStorage quota exceeded):", e);
-        }
-        pending = null;
-      }, 300);
-    },
-    removeItem: (name) => {
-      if (pending) clearTimeout(pending);
-      pending = null;
-      localStorage.removeItem(name);
-    },
-  };
-}
+import { resolveWorkspaceStorage } from "@/app/lib/corpus/storeAdapter";
 
 // ---------------------------------------------------------------------------
 // Rehydration validation — coerce deserialized localStorage data to safe types.
@@ -524,7 +493,10 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
     }),
     {
       name: "workspace-zustand-v1",
-      storage: createJSONStorage(createDebouncedStorage),
+      // Storage seam is selected here (DD-009 S1): debounced localStorage by
+      // default, or a CorpusFS-backed adapter when the dev flag is on. The seam
+      // is typed as CorpusFS so the S3 worker-proxy is a drop-in.
+      storage: createJSONStorage(resolveWorkspaceStorage),
       // SSR safe: render defaults first, hydrate in useEffect via rehydrate()
       skipHydration: true,
       // Validate deserialized localStorage data before merging into the store.
