@@ -2,7 +2,7 @@
 
 - **Goal**: Implement DD-009's opt-in, user-visible FSA folder as the source-of-truth mirror — an FSA-backed `CorpusFS`, an async OPFS→FSA mirror-on-write with retry + a truthful sync-ack, read-path fallthrough (OPFS empty → read FSA), and a folder-pick + permission flow — all behind the existing default-off corpus flag, without disturbing the localStorage default or S1's committed behavior.
 - **Project state**: branch `feat/corpus-fsa-mirror` off `feat/corpus-architecture` (S1, not yet merged to main); second of the S0–S5 sub-tasks; depends on S1, parallel-independent of S3 · not blocked (S1 contracts settled + committed).
-- **Task status**: in-progress (research + test-strategy + arch-review gates complete; implementing test-first behind the flag).
+- **Task status**: complete (S2 implemented 2026-06-01 on `feat/corpus-fsa-mirror`; lint clean, build passes, 367 tests green incl. 43 new S2 corpus tests; real-browser FSA flow documented in `docs/spikes/corpus-fsa-smoke.md` but not yet run).
 
 Research: docs/working/research-corpus-s2.md
 Decomposition: docs/working/decomposition-corpus-architecture.md
