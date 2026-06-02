@@ -46,9 +46,13 @@ export function useEvidenceIntegration(
       setIntegrating(key, true);
       setError(key, null);
       try {
-        // Send top papers by combined score, excluding subsumed papers
+        // Send top papers by combined score, excluding pruned and subsumed papers.
+        // Pruned papers are kept for overlap analysis (they still inform what the
+        // literature covers) but excluded from integration — the user has signaled
+        // they should not shape the artifact.
         const overlap = useEvidenceStore.getState().overlap[key];
         const eligiblePapers = currentSlot.papers.filter((p) => {
+          if (p.status === "pruned") return false;
           if (!p.reliability || !p.relatedness) return false;
           if (overlap?.paperStatus[p.openAlexId] === "subsumed") return false;
           return true;
