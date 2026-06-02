@@ -80,7 +80,7 @@ export default function ContextInput({ value, onChange, onFormalise, loading, wa
         />
         {value && !refining && <RefinementButtons onRefine={handleRefinement} />}
         {refining && (
-          <p className="text-xs text-[#6B6560]">
+          <p className="text-xs text-[#4A4540]">
             Refining...{refineWaitEstimate ? ` ${refineWaitEstimate.remainingLabel}` : ""}
           </p>
         )}

@@ -12,7 +12,7 @@ const REFINEMENT_ACTIONS = [
 export default function RefinementButtons({ onRefine }: RefinementButtonsProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-[#6B6560]">Refine:</span>
+      <span className="text-xs text-[#4A4540]">Refine:</span>
       {REFINEMENT_ACTIONS.map((action) => (
         <button
           key={action.id}

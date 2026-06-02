@@ -54,12 +54,12 @@ export default function InputPanel({
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--ivory-cream)]">
       {/* Top Section: Source Inputs */}
       <div className="flex max-h-[50%] min-h-0 flex-col overflow-hidden border-b border-[#DDD9D5]">
-        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
+        <div className="shrink-0 border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Source Inputs
           </h2>
         </div>
-        <div className="flex min-h-0 flex-col gap-3 overflow-auto p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
           <TextInput value={sourceText} onChange={onSourceTextChange} />
           <FileUpload onFilesChanged={onFilesChanged} existingFiles={existingFiles} />
 
@@ -81,7 +81,7 @@ export default function InputPanel({
 
       {/* Bottom Section: Context + Artifact Selection + Formalise */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
+        <div className="shrink-0 border-b border-[#DDD9D5] bg-[#F5F1ED] px-4 py-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
             Generate Analysis
           </h2>
