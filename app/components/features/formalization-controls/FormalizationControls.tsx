@@ -1,7 +1,7 @@
 import type { ArtifactType } from "@/app/lib/types/session";
 import type { ArtifactLoadingState } from "@/app/hooks/useArtifactGeneration";
 import type { CustomArtifactTypeDefinition } from "@/app/lib/types/customArtifact";
-import ArtifactChipSelector from "@/app/components/features/artifact-selector/ArtifactChipSelector";
+import OutputTypesSection from "@/app/components/features/artifact-selector/OutputTypesSection";
 import CostTooltip from "@/app/components/ui/CostTooltip";
 
 type FormalizationControlsProps = {
@@ -23,6 +23,13 @@ type FormalizationControlsProps = {
   sourceText?: string;
   /** Source text character count, used for cost estimation tooltip. */
   sourceCharLength?: number;
+  /**
+   * When true, the component fills its parent's height and scrolls the
+   * context+chips area, keeping the Generate button docked at the bottom.
+   * When false (default), the component sizes to its content — appropriate
+   * for use as a docked bottom block (see NodeDetailPanel).
+   */
+  fillHeight?: boolean;
 };
 
 export default function FormalizationControls({
@@ -40,6 +47,7 @@ export default function FormalizationControls({
   onDeleteCustomType,
   sourceText,
   sourceCharLength,
+  fillHeight = false,
 }: FormalizationControlsProps) {
   // Derive per-chip loading booleans from loadingState
   const chipLoading: Partial<Record<ArtifactType, boolean>> = {};
@@ -48,41 +56,45 @@ export default function FormalizationControls({
   }
 
   const buttonLabel = loading
-    ? "Formalising..."
+    ? "Generating..."
     : selectedArtifactTypes.length > 1
-      ? `Formalise \u2192 ${selectedArtifactTypes.length} artifacts`
-      : "Formalise";
+      ? `Generate \u2192 ${selectedArtifactTypes.length} outputs`
+      : "Generate";
+
+  // In fillHeight mode the wrapper claims remaining space and the inner
+  // section scrolls so the Generate button stays visible at the bottom.
+  // Default mode keeps the original docked behavior used by NodeDetailPanel.
+  const wrapperClass = fillHeight
+    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+    : "flex shrink-0 flex-col";
+  const scrollClass = fillHeight
+    ? "flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4"
+    : "flex flex-col gap-3 p-4";
 
   return (
-    <div className="flex shrink-0 flex-col">
-      <div className="flex flex-col gap-3 p-4">
+    <div className={wrapperClass}>
+      <div className={scrollClass}>
         <textarea
           value={contextText}
           onChange={(e) => onContextChange(e.target.value)}
-          placeholder={contextPlaceholder ?? "e.g., Explore this in the context of decision theory within game-theoretic settings..."}
+          placeholder={contextPlaceholder ?? "What is the context in which you are analyzing this text? What's your relationship to it? e.g., 'I'm evaluating this policy proposal as a city planner'"}
           rows={6}
           className="resize-none rounded-md border border-[#DDD9D5] bg-white px-4 py-3 text-[var(--ink-black)] placeholder-[#9A9590] shadow-sm transition-shadow duration-200 focus:border-[var(--ink-black)] focus:outline-none focus:ring-1 focus:ring-[var(--ink-black)] focus:shadow-md"
           style={{ lineHeight: 1.7, caretColor: "#000000" }}
         />
 
-        {/* Artifact type chips */}
-        <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4A4540]">
-            Artifact Types
-          </h3>
-          <ArtifactChipSelector
-            selected={selectedArtifactTypes}
-            onChange={onArtifactTypesChange}
-            loading={chipLoading}
-            disabled={loading}
-            customTypes={customArtifactTypes}
-            onCreateCustomType={onCreateCustomType}
-            onEditCustomType={onEditCustomType}
-            onDeleteCustomType={onDeleteCustomType}
-            sourceText={sourceText}
-            contextText={contextText}
-          />
-        </div>
+        <OutputTypesSection
+          selected={selectedArtifactTypes}
+          onChange={onArtifactTypesChange}
+          loading={chipLoading}
+          disabled={loading}
+          customArtifactTypes={customArtifactTypes}
+          onCreateCustomType={onCreateCustomType}
+          onEditCustomType={onEditCustomType}
+          onDeleteCustomType={onDeleteCustomType}
+          sourceText={sourceText}
+          contextText={contextText}
+        />
       </div>
 
       {/* Docked Formalise button */}

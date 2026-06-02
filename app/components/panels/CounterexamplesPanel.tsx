@@ -2,12 +2,14 @@
 
 import { useMemo } from "react";
 import type { CounterexamplesResponse } from "@/app/lib/types/artifacts";
-import ArtifactPanelShell, { type ArtifactEditingProps } from "./ArtifactPanelShell";
+import ArtifactPanelShell, { type ArtifactEditingProps, type StalenessProps } from "./ArtifactPanelShell";
 import EditableSection from "@/app/components/features/output-editing/EditableSection";
 import CollapsibleSection from "@/app/components/ui/CollapsibleSection";
 import { useFieldUpdaters } from "@/app/hooks/useFieldUpdaters";
 import FindEvidenceButton from "@/app/components/features/evidence-search/FindEvidenceButton";
 import { WHOLE_ARTIFACT_ELEMENT_ID } from "@/app/lib/types/evidence";
+
+const BADGE_BASE = "rounded-full px-2 py-0.5 text-xs font-medium";
 
 const PLAUSIBILITY_STYLES: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -15,11 +17,20 @@ const PLAUSIBILITY_STYLES: Record<string, string> = {
   low: "bg-green-100 text-green-700",
 };
 
+// isEmpirical === true → "Hypothetical": empirical counterexamples use hypothetical
+// framing ("if evidence showed X...") to avoid fabricating citations. The label tells
+// the user to verify via Find Evidence rather than trusting the LLM's claim.
+// isEmpirical === undefined (old artifacts) → no badge shown.
+const EMPIRICAL_STYLES: Record<string, { label: string; classes: string }> = {
+  true: { label: "Hypothetical", classes: "bg-blue-100 text-blue-700" },
+  false: { label: "Logical", classes: "bg-gray-100 text-gray-600" },
+};
+
 type CounterexamplesPanelProps = {
   counterexamples: CounterexamplesResponse["counterexamples"] | null;
   loading?: boolean;
   onContentChange?: (json: string) => void;
-} & ArtifactEditingProps;
+} & ArtifactEditingProps & StalenessProps;
 
 // Support legacy persisted data that used "counterexamples" as the array field name
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,9 +41,15 @@ function getScenarios(data: any): CounterexamplesResponse["counterexamples"]["sc
 export default function CounterexamplesPanel({
   counterexamples, loading,
   onContentChange, onAiEdit, editing, editWaitEstimate,
+  isStale, onRegenerate,
 }: CounterexamplesPanelProps) {
   const scenarios = getScenarios(counterexamples);
   const { updateField, updateArrayItem } = useFieldUpdaters(counterexamples, onContentChange);
+
+  const artifactJson = useMemo(
+    () => counterexamples ? JSON.stringify(counterexamples) : undefined,
+    [counterexamples],
+  );
 
   // Build search description from claim + top counterexample scenarios
   const evidenceSearchContent = useMemo(() => {
@@ -49,11 +66,13 @@ export default function CounterexamplesPanel({
       title="Counterexamples"
       loading={loading}
       hasData={counterexamples !== null}
-      emptyMessage="No counterexamples yet. Generate them from the source panel or node detail."
+      emptyMessage="No counterexamples yet. Generate them from the Source panel or component detail."
       loadingMessage="Generating counterexamples..."
       onAiEdit={onAiEdit}
       editing={editing}
       editWaitEstimate={editWaitEstimate}
+      isStale={isStale}
+      onRegenerate={onRegenerate}
     >
       {counterexamples && (
         <>
@@ -67,7 +86,7 @@ export default function CounterexamplesPanel({
 
           {/* Claim under test */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Under Test</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Claim Being Challenged</h3>
             <EditableSection value={counterexamples.claim} onChange={(v) => updateField("claim", v)}>
               <p className="text-sm text-[var(--ink-black)] leading-relaxed italic">{counterexamples.claim}</p>
             </EditableSection>
@@ -81,17 +100,27 @@ export default function CounterexamplesPanel({
                   <div className="rounded border border-[#DDD9D5] bg-white px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs text-[#9A9590]">{cx.id}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
+                      <span className={`${BADGE_BASE} ${PLAUSIBILITY_STYLES[cx.plausibility] ?? ""}`}>
                         {cx.plausibility}
                       </span>
+                      {cx.isEmpirical != null && (
+                        <span className={`${BADGE_BASE} ${EMPIRICAL_STYLES[String(cx.isEmpirical)].classes}`}>
+                          {EMPIRICAL_STYLES[String(cx.isEmpirical)].label}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-[var(--ink-black)]">{cx.scenario}</p>
                     <div className="text-xs text-[#6B6560]">
-                      <span className="font-semibold">Targets:</span> {cx.targetAssumption}
+                      <span className="font-semibold">Challenges:</span> {cx.targetAssumption}
                     </div>
                     <div className="text-xs text-[#6B6560]">
                       <span className="font-semibold">Why it works:</span> {cx.explanation}
                     </div>
+                    {cx.isEmpirical === true && (
+                      <p className="text-xs text-blue-600 italic">
+                        This counterexample describes evidence that would challenge the claim. Use Find Evidence to search for real papers.
+                      </p>
+                    )}
                   </div>
                 </EditableSection>
               ))}
@@ -100,7 +129,7 @@ export default function CounterexamplesPanel({
 
           {/* Robustness Assessment */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Robustness Assessment</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6B6560] mb-2">Overall Strength</h3>
             <EditableSection value={counterexamples.robustnessAssessment} onChange={(v) => updateField("robustnessAssessment", v)}>
               <p className="text-sm text-[var(--ink-black)] leading-relaxed">{counterexamples.robustnessAssessment}</p>
             </EditableSection>
@@ -116,6 +145,8 @@ export default function CounterexamplesPanel({
                 artifactType="counterexamples"
                 elementId={WHOLE_ARTIFACT_ELEMENT_ID}
                 elementContent={evidenceSearchContent}
+                artifactJson={artifactJson}
+                onContentChange={onContentChange}
               />
             </section>
           )}

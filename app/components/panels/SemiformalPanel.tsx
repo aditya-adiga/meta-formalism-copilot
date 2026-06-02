@@ -18,9 +18,11 @@ type SemiformalPanelProps = {
   showGenerateLean?: boolean;
   leanLoading?: boolean;
   waitEstimate?: WaitTimeEstimate | null;
+  isStale?: boolean;
+  onRegenerate?: () => void;
 };
 
-export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading, waitEstimate }: SemiformalPanelProps) {
+export default function SemiformalPanel({ semiformalText, onSemiformalTextChange, sessionBanner, onGenerateLean, showGenerateLean, leanLoading, waitEstimate, isStale, onRegenerate }: SemiformalPanelProps) {
   const [editing, setEditing] = useState(false);
   const [editEndpoint, setEditEndpoint] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<"rendered" | "raw">("rendered");
@@ -86,7 +88,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       <div className="flex items-center justify-between border-b border-[#DDD9D5] bg-[#F5F1ED] px-6 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ink-black)]">
-            Semiformal Proof
+            Step-by-Step Proof
           </h2>
           {!semiformalText && waitEstimate && (
             <span className="text-xs text-[#6B6560]">
@@ -105,6 +107,21 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
         </div>
       </div>
 
+      {isStale && (
+        <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-800">
+          <span>Generated from different inputs.</span>
+          {onRegenerate && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="font-medium underline hover:text-amber-900"
+            >
+              Regenerate
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <EditableOutput
           value={semiformalText}
@@ -119,7 +136,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
       {showGenerateLean && (
         <div className="shrink-0 border-t border-[#DDD9D5] px-4 py-3">
           <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800">
-            Review and edit the semiformal proof above, then generate Lean4 code when ready.
+            Review and edit the proof above, then generate computer-checkable code when ready.
           </div>
           <CostTooltip
             inputCharLength={semiformalText.length}
@@ -131,7 +148,7 @@ export default function SemiformalPanel({ semiformalText, onSemiformalTextChange
               disabled={leanLoading}
               className="w-full rounded-full bg-[var(--ink-black)] px-6 py-2.5 text-sm font-medium text-white shadow-md transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ink-black)] focus:ring-offset-2 focus:ring-offset-[var(--ivory-cream)] disabled:opacity-50"
             >
-              {leanLoading ? "Generating..." : "Generate Lean4 Code"}
+              {leanLoading ? "Generating..." : "Generate Proof Code"}
             </button>
           </CostTooltip>
         </div>

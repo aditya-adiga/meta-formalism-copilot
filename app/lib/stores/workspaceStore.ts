@@ -9,7 +9,7 @@
  * - Semiformal/lean kept as flat strings for pipeline compatibility
  * - Streaming preview state stays outside this store (keep transient state local)
  *
- * See docs/decisions/005-zustand-state-management.md for rationale.
+ * See docs/decisions/006-zustand-state-management.md for rationale.
  */
 
 import { create } from "zustand";
@@ -19,7 +19,8 @@ import type { PersistedDecomposition, PersistedWorkspace } from "@/app/lib/types
 import type { ArtifactKey, ArtifactVersion, ArtifactRecord } from "@/app/lib/types/artifactStore";
 import { MAX_VERSIONS } from "@/app/lib/types/artifactStore";
 import type { CustomArtifactTypeDefinition, CustomArtifactTypeId } from "@/app/lib/types/customArtifact";
-import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition } from "@/app/lib/utils/workspacePersistence";
+import type { GenerationProvenance } from "@/app/lib/utils/provenance";
+import { loadWorkspace, sanitizeVerificationStatus, sanitizeNodeStatus, coerceDecomposition, isObject } from "@/app/lib/utils/workspacePersistence";
 import { WORKSPACE_KEY } from "@/app/lib/types/persistence";
 import type { PropositionNode } from "@/app/lib/types/decomposition";
 import { resolveWorkspaceStorage } from "@/app/lib/corpus/storeAdapter";
@@ -29,10 +30,6 @@ import { resolveWorkspaceStorage } from "@/app/lib/corpus/storeAdapter";
 // Reuses coerceDecomposition from workspacePersistence for thorough node validation.
 // ---------------------------------------------------------------------------
 
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
 const VALID_ARTIFACT_SOURCES = new Set(["generated", "ai-edit", "manual-edit"]);
 
 /** Validate an individual ArtifactVersion from deserialized JSON. */
@@ -40,12 +37,23 @@ function coerceArtifactVersion(raw: unknown): ArtifactVersion | null {
   if (!isObject(raw)) return null;
   if (typeof raw.content !== "string") return null;
   if (typeof raw.id !== "string") return null;
+  // Preserve provenance if present and well-formed
+  let provenance: GenerationProvenance | undefined;
+  if (isObject(raw.provenance) && typeof (raw.provenance as Record<string, unknown>).inputHash === "string") {
+    const p = raw.provenance as Record<string, unknown>;
+    provenance = {
+      inputHash: p.inputHash as string,
+      generatedAt: typeof p.generatedAt === "string" ? p.generatedAt : "",
+    };
+  }
+
   return {
     id: raw.id,
     content: raw.content,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
     source: VALID_ARTIFACT_SOURCES.has(raw.source as string) ? raw.source as ArtifactVersion["source"] : "generated",
     editInstruction: typeof raw.editInstruction === "string" ? raw.editInstruction : undefined,
+    provenance,
   };
 }
 
@@ -79,6 +87,13 @@ function coercePersistedState(persisted: Record<string, unknown>): Partial<Works
   if (typeof persisted.semiformalText === "string") result.semiformalText = persisted.semiformalText;
   if (typeof persisted.leanCode === "string") result.leanCode = persisted.leanCode;
   if (typeof persisted.semiformalDirty === "boolean") result.semiformalDirty = persisted.semiformalDirty;
+  if (isObject(persisted.semiformalProvenance) && typeof (persisted.semiformalProvenance as Record<string, unknown>).inputHash === "string") {
+    const p = persisted.semiformalProvenance as Record<string, unknown>;
+    result.semiformalProvenance = {
+      inputHash: p.inputHash as string,
+      generatedAt: typeof p.generatedAt === "string" ? p.generatedAt : "",
+    };
+  }
   if (typeof persisted.verificationStatus === "string") {
     result.verificationStatus = sanitizeVerificationStatus(persisted.verificationStatus);
   }
@@ -87,7 +102,7 @@ function coercePersistedState(persisted: Record<string, unknown>): Partial<Works
   // Validate artifact records
   if (isObject(persisted.artifacts)) {
     const artifacts: Partial<Record<ArtifactKey, ArtifactRecord>> = {};
-    const validKeys: ArtifactKey[] = ["causal-graph", "statistical-model", "property-tests", "dialectical-map", "counterexamples"];
+    const validKeys: ArtifactKey[] = ["causal-graph", "statistical-model", "property-tests", "balanced-perspectives", "counterexamples"];
     for (const key of validKeys) {
       const rec = coerceArtifactRecord((persisted.artifacts as Record<string, unknown>)[key], key);
       if (rec) artifacts[key] = rec;
@@ -128,10 +143,17 @@ export function resolveArtifactContent(rec: ArtifactRecord | undefined): string 
   return rec.versions[rec.currentVersionIndex]?.content ?? null;
 }
 
+/** Resolve the current version's provenance from an ArtifactRecord. */
+export function resolveArtifactProvenance(rec: ArtifactRecord | undefined): GenerationProvenance | undefined {
+  if (!rec) return undefined;
+  return rec.versions[rec.currentVersionIndex]?.provenance;
+}
+
 export function makeVersion(
   content: string,
   source: ArtifactVersion["source"],
   instruction?: string,
+  provenance?: GenerationProvenance,
 ): ArtifactVersion {
   return {
     id: crypto.randomUUID(),
@@ -139,6 +161,7 @@ export function makeVersion(
     createdAt: new Date().toISOString(),
     source,
     editInstruction: instruction,
+    provenance,
   };
 }
 
@@ -158,6 +181,9 @@ export interface WorkspaceState {
   semiformalDirty: boolean;
   verificationStatus: VerificationStatus;
   verificationErrors: string;
+
+  // --- Provenance ---
+  semiformalProvenance: GenerationProvenance | null;
 
   // --- Structured artifacts (with versioning) ---
   artifacts: Partial<Record<ArtifactKey, ArtifactRecord>>;
@@ -181,9 +207,12 @@ export interface WorkspaceActions {
   setVerificationStatus: (v: VerificationStatus) => void;
   setVerificationErrors: (v: string) => void;
 
+  // Provenance
+  setSemiformalProvenance: (v: GenerationProvenance | null) => void;
+
   // Artifact versioning
-  setArtifactGenerated: (key: ArtifactKey, content: string) => void;
-  setArtifactsBatchGenerated: (entries: Array<{ key: ArtifactKey; content: string }>) => void;
+  setArtifactGenerated: (key: ArtifactKey, content: string, provenance?: GenerationProvenance) => void;
+  setArtifactsBatchGenerated: (entries: Array<{ key: ArtifactKey; content: string }>, provenance?: GenerationProvenance) => void;
   setArtifactEdited: (key: ArtifactKey, content: string, source: "ai-edit" | "manual-edit", instruction?: string) => void;
   undoArtifact: (key: ArtifactKey) => void;
   redoArtifact: (key: ArtifactKey) => void;
@@ -218,6 +247,7 @@ const DEFAULT_STATE: WorkspaceState = {
   semiformalText: "",
   leanCode: "",
   semiformalDirty: false,
+  semiformalProvenance: null,
   verificationStatus: "none",
   verificationErrors: "",
   artifacts: {},
@@ -240,7 +270,7 @@ export const PERSISTED_ARTIFACT_FIELDS: Record<string, ArtifactKey> = {
   causalGraph: "causal-graph",
   statisticalModel: "statistical-model",
   propertyTests: "property-tests",
-  dialecticalMap: "dialectical-map",
+  balancedPerspectives: "balanced-perspectives",
   counterexamples: "counterexamples",
 };
 
@@ -336,11 +366,14 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
       setVerificationStatus: (v) => set({ verificationStatus: v }),
       setVerificationErrors: (v) => set({ verificationErrors: v }),
 
+      // --- Provenance ---
+      setSemiformalProvenance: (v) => set({ semiformalProvenance: v }),
+
       // --- Artifact versioning ---
-      setArtifactGenerated: (key, content) =>
+      setArtifactGenerated: (key, content, provenance?) =>
         set((s) => {
           const existing = s.artifacts[key];
-          const version = makeVersion(content, "generated");
+          const version = makeVersion(content, "generated", undefined, provenance);
           const versions = existing
             ? [...existing.versions.slice(-MAX_VERSIONS + 1), version]
             : [version];
@@ -356,12 +389,12 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
           };
         }),
 
-      setArtifactsBatchGenerated: (entries) =>
+      setArtifactsBatchGenerated: (entries, provenance?) =>
         set((s) => {
           const updated = { ...s.artifacts };
           for (const { key, content } of entries) {
             const existing = updated[key];
-            const version = makeVersion(content, "generated");
+            const version = makeVersion(content, "generated", undefined, provenance);
             const versions = existing
               ? [...existing.versions.slice(-MAX_VERSIONS + 1), version]
               : [version];
@@ -478,6 +511,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
           semiformalText: s.semiformalText,
           leanCode: s.leanCode,
           semiformalDirty: s.semiformalDirty,
+          semiformalProvenance: s.semiformalProvenance,
           verificationStatus: sanitizeVerificationStatus(s.verificationStatus),
           verificationErrors: s.verificationErrors,
           artifacts: structuredClone(s.artifacts),
@@ -515,6 +549,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
         semiformalText: state.semiformalText,
         leanCode: state.leanCode,
         semiformalDirty: state.semiformalDirty,
+        semiformalProvenance: state.semiformalProvenance,
         // Strip transient "verifying" back to "none" so a browser close during
         // verification doesn't leave the app stuck in a loading state on reload.
         verificationStatus: sanitizeVerificationStatus(state.verificationStatus),

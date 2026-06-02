@@ -27,20 +27,20 @@ describe('ContextInput', () => {
     expect(onChange).toHaveBeenCalledWith('x')
   })
 
-  it('shows the Formalise button', () => {
+  it('shows the Generate button', () => {
     render(<ContextInput {...defaultProps} />)
-    expect(screen.getByText('Formalise')).toBeInTheDocument()
+    expect(screen.getByText('Generate')).toBeInTheDocument()
   })
 
-  it('disables the Formalise button when loading', () => {
+  it('disables the Generate button when loading', () => {
     render(<ContextInput {...defaultProps} loading={true} />)
-    expect(screen.getByRole('button', { name: /formalising/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /generating/i })).toBeDisabled()
   })
 
   it('calls onFormalise when the button is clicked', async () => {
     const onFormalise = vi.fn()
     render(<ContextInput {...defaultProps} onFormalise={onFormalise} />)
-    await userEvent.click(screen.getByText('Formalise'))
+    await userEvent.click(screen.getByText('Generate'))
     expect(onFormalise).toHaveBeenCalledOnce()
   })
 
