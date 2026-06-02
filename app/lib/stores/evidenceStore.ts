@@ -5,8 +5,8 @@
  * artifacts, not an artifact itself — it doesn't participate in artifact
  * versioning, undo/redo, or generation provenance.
  *
- * Persists to localStorage with the same debounced write pattern as
- * workspaceStore to avoid excessive serialization.
+ * Persists to localStorage with debounced writes (see the debounced storage
+ * adapter below) to avoid excessive serialization on rapid updates.
  */
 
 import { create } from "zustand";

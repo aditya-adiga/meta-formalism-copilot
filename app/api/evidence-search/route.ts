@@ -175,8 +175,9 @@ export async function POST(request: NextRequest) {
     // Step 3: Filter by relevance score, map, deduplicate, cap results
     // OpenAlex returns relevance_score with title_and_abstract.search filter;
     // drop results with very low scores (< 40% of the top result's score)
-    // Safe to spread: max PER_QUERY_RESULTS × MAX_OVERRIDE_QUERIES (5) results,
-    // well under the argument-count stack limit.
+    // Safe to spread: allWorks holds at most PER_QUERY_RESULTS per query —
+    // worst case MAX_OVERRIDE_QUERIES (5) queries on the override path (25),
+    // fewer on the LLM path (≤3 queries → 15). Well under the arg-count limit.
     const topScore = Math.max(...allWorks.map((w) => w.relevance_score ?? 0), 1);
     const relevanceThreshold = topScore * 0.4;
     const relevantWorks = allWorks.filter(
